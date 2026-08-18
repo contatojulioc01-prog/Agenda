@@ -39,14 +39,14 @@ export class CalendarManagerComponent implements OnInit {
   readonly currentUser = this.authService.currentUser;
 
   // Form state
-  name = '';
+  name = signal('');
   selectedColor = '#4f46e5';
   isPrivate = false;
 
   // Dropdowns
   showNameDropdown = false;
   showMemberDropdown = false;
-  userSearch = '';
+  userSearch = signal('');
   isSaving = false;
 
   // Membros adicionados
@@ -63,9 +63,9 @@ export class CalendarManagerComponent implements OnInit {
     return users.filter(u => u.id !== currentId && !addedIds.has(u.id));
   });
 
-  /** Usuários filtrados para o campo de busca de membros */
+  /** Usuários filtrados para o campo de busca de membros (atualiza em tempo real) */
   readonly filteredUsers = computed<UserResponse[]>(() => {
-    const q = this.userSearch.toLowerCase().trim();
+    const q = this.userSearch().toLowerCase().trim();
     const available = this.availableUsers();
 
     if (!q) return available.slice(0, 15);
@@ -76,9 +76,9 @@ export class CalendarManagerComponent implements OnInit {
     ).slice(0, 15);
   });
 
-  /** Sugestões automáticas no campo "Nome da Agenda" */
+  /** Sugestões automáticas no campo "Nome da Agenda" (atualiza em tempo real) */
   readonly nameSuggestions = computed<NameSuggestion[]>(() => {
-    const q = this.name.toLowerCase().trim();
+    const q = this.name().toLowerCase().trim();
     const users = this.allUsers();
     const suggestions: NameSuggestion[] = [];
 
@@ -111,7 +111,7 @@ export class CalendarManagerComponent implements OnInit {
 
   ngOnInit(): void {
     if (this.calendar) {
-      this.name = this.calendar.name;
+      this.name.set(this.calendar.name);
       this.selectedColor = this.calendar.color;
       this.isPrivate = this.calendar.isPrivate;
 
@@ -143,7 +143,7 @@ export class CalendarManagerComponent implements OnInit {
   }
 
   selectNameSuggestion(sug: NameSuggestion): void {
-    this.name = sug.title;
+    this.name.set(sug.title);
     this.showNameDropdown = false;
 
     if (sug.user && !this.members().some(m => m.user_id === sug.user!.id)) {
@@ -175,7 +175,7 @@ export class CalendarManagerComponent implements OnInit {
       userName: user.name,
       userEmail: user.email,
     }]);
-    this.userSearch = '';
+    this.userSearch.set('');
   }
 
   updatePermission(userId: string, permission: CalendarPermission): void {
@@ -189,12 +189,13 @@ export class CalendarManagerComponent implements OnInit {
   }
 
   onSave(): void {
-    if (!this.name.trim()) return;
+    const val = this.name().trim();
+    if (!val) return;
     this.isSaving = true;
 
     if (this.isEditing && this.calendar) {
       this.calendarsService.update(this.calendar.id, {
-        name: this.name.trim(),
+        name: val,
         color: this.selectedColor,
         isPrivate: this.isPrivate,
       });
@@ -217,7 +218,11 @@ export class CalendarManagerComponent implements OnInit {
         this.calendarsService.updateMemberPermission(this.calendar!.id, e.id, m.permission);
       });
     } else {
-      this.calendarsService.create(this.name.trim(), this.selectedColor, this.isPrivate);
+      const initialMembers = this.members().map(m => ({
+        user_id: m.user_id,
+        permission: m.permission,
+      }));
+      this.calendarsService.create(val, this.selectedColor, this.isPrivate, initialMembers);
     }
 
     setTimeout(() => {
@@ -225,6 +230,19 @@ export class CalendarManagerComponent implements OnInit {
       this.saved.emit();
       this.closed.emit();
     }, 500);
+  }
+
+  onDelete(): void {
+    if (!this.calendar) return;
+    if (confirm(`Tem certeza que deseja excluir a agenda "${this.name()}"?\nTodos os eventos vinculados a ela serão removidos.`)) {
+      this.isSaving = true;
+      this.calendarsService.remove(this.calendar.id);
+      setTimeout(() => {
+        this.isSaving = false;
+        this.saved.emit();
+        this.closed.emit();
+      }, 400);
+    }
   }
 
   onClose(): void {

@@ -29,9 +29,9 @@
           <input
             type="text"
             class="field-input with-left-icon"
-            [(ngModel)]="name"
+            [ngModel]="name()"
             (focus)="onNameFocus()"
-            (ngModelChange)="onNameChange()"
+            (ngModelChange)="name.set($event); onNameChange()"
             (blur)="onNameBlur()"
             placeholder="Ex: Agenda de Carlos, Equipe TI, Projetos..."
             maxlength="60"
@@ -122,11 +122,11 @@
           <input
             type="text"
             class="field-input user-search-input"
-            [(ngModel)]="userSearch"
+            [ngModel]="userSearch()"
             (focus)="onMemberSearchFocus()"
-            (ngModelChange)="onMemberSearchChange()"
+            (ngModelChange)="userSearch.set($event); onMemberSearchChange()"
             (blur)="onMemberSearchBlur()"
-            placeholder="Clique para ver a lista de colaboradores..."
+            placeholder="Clique para pesquisar ou ver colaboradores..."
             autocomplete="off"
           />
         </div>
@@ -179,25 +179,39 @@
           </div>
         </div>
 
-        <p class="members-empty-hint" *ngIf="members().length === 0 && !showMemberDropdown">
-          Nenhum membro adicionado ainda. Clique no campo de busca acima para ver a lista de colaboradores.
+        <p class="members-empty-hint" *ngIf="members().length === 0">
+          Nenhum membro adicionado ainda. Pesquise pelo nome no campo acima para vincular colaboradores.
         </p>
       </div>
     </div>
 
     <!-- Footer -->
     <div class="modal-footer">
-      <button class="btn-cancel" (click)="onClose()" type="button">Cancelar</button>
       <button
-        class="btn-save"
-        [disabled]="!name.trim() || isSaving"
-        (click)="onSave()"
+        *ngIf="isEditing"
+        class="btn-delete"
+        [disabled]="isSaving"
+        (click)="onDelete()"
         type="button"
+        matTooltip="Excluir esta agenda e todos os seus eventos"
       >
-        <mat-icon *ngIf="isSaving" class="spin">refresh</mat-icon>
-        <mat-icon *ngIf="!isSaving">{{ isEditing ? 'save' : 'add' }}</mat-icon>
-        {{ isSaving ? 'Salvando...' : (isEditing ? 'Salvar' : 'Criar Agenda') }}
+        <mat-icon>delete_outline</mat-icon>
+        Excluir Agenda
       </button>
+
+      <div class="footer-right-actions">
+        <button class="btn-cancel" (click)="onClose()" type="button">Cancelar</button>
+        <button
+          class="btn-save"
+          [disabled]="!name().trim() || isSaving"
+          (click)="onSave()"
+          type="button"
+        >
+          <mat-icon *ngIf="isSaving" class="spin">refresh</mat-icon>
+          <mat-icon *ngIf="!isSaving">{{ isEditing ? 'save' : 'add' }}</mat-icon>
+          {{ isSaving ? 'Salvando...' : (isEditing ? 'Salvar' : 'Criar Agenda') }}
+        </button>
+      </div>
     </div>
   </div>
 </div>

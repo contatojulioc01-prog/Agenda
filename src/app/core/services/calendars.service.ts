@@ -69,9 +69,35 @@ export class CalendarsService {
   }
 
   /** Cria nova agenda */
-  create(name: string, color: string, isPrivate: boolean): void {
-    this.http.post<Calendar>(`${getBackendUrl()}/api/calendars`, { name, color, isPrivate }, { headers: this.headers })
-      .pipe(catchError(() => of(null)))
+  create(
+    name: string,
+    color: string,
+    isPrivate: boolean,
+    initialMembers: { user_id: string; permission: CalendarPermission }[] = []
+  ): void {
+    const payload = { name, color, isPrivate, members: initialMembers };
+    this.http.post<Calendar>(`${getBackendUrl()}/api/calendars`, payload, { headers: this.headers })
+      .pipe(catchError(() => {
+        const localCal: Calendar = {
+          id: genLocalId(),
+          name,
+          color,
+          isPrivate,
+          owner_id: this.userId,
+          created_at: new Date().toISOString(),
+          members: [
+            { id: genLocalId(), calendar_id: '', user_id: this.userId, permission: 'owner' },
+            ...initialMembers.map(m => ({
+              id: genLocalId(),
+              calendar_id: '',
+              user_id: m.user_id,
+              permission: m.permission
+            }))
+          ],
+          my_permission: 'owner',
+        };
+        return of(localCal);
+      }))
       .subscribe(cal => {
         if (cal) {
           this.calendars.update(list => [...list, cal]);

@@ -32,7 +32,7 @@ router.post('/', (req, res) => {
   const userId = req.headers['x-user-id'];
   if (!userId) return res.status(400).json({ error: 'x-user-id header obrigatório' });
 
-  const { name, color = '#4f46e5', isPrivate = false } = req.body;
+  const { name, color = '#4f46e5', isPrivate = false, members = [] } = req.body;
   if (!name) return res.status(400).json({ error: 'name é obrigatório' });
 
   const id = genId();
@@ -42,9 +42,20 @@ router.post('/', (req, res) => {
   db.run('INSERT INTO calendar_members (id, calendar_id, user_id, permission) VALUES (?, ?, ?, ?)',
     [genId(), id, userId, 'owner']);
 
+  if (Array.isArray(members)) {
+    members.forEach(m => {
+      const memberUserId = m.user_id || m.userId;
+      if (memberUserId && memberUserId !== userId) {
+        db.run('INSERT INTO calendar_members (id, calendar_id, user_id, permission) VALUES (?, ?, ?, ?)',
+          [genId(), id, memberUserId, m.permission || 'editor']);
+      }
+    });
+  }
+
   const calendar = db.get('SELECT * FROM calendars WHERE id = ?', [id]);
+  const memberRows = db.all('SELECT * FROM calendar_members WHERE calendar_id = ?', [id]);
   req.broadcast({ type: 'calendar_created', calendarId: id });
-  res.status(201).json({ ...calendar, isPrivate: calendar.is_private === 1, members: [] });
+  res.status(201).json({ ...calendar, isPrivate: calendar.is_private === 1, members: memberRows });
 });
 
 // PUT /api/calendars/:id

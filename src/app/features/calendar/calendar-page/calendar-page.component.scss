@@ -220,6 +220,13 @@
   mat-icon { font-size: 13px; width: 13px; height: 13px; }
 }
 
+.calendar-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-right: 4px;
+}
+
 .btn-cal-menu {
   width: 24px; height: 24px;
   border-radius: 6px;
@@ -229,9 +236,9 @@
   opacity: 0;
   transition: all var(--transition);
   flex-shrink: 0;
-  margin-right: 4px;
-  mat-icon { font-size: 16px; width: 16px; height: 16px; }
+  mat-icon { font-size: 15px; width: 15px; height: 15px; }
   &:hover { background: var(--bg-surface); color: var(--text-primary); }
+  &.danger:hover { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
 }
 
 .no-calendars-hint {
@@ -325,14 +332,29 @@
   }
 }
 
+/* ── Área central rolável da sidebar ── */
+.sidebar-content {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Rodapé fixo na base da sidebar ── */
+.sidebar-footer {
+  flex-shrink: 0;
+  background: var(--bg-sidebar);
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+
 /* Botão de tema na base da sidebar */
 .sidebar-bottom {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
-  border-top: 1px solid var(--border);
-  flex-shrink: 0;
+  padding: 10px 16px 12px;
 }
 
 .theme-label {

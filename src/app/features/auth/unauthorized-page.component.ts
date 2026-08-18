@@ -37,7 +37,7 @@ import { AuthService } from '../../core/services/auth.service';
 
         <div class="auth-footer-help">
           <p>Exemplo de rota esperada:</p>
-          <code>http://192.168.13.249:5079/?token=eyJhbGciOi...</code>
+          <code>http://192.168.13.244:5079/?token=eyJhbGciOi...</code>
         </div>
       </div>
     </div>

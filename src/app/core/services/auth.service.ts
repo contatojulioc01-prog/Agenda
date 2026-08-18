@@ -122,8 +122,8 @@ export class AuthService {
         this.allUsers.set(sampleList);
         this.currentUser.set({
           id: 'user-me',
-          name: 'Wallace',
-          email: 'wallace@empresa.com.br',
+          name: 'Meu Usuário',
+          email: 'usuario@empresa.com.br',
           departamentName: 'Tecnologia da Informação',
           roles: ['ADMIN'],
           permissions: [],
@@ -134,27 +134,24 @@ export class AuthService {
   }
 
   fetchMe(): Observable<UserMe | null> {
-    const directUrl = 'http://192.168.13.249:7000/api/auth/me';
     const proxyUrl = `${getApiBase()}/auth/me`;
 
     return this.http.get<UserMe>(proxyUrl).pipe(
-      catchError(() => this.http.get<UserMe>(directUrl)),
       catchError(err => {
-        console.warn('[AuthService] /auth/me indisponível:', err.message);
+        console.warn('[AuthService] /auth/me indisponível via proxy:', err.message);
         return of(null);
       })
     );
   }
 
   fetchUsers(): Observable<UserResponse[]> {
-    const directUrl = 'http://192.168.13.249:7000/api/users/all';
     const proxyUrl = `${getApiBase()}/users/all`;
 
     return this.http.get<any>(proxyUrl).pipe(
-      catchError(() => this.http.get<any>(directUrl)),
+      catchError(() => this.http.get<any>(`${getApiBase()}/users`)),
       map(res => this.extractUserList(res)),
       catchError(err => {
-        console.warn('[AuthService] /users/all indisponível, carregando colaboradores locais:', err.message);
+        console.warn('[AuthService] /users/all indisponível via proxy, carregando colaboradores locais:', err.message);
         return of(this.getSampleUsers());
       })
     );
@@ -164,8 +161,10 @@ export class AuthService {
     if (!res) return [];
     if (Array.isArray(res)) return res;
     if (Array.isArray(res.data?.userResponses)) return res.data.userResponses;
+    if (Array.isArray(res.data?.users)) return res.data.users;
     if (Array.isArray(res.data)) return res.data;
     if (Array.isArray(res.userResponses)) return res.userResponses;
+    if (Array.isArray(res.users)) return res.users;
     return [];
   }
 
@@ -182,19 +181,6 @@ export class AuthService {
   /** Colaboradores corporativos para quando a API estiver em rede privada ou indisponível */
   private getSampleUsers(): UserResponse[] {
     return [
-      {
-        id: 'usr-wallace',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        name: 'Wallace',
-        email: 'wallace@empresa.com.br',
-        departamentId: 'dep-ti',
-        avatar: '',
-        isActive: true,
-        departament: { id: 'dep-ti', name: 'Tecnologia da Informação' },
-        roles: [{ id: '1', name: 'Administrador' }],
-        pemisssions: [],
-      },
       {
         id: 'usr-carlos',
         createdAt: new Date().toISOString(),

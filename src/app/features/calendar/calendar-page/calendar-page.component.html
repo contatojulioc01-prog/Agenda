@@ -30,94 +30,105 @@
       </button>
     </div>
 
-    <!-- Mini calendário -->
-    <app-mini-calendar
-      [selectedDate]="selectedDate"
-      [holidays]="holidays"
-      [events]="events()"
-      (dateSelected)="onMiniCalDateSelected($event)"
-      (monthChanged)="onMiniCalMonthChanged($event)"
-    ></app-mini-calendar>
+    <!-- Conteúdo central rolável -->
+    <div class="sidebar-content">
+      <!-- Mini calendário -->
+      <app-mini-calendar
+        [selectedDate]="selectedDate"
+        [holidays]="holidays"
+        [events]="events()"
+        (dateSelected)="onMiniCalDateSelected($event)"
+        (monthChanged)="onMiniCalMonthChanged($event)"
+      ></app-mini-calendar>
 
-    <div class="sidebar-divider"></div>
+      <div class="sidebar-divider"></div>
 
-    <!-- ── Minhas Agendas ── -->
-    <div class="sidebar-section">
-      <div class="sidebar-section-header">
-        <span class="sidebar-section-title">Minhas Agendas</span>
-        <button class="btn-add-calendar" (click)="openCreateCalendar()" matTooltip="Nova agenda" id="btn-new-calendar">
-          <mat-icon>add</mat-icon>
-        </button>
-      </div>
-
-      <div class="calendar-list">
-        <div *ngFor="let cal of myCalendars()" class="calendar-item">
-          <label class="calendar-checkbox-label">
-            <input
-              type="checkbox"
-              class="calendar-checkbox"
-              [checked]="calendarsService.visibleCalendarIds().has(cal.id)"
-              (change)="toggleCalendarVisibility(cal.id)"
-            />
-            <span class="calendar-dot" [style.background]="cal.color"></span>
-            <span class="calendar-name" [matTooltip]="cal.name">{{ cal.name }}</span>
-            <span *ngIf="cal.isPrivate" class="lock-icon" matTooltip="Privada">
-              <mat-icon>lock</mat-icon>
-            </span>
-          </label>
-          <button class="btn-cal-menu" (click)="openEditCalendar(cal)" matTooltip="Editar agenda">
-            <mat-icon>more_vert</mat-icon>
+      <!-- ── Minhas Agendas ── -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-header">
+          <span class="sidebar-section-title">Minhas Agendas</span>
+          <button class="btn-add-calendar" (click)="openCreateCalendar()" matTooltip="Nova agenda" id="btn-new-calendar">
+            <mat-icon>add</mat-icon>
           </button>
         </div>
 
-        <div *ngIf="myCalendars().length === 0" class="no-calendars-hint">
-          <mat-icon>calendar_today</mat-icon>
-          <span>Nenhuma agenda criada</span>
+        <div class="calendar-list">
+          <div *ngFor="let cal of myCalendars()" class="calendar-item">
+            <label class="calendar-checkbox-label">
+              <input
+                type="checkbox"
+                class="calendar-checkbox"
+                [checked]="calendarsService.visibleCalendarIds().has(cal.id)"
+                (change)="toggleCalendarVisibility(cal.id)"
+              />
+              <span class="calendar-dot" [style.background]="cal.color"></span>
+              <span class="calendar-name" [matTooltip]="cal.name">{{ cal.name }}</span>
+              <span *ngIf="cal.isPrivate" class="lock-icon" matTooltip="Privada">
+                <mat-icon>lock</mat-icon>
+              </span>
+            </label>
+            <div class="calendar-actions">
+              <button class="btn-cal-menu" (click)="openEditCalendar(cal)" matTooltip="Editar agenda">
+                <mat-icon>edit</mat-icon>
+              </button>
+              <button class="btn-cal-menu danger" (click)="removeCalendar(cal)" matTooltip="Excluir agenda">
+                <mat-icon>delete_outline</mat-icon>
+              </button>
+            </div>
+          </div>
+
+          <div *ngIf="myCalendars().length === 0" class="no-calendars-hint">
+            <mat-icon>calendar_today</mat-icon>
+            <span>Nenhuma agenda criada</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Agendas Compartilhadas ── -->
+      <div class="sidebar-section" *ngIf="sharedCalendars().length > 0">
+        <div class="sidebar-section-title">Compartilhadas</div>
+        <div class="calendar-list">
+          <div *ngFor="let cal of sharedCalendars()" class="calendar-item">
+            <label class="calendar-checkbox-label">
+              <input
+                type="checkbox"
+                class="calendar-checkbox"
+                [checked]="calendarsService.visibleCalendarIds().has(cal.id)"
+                (change)="toggleCalendarVisibility(cal.id)"
+              />
+              <span class="calendar-dot" [style.background]="cal.color"></span>
+              <span class="calendar-name" [matTooltip]="cal.name">{{ cal.name }}</span>
+              <span class="shared-badge" matTooltip="Compartilhada">
+                <mat-icon>group</mat-icon>
+              </span>
+            </label>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- ── Agendas Compartilhadas ── -->
-    <div class="sidebar-section" *ngIf="sharedCalendars().length > 0">
-      <div class="sidebar-section-title">Compartilhadas</div>
-      <div class="calendar-list">
-        <div *ngFor="let cal of sharedCalendars()" class="calendar-item">
-          <label class="calendar-checkbox-label">
-            <input
-              type="checkbox"
-              class="calendar-checkbox"
-              [checked]="calendarsService.visibleCalendarIds().has(cal.id)"
-              (change)="toggleCalendarVisibility(cal.id)"
-            />
-            <span class="calendar-dot" [style.background]="cal.color"></span>
-            <span class="calendar-name" [matTooltip]="cal.name">{{ cal.name }}</span>
-            <span class="shared-badge" matTooltip="Compartilhada">
-              <mat-icon>group</mat-icon>
-            </span>
-          </label>
+    <!-- Rodapé fixo no canto inferior esquerdo -->
+    <div class="sidebar-footer">
+      <!-- Perfil do Usuário -->
+      <div class="sidebar-user-card" *ngIf="currentUser() as user">
+        <div class="user-avatar" [class.has-img]="!!user.avatar">
+          <img *ngIf="user.avatar" [src]="user.avatar" [alt]="user.name" />
+          <span *ngIf="!user.avatar">{{ user.name.slice(0, 2).toUpperCase() }}</span>
         </div>
+        <div class="user-info">
+          <span class="user-name" [matTooltip]="user.name">{{ user.name }}</span>
+          <span class="user-dept">{{ user.departamentName || 'Corporativo' }}</span>
+        </div>
+        <button class="btn-logout" (click)="logout()" matTooltip="Encerrar sessão" aria-label="Sair">
+          <mat-icon>logout</mat-icon>
+        </button>
       </div>
-    </div>
 
-    <!-- ── Perfil do Usuário ── -->
-    <div class="sidebar-user-card" *ngIf="currentUser() as user">
-      <div class="user-avatar" [class.has-img]="!!user.avatar">
-        <img *ngIf="user.avatar" [src]="user.avatar" [alt]="user.name" />
-        <span *ngIf="!user.avatar">{{ user.name.slice(0, 2).toUpperCase() }}</span>
+      <!-- Toggle tema fixo -->
+      <div class="sidebar-bottom">
+        <span class="theme-label">Tema</span>
+        <app-theme-toggle></app-theme-toggle>
       </div>
-      <div class="user-info">
-        <span class="user-name" [matTooltip]="user.name">{{ user.name }}</span>
-        <span class="user-dept">{{ user.departamentName || 'Corporativo' }}</span>
-      </div>
-      <button class="btn-logout" (click)="logout()" matTooltip="Encerrar sessão" aria-label="Sair">
-        <mat-icon>logout</mat-icon>
-      </button>
-    </div>
-
-    <!-- Toggle tema -->
-    <div class="sidebar-bottom">
-      <span class="theme-label">Tema</span>
-      <app-theme-toggle></app-theme-toggle>
     </div>
   </aside>
 

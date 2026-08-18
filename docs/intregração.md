@@ -2,7 +2,8 @@ TODA URL TEM QUE TER ROTA PARA /?token=
 EXEMPLO: http://192.168.13.249:5079/?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ## BUSCAR TODOS USUARIOS COM DEPARTAMENTO
-http://192.168.13.249:7000/api/users/all
+
+http://192.168.13.244:7000/api/users/all
 export interface UserAll {
   success: boolean
   message: any
@@ -45,7 +46,8 @@ export interface Pemisssion {
 }
 
 ## BUSCAR USUARIO ATUAL COM DEPARTAMENTO
-http://192.168.13.249:7000/api/auth/me
+
+http://192.168.13.244:7000/api/auth/me
 export interface UserMe {
   success: boolean
   message: any

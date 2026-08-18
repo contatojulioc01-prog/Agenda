@@ -40,26 +40,49 @@ app.use((req, _res, next) => { req.broadcast = broadcast; next(); });
 app.get('/health', (_req, res) => res.json({ status: 'ok', clients: wss.clients.size, ts: new Date().toISOString() }));
 
 // Proxy transparente para a API corporativa (elimina problemas de CORS e rede do browser)
-app.get('/api/users/all', async (req, res) => {
+const PORTAL_API = process.env.PORTAL_API || 'http://192.168.13.244:7000';
+
+const handleUsersProxy = async (req, res) => {
   try {
     const authHeader = req.headers['authorization'] || '';
-    const response = await fetch('http://192.168.13.249:7000/api/users/all', {
+    const response = await fetch(`${PORTAL_API}/api/users/all`, {
       headers: authHeader ? { 'Authorization': authHeader } : {}
     });
+
+    if (!response.ok) {
+      console.warn(`[PROXY] API corporativa retornou HTTP ${response.status} para /users/all`);
+      const text = await response.text();
+      let errorBody = null;
+      try { errorBody = JSON.parse(text); } catch { errorBody = { message: text || `HTTP ${response.status}` }; }
+      return res.status(response.status).json(errorBody);
+    }
+
     const data = await response.json();
     res.json(data);
   } catch (err) {
     console.error('[PROXY] Erro ao buscar /users/all da API corporativa:', err.message);
     res.status(502).json({ error: err.message, fallback: true });
   }
-});
+};
+
+app.get('/api/users/all', handleUsersProxy);
+app.get('/api/users', handleUsersProxy);
 
 app.get('/api/auth/me', async (req, res) => {
   try {
     const authHeader = req.headers['authorization'] || '';
-    const response = await fetch('http://192.168.13.249:7000/api/auth/me', {
+    const response = await fetch(`${PORTAL_API}/api/auth/me`, {
       headers: authHeader ? { 'Authorization': authHeader } : {}
     });
+
+    if (!response.ok) {
+      console.warn(`[PROXY] API corporativa retornou HTTP ${response.status} para /auth/me`);
+      const text = await response.text();
+      let errorBody = null;
+      try { errorBody = JSON.parse(text); } catch { errorBody = { message: text || `HTTP ${response.status}` }; }
+      return res.status(response.status).json(errorBody);
+    }
+
     const data = await response.json();
     res.json(data);
   } catch (err) {

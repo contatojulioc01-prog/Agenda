@@ -7,10 +7,21 @@ function genId() {
 }
 
 function hasAccess(calendarId, userId, requireWrite = false) {
+  if (!calendarId) return true;
+  const cal = db.get('SELECT * FROM calendars WHERE id = ?', [calendarId]);
+  if (!cal) return true; // Agenda padrão/local
+  if (cal.owner_id === userId) return true;
+
   const member = db.get('SELECT permission FROM calendar_members WHERE calendar_id = ? AND user_id = ?', [calendarId, userId]);
-  if (!member) return false;
-  if (requireWrite) return ['owner', 'editor'].includes(member.permission);
-  return true;
+  if (member) {
+    if (requireWrite) return ['owner', 'editor'].includes(member.permission);
+    return true;
+  }
+
+  // Se a agenda não for privada e for apenas leitura
+  if (cal.is_private === 0 && !requireWrite) return true;
+
+  return false;
 }
 
 // GET /api/calendars/:calendarId/events
