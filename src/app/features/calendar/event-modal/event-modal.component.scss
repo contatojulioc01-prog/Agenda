@@ -1,0 +1,198 @@
+/* Os estilos base do modal vêm das skills (styles/modal.scss e styles/form-groups.scss) */
+:host { display: block; }
+
+/* ── Color Picker ── */
+.color-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 2px;
+}
+
+.color-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2.5px solid transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+
+  mat-icon {
+    color: #fff;
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+  }
+
+  &.selected {
+    border-color: #fff;
+    box-shadow: 0 0 0 2px currentColor, 0 2px 8px rgba(0,0,0,0.25);
+    transform: scale(1.15);
+  }
+
+  &:hover:not(.selected) {
+    transform: scale(1.1);
+    border-color: rgba(255,255,255,0.6);
+  }
+}
+
+/* ── Aviso de feriado ── */
+.holiday-warning {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #d97706;
+  background: rgba(217, 119, 6, 0.08);
+  border: 1px solid rgba(217, 119, 6, 0.25);
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+
+/* ── All Day Row ── */
+.all-day-row {
+  flex-direction: row !important;
+  align-items: center;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+
+  input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--brand-500);
+    cursor: pointer;
+  }
+}
+
+.disabled-field {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* ── Participantes (Grid de Seleção) ── */
+.attendees-selection-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+  max-height: 160px;
+  overflow-y: auto;
+  padding: 2px;
+}
+
+.attendee-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--bg-hover, #f1f5f9);
+  border: 1.5px solid var(--border, #e2e8f0);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+
+  &:hover {
+    border-color: #cbd5e1;
+    background: #e2e8f0;
+  }
+
+  &.selected {
+    background: rgba(79, 70, 229, 0.08);
+    border-color: var(--brand-500, #4f46e5);
+  }
+}
+
+.chip-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--brand-500);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  overflow: hidden;
+  flex-shrink: 0;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+.chip-details {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.chip-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chip-dept {
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chip-check {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  color: var(--brand-500);
+  flex-shrink: 0;
+}
+
+/* ── Footer extras ── */
+.footer-spacer { flex: 1; }
+
+.btn-delete {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: #fee2e2;
+  color: #ef4444;
+  border: 1.5px solid #fecaca;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  mat-icon { font-size: 20px; width: 20px; height: 20px; }
+
+  &:hover {
+    background: #fecaca;
+    border-color: #f87171;
+  }
+}
+
+/* Spinner dentro do botão salvar */
+.button-spinner {
+  ::ng-deep circle {
+    stroke: rgba(255, 255, 255, 0.85);
+  }
+}

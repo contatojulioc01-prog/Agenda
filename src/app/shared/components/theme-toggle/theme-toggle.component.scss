@@ -1,0 +1,63 @@
+:host { display: block; }
+
+.theme-toggle-btn {
+  position: relative;
+  width: 64px;
+  height: 32px;
+  border-radius: 999px;
+  background: var(--toggle-track, #e2e8f0);
+  border: 2px solid var(--border);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 0 4px;
+  transition: background 0.3s ease, border-color 0.3s ease;
+  outline: none;
+
+  &.dark {
+    background: #1e293b;
+    border-color: #334155;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--border-focus);
+    outline-offset: 2px;
+  }
+}
+
+.toggle-icon {
+  position: absolute;
+  font-size: 14px;
+  line-height: 1;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+  user-select: none;
+}
+
+.icon-sun  { left: 6px;  }
+.icon-moon { right: 6px; }
+
+/* No modo light: mostra sol, esconde lua */
+.theme-toggle-btn:not(.dark) .icon-sun  { opacity: 1; }
+.theme-toggle-btn:not(.dark) .icon-moon { opacity: 0; }
+
+/* No modo dark: mostra lua, esconde sol */
+.theme-toggle-btn.dark .icon-sun  { opacity: 0; }
+.theme-toggle-btn.dark .icon-moon { opacity: 1; }
+
+.toggle-thumb {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.20);
+  left: 3px;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              background 0.3s ease;
+}
+
+.theme-toggle-btn.dark .toggle-thumb {
+  transform: translateX(32px);
+  background: #94a3b8;
+}

@@ -1,0 +1,31 @@
+<div class="mini-cal">
+  <!-- Cabeçalho do mini-calendário -->
+  <div class="mini-cal-header">
+    <span class="mini-cal-title">{{ monthLabel }}</span>
+    <div class="mini-cal-nav">
+      <button (click)="prevMonth()" matTooltip="Mês anterior">&#8249;</button>
+      <button (click)="nextMonth()" matTooltip="Próximo mês">&#8250;</button>
+    </div>
+  </div>
+
+  <!-- Grade dias da semana -->
+  <div class="mini-cal-grid">
+    <span class="mini-cal-dow" *ngFor="let d of DOW">{{ d }}</span>
+
+    <ng-container *ngFor="let week of weeks">
+      <div
+        *ngFor="let day of week"
+        class="mini-cal-day"
+        [class.other-month]="!day.isCurrentMonth"
+        [class.today]="day.isToday"
+        [class.selected]="day.isSelected && !day.isToday"
+        [class.weekend]="day.isWeekend && !day.isToday"
+        [class.holiday]="day.isHoliday && !day.isToday"
+        [class.has-event]="day.hasEvent"
+        (click)="selectDay(day)"
+      >
+        {{ day.dayNum }}
+      </div>
+    </ng-container>
+  </div>
+</div>

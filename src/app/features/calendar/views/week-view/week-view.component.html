@@ -1,0 +1,89 @@
+<div class="view-week">
+  <!-- Cabeçalho da semana -->
+  <div class="week-header">
+    <div class="week-time-gutter-header"></div>
+    <div
+      *ngFor="let day of weekDays"
+      class="week-day-header"
+      [class.today]="day.isToday"
+      [class.weekend]="day.isWeekend"
+      [class.holiday]="!!day.holiday"
+      (click)="dayClick.emit(day.dateStr)"
+      [matTooltip]="day.holiday?.name ?? ''"
+    >
+      <span class="week-day-label">{{ day.dayLabel }}</span>
+      <span class="week-day-number">{{ day.dayNum }}</span>
+      <span *ngIf="day.holiday" class="week-holiday-dot" title="Feriado">🎌</span>
+    </div>
+  </div>
+
+  <!-- Body com grade de horas -->
+  <div class="week-body">
+    <!-- Coluna de horas -->
+    <div class="week-time-col">
+      <div *ngFor="let h of HOURS" class="time-label">{{ formatHour(h) }}</div>
+    </div>
+
+    <!-- Colunas dos dias -->
+    <div
+      *ngFor="let day of weekDays"
+      #colRef
+      class="week-day-col"
+      (dragover)="onDragOver($event, colRef)"
+      (dragleave)="onDragLeave(colRef)"
+      (drop)="onDrop($event, day, colRef)"
+      (click)="dayClick.emit(day.dateStr)"
+    >
+      <!-- Linhas de hora -->
+      <div *ngFor="let h of HOURS" class="hour-row">
+        <div class="half-hour-line"></div>
+      </div>
+
+      <!-- Linha de hora atual (apenas coluna hoje) -->
+      <div
+        *ngIf="day.isToday"
+        class="current-time-line"
+        [style.top.px]="currentTimeTop"
+      ></div>
+
+      <!-- Eventos posicionados com cálculo de sobreposição e redimensionamento -->
+      <div
+        *ngFor="let ev of day.positionedEvents"
+        class="week-event"
+        [class.is-resizing]="resizingEventId === ev.id"
+        [style.top.px]="ev.top"
+        [style.height.px]="ev.height"
+        [style.left]="'calc(' + ev.left + '% + 2px)'"
+        [style.width]="'calc(' + ev.width + '% - 4px)'"
+        [style.z-index]="resizingEventId === ev.id ? 100 : (10 + ev.column)"
+        [style.background]="colorMap[ev.color]"
+        [attr.draggable]="isResizing ? null : true"
+        (dragstart)="onDragStart($event, ev)"
+        (dragend)="onDragEnd($event)"
+        (click)="$event.stopPropagation(); onCardClick($event, ev)"
+        [matTooltip]="ev.title + ' · ' + ev.startTime + ' - ' + ev.endTime"
+      >
+        <!-- Alça de Redimensionamento Superior (Início) -->
+        <div
+          class="event-resize-handle top"
+          (mousedown)="onResizeStart($event, ev, colRef, 'top')"
+          title="Arrastar para alterar horário de início"
+        ></div>
+
+        <div class="ev-title-row">
+          <span class="ev-title">{{ ev.title }}</span>
+        </div>
+        <div class="ev-time" *ngIf="ev.height >= 32">
+          {{ ev.startTime }} – {{ ev.endTime }}
+        </div>
+
+        <!-- Alça de Redimensionamento Inferior (Término) -->
+        <div
+          class="event-resize-handle bottom"
+          (mousedown)="onResizeStart($event, ev, colRef, 'bottom')"
+          title="Arrastar para alterar horário de término"
+        ></div>
+      </div>
+    </div>
+  </div>
+</div>

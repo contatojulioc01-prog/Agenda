@@ -1,0 +1,203 @@
+<div class="modal-overlay" (click)="onClose()">
+  <div class="modal-card" (click)="$event.stopPropagation()">
+
+    <!-- Header -->
+    <div class="modal-header">
+      <div class="modal-icon-badge">
+        <mat-icon>calendar_month</mat-icon>
+      </div>
+      <div class="modal-title-group">
+        <h2 class="modal-title">{{ isEditing ? 'Editar Agenda' : 'Nova Agenda' }}</h2>
+        <p class="modal-subtitle">Configure nome, cor e colaboradores vinculados</p>
+      </div>
+      <button class="btn-close-modal" (click)="onClose()" aria-label="Fechar">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <!-- Body -->
+    <div class="modal-body">
+
+      <!-- Nome com sugestões de usuários e setores -->
+      <div class="field-group input-relative">
+        <label class="field-label">
+          Nome da agenda
+          <span class="label-hint">(digite ou escolha um colaborador abaixo)</span>
+        </label>
+        <div class="input-with-icon">
+          <mat-icon class="input-icon">edit</mat-icon>
+          <input
+            type="text"
+            class="field-input with-left-icon"
+            [(ngModel)]="name"
+            (focus)="onNameFocus()"
+            (ngModelChange)="onNameChange()"
+            (blur)="onNameBlur()"
+            placeholder="Ex: Agenda de Carlos, Equipe TI, Projetos..."
+            maxlength="60"
+            autofocus
+            autocomplete="off"
+          />
+        </div>
+
+        <!-- Dropdown com lista de usuários e setores para o Nome -->
+        <div class="user-dropdown name-suggestions-dropdown" *ngIf="showNameDropdown && nameSuggestions().length > 0">
+          <div class="dropdown-header">
+            <mat-icon>group</mat-icon>
+            <span>Sugestões rápidas por colaborador ou setor:</span>
+          </div>
+          <button
+            *ngFor="let sug of nameSuggestions()"
+            class="user-result-row"
+            (mousedown)="selectNameSuggestion(sug)"
+            type="button"
+          >
+            <div class="user-avatar-sm" [style.background]="sug.dept ? '#0d9488' : '#4f46e5'">
+              <img *ngIf="sug.avatar" [src]="sug.avatar" [alt]="sug.title" />
+              <mat-icon *ngIf="sug.dept" class="dept-icon">apartment</mat-icon>
+              <span *ngIf="!sug.avatar && !sug.dept">{{ sug.title.slice(10, 12).toUpperCase() }}</span>
+            </div>
+            <div class="user-result-info">
+              <span class="user-result-name">{{ sug.title }}</span>
+              <span class="user-result-dept">{{ sug.subtitle }}</span>
+            </div>
+            <span class="select-badge">Selecionar</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Cor -->
+      <div class="field-group">
+        <label class="field-label">Cor da agenda</label>
+        <div class="color-picker">
+          <button
+            *ngFor="let c of COLORS"
+            class="color-dot"
+            [class.selected]="selectedColor === c.value"
+            [style.background]="c.value"
+            [matTooltip]="c.label"
+            (click)="selectedColor = c.value"
+            type="button"
+          >
+            <mat-icon *ngIf="selectedColor === c.value" class="check-icon">check</mat-icon>
+          </button>
+        </div>
+      </div>
+
+      <!-- Privacidade -->
+      <div class="field-group">
+        <label class="field-label">Visibilidade</label>
+        <div class="privacy-toggle">
+          <button
+            class="privacy-btn"
+            [class.active]="!isPrivate"
+            (click)="isPrivate = false"
+            type="button"
+          >
+            <mat-icon>group</mat-icon>
+            Compartilhada
+          </button>
+          <button
+            class="privacy-btn"
+            [class.active]="isPrivate"
+            (click)="isPrivate = true"
+            type="button"
+          >
+            <mat-icon>lock</mat-icon>
+            Privada
+          </button>
+        </div>
+      </div>
+
+      <!-- Membros e Permissões (somente para agendas não privadas) -->
+      <div class="field-group members-section input-relative" *ngIf="!isPrivate">
+        <label class="field-label">
+          <mat-icon class="label-icon">people</mat-icon>
+          Colaboradores Vinculados & Permissões
+        </label>
+
+        <!-- Busca de usuário -->
+        <div class="user-search-wrap">
+          <mat-icon class="search-icon-field">search</mat-icon>
+          <input
+            type="text"
+            class="field-input user-search-input"
+            [(ngModel)]="userSearch"
+            (focus)="onMemberSearchFocus()"
+            (ngModelChange)="onMemberSearchChange()"
+            (blur)="onMemberSearchBlur()"
+            placeholder="Clique para ver a lista de colaboradores..."
+            autocomplete="off"
+          />
+        </div>
+
+        <!-- Dropdown de colaboradores -->
+        <div class="user-dropdown" *ngIf="showMemberDropdown && filteredUsers().length > 0">
+          <div class="dropdown-header">
+            <mat-icon>person_add</mat-icon>
+            <span>Selecione um usuário para adicionar:</span>
+          </div>
+          <button
+            *ngFor="let user of filteredUsers()"
+            class="user-result-row"
+            (mousedown)="addMember(user)"
+            type="button"
+          >
+            <div class="user-avatar-sm" [style.background]="'#4f46e5'">
+              <img *ngIf="user.avatar" [src]="user.avatar" [alt]="user.name" />
+              <span *ngIf="!user.avatar">{{ user.name.slice(0,2).toUpperCase() }}</span>
+            </div>
+            <div class="user-result-info">
+              <span class="user-result-name">{{ user.name }}</span>
+              <span class="user-result-dept">{{ user.departament?.name || 'Geral' }} · {{ user.email }}</span>
+            </div>
+            <mat-icon class="add-icon">add_circle_outline</mat-icon>
+          </button>
+        </div>
+
+        <!-- Lista de membros adicionados -->
+        <div class="members-list" *ngIf="members().length > 0">
+          <div *ngFor="let m of members()" class="member-row">
+            <div class="user-avatar-sm">
+              <span>{{ (m.userName ?? m.user_id).slice(0,2).toUpperCase() }}</span>
+            </div>
+            <div class="member-info">
+              <span class="member-name">{{ m.userName ?? m.user_id }}</span>
+              <span class="member-email">{{ m.userEmail }}</span>
+            </div>
+            <select
+              class="permission-select"
+              [ngModel]="m.permission"
+              (ngModelChange)="updatePermission(m.user_id, $event)"
+            >
+              <option value="editor">Leitura e Gravação</option>
+              <option value="viewer">Somente Leitura</option>
+            </select>
+            <button class="btn-remove-member" (click)="removeMember(m.user_id)" matTooltip="Remover membro" type="button">
+              <mat-icon>person_remove</mat-icon>
+            </button>
+          </div>
+        </div>
+
+        <p class="members-empty-hint" *ngIf="members().length === 0 && !showMemberDropdown">
+          Nenhum membro adicionado ainda. Clique no campo de busca acima para ver a lista de colaboradores.
+        </p>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="modal-footer">
+      <button class="btn-cancel" (click)="onClose()" type="button">Cancelar</button>
+      <button
+        class="btn-save"
+        [disabled]="!name.trim() || isSaving"
+        (click)="onSave()"
+        type="button"
+      >
+        <mat-icon *ngIf="isSaving" class="spin">refresh</mat-icon>
+        <mat-icon *ngIf="!isSaving">{{ isEditing ? 'save' : 'add' }}</mat-icon>
+        {{ isSaving ? 'Salvando...' : (isEditing ? 'Salvar' : 'Criar Agenda') }}
+      </button>
+    </div>
+  </div>
+</div>

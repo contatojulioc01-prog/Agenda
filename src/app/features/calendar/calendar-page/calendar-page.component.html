@@ -1,0 +1,200 @@
+<!-- ╔══════════════════════════════════════════════════════════╗
+     ║  SKILL: Angular Page Groups Layout                      ║
+     ║  GRUPO 1 — Header/Ações | GRUPO 2 — Conteúdo principal ║
+     ╚══════════════════════════════════════════════════════════╝ -->
+
+<div class="page-layout">
+
+  <!-- ══════════════ SIDEBAR ══════════════ -->
+  <aside class="sidebar">
+    <div class="sidebar-top">
+      <!-- Logo -->
+      <div class="app-brand">
+        <div class="app-brand-icon">
+          <svg viewBox="0 0 24 24" fill="none">
+            <rect x="3" y="4" width="18" height="18" rx="3" stroke="white" stroke-width="2"/>
+            <path d="M3 9h18" stroke="white" stroke-width="2"/>
+            <path d="M8 2v4M16 2v4" stroke="white" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div>
+          <div class="app-brand-name">Agenda</div>
+          <div class="app-brand-sub">Corporativa</div>
+        </div>
+      </div>
+
+      <!-- Botão criar evento -->
+      <button class="btn-create" (click)="openCreateModal()" id="btn-create-event" matTooltip="Criar novo evento">
+        <span class="btn-create-icon">＋</span>
+        <span>Criar evento</span>
+      </button>
+    </div>
+
+    <!-- Mini calendário -->
+    <app-mini-calendar
+      [selectedDate]="selectedDate"
+      [holidays]="holidays"
+      [events]="events()"
+      (dateSelected)="onMiniCalDateSelected($event)"
+      (monthChanged)="onMiniCalMonthChanged($event)"
+    ></app-mini-calendar>
+
+    <div class="sidebar-divider"></div>
+
+    <!-- ── Minhas Agendas ── -->
+    <div class="sidebar-section">
+      <div class="sidebar-section-header">
+        <span class="sidebar-section-title">Minhas Agendas</span>
+        <button class="btn-add-calendar" (click)="openCreateCalendar()" matTooltip="Nova agenda" id="btn-new-calendar">
+          <mat-icon>add</mat-icon>
+        </button>
+      </div>
+
+      <div class="calendar-list">
+        <div *ngFor="let cal of myCalendars()" class="calendar-item">
+          <label class="calendar-checkbox-label">
+            <input
+              type="checkbox"
+              class="calendar-checkbox"
+              [checked]="calendarsService.visibleCalendarIds().has(cal.id)"
+              (change)="toggleCalendarVisibility(cal.id)"
+            />
+            <span class="calendar-dot" [style.background]="cal.color"></span>
+            <span class="calendar-name" [matTooltip]="cal.name">{{ cal.name }}</span>
+            <span *ngIf="cal.isPrivate" class="lock-icon" matTooltip="Privada">
+              <mat-icon>lock</mat-icon>
+            </span>
+          </label>
+          <button class="btn-cal-menu" (click)="openEditCalendar(cal)" matTooltip="Editar agenda">
+            <mat-icon>more_vert</mat-icon>
+          </button>
+        </div>
+
+        <div *ngIf="myCalendars().length === 0" class="no-calendars-hint">
+          <mat-icon>calendar_today</mat-icon>
+          <span>Nenhuma agenda criada</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Agendas Compartilhadas ── -->
+    <div class="sidebar-section" *ngIf="sharedCalendars().length > 0">
+      <div class="sidebar-section-title">Compartilhadas</div>
+      <div class="calendar-list">
+        <div *ngFor="let cal of sharedCalendars()" class="calendar-item">
+          <label class="calendar-checkbox-label">
+            <input
+              type="checkbox"
+              class="calendar-checkbox"
+              [checked]="calendarsService.visibleCalendarIds().has(cal.id)"
+              (change)="toggleCalendarVisibility(cal.id)"
+            />
+            <span class="calendar-dot" [style.background]="cal.color"></span>
+            <span class="calendar-name" [matTooltip]="cal.name">{{ cal.name }}</span>
+            <span class="shared-badge" matTooltip="Compartilhada">
+              <mat-icon>group</mat-icon>
+            </span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Perfil do Usuário ── -->
+    <div class="sidebar-user-card" *ngIf="currentUser() as user">
+      <div class="user-avatar" [class.has-img]="!!user.avatar">
+        <img *ngIf="user.avatar" [src]="user.avatar" [alt]="user.name" />
+        <span *ngIf="!user.avatar">{{ user.name.slice(0, 2).toUpperCase() }}</span>
+      </div>
+      <div class="user-info">
+        <span class="user-name" [matTooltip]="user.name">{{ user.name }}</span>
+        <span class="user-dept">{{ user.departamentName || 'Corporativo' }}</span>
+      </div>
+      <button class="btn-logout" (click)="logout()" matTooltip="Encerrar sessão" aria-label="Sair">
+        <mat-icon>logout</mat-icon>
+      </button>
+    </div>
+
+    <!-- Toggle tema -->
+    <div class="sidebar-bottom">
+      <span class="theme-label">Tema</span>
+      <app-theme-toggle></app-theme-toggle>
+    </div>
+  </aside>
+
+  <!-- ══════════════ MAIN ══════════════ -->
+  <div class="main-area">
+
+    <!-- ── GRUPO 1: Header ── -->
+    <div class="group-panel header-panel">
+      <div class="header-left">
+        <button class="btn-today" (click)="goToday()" id="btn-hoje">Hoje</button>
+        <button class="nav-arrow" (click)="navigate(-1)" id="btn-prev" aria-label="Período anterior">
+          <mat-icon>chevron_left</mat-icon>
+        </button>
+        <button class="nav-arrow" (click)="navigate(1)" id="btn-next" aria-label="Próximo período">
+          <mat-icon>chevron_right</mat-icon>
+        </button>
+        <h1 class="period-label">{{ periodLabel }}</h1>
+      </div>
+
+      <div class="header-right">
+        <!-- Indicador de Sync WebSocket -->
+        <div
+          class="sync-indicator"
+          (click)="syncService.connect()"
+          style="cursor: pointer;"
+          [matTooltip]="'Sincronização: ' + syncStatus() + (lastSyncLabel ? ' · ' + lastSyncLabel : '') + ' (Clique para reconectar)'"
+        >
+          <span class="sync-dot" [class]="syncStatus()"></span>
+          <span class="sync-label">{{ syncStatus() === 'connected' ? 'Online' : syncStatus() === 'connecting' ? 'Conectando' : 'Reconectar' }}</span>
+        </div>
+
+        <!-- View switcher -->
+        <div class="view-switcher" role="group" aria-label="Tipo de visualização">
+          <button class="view-btn" [class.active]="currentView === 'month'" (click)="setView('month')" id="btn-view-month">Mês</button>
+          <button class="view-btn" [class.active]="currentView === 'week'" (click)="setView('week')" id="btn-view-week">Semana</button>
+          <button class="view-btn" [class.active]="currentView === 'day'" (click)="setView('day')" id="btn-view-day">Dia</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── GRUPO 2: Calendário ── -->
+    <div class="group-panel panel-fill calendar-panel">
+
+      <app-month-view
+        *ngIf="currentView === 'month'"
+        [year]="year" [month]="month"
+        [events]="events()" [holidays]="holidays"
+        (dayClick)="openCreateModal($event)"
+        (eventClick)="openEditModal($event)"
+        (eventDrop)="onEventDrop($event)"
+      ></app-month-view>
+
+      <app-week-view
+        *ngIf="currentView === 'week'"
+        [selectedDate]="selectedDate"
+        [events]="events()" [holidays]="holidays"
+        (dayClick)="openCreateModal($event)"
+        (eventClick)="openEditModal($event)"
+        (eventDrop)="onEventDrop($event)"
+      ></app-week-view>
+
+      <app-day-view
+        *ngIf="currentView === 'day'"
+        [selectedDate]="selectedDate"
+        [events]="events()" [holidays]="holidays"
+        (eventClick)="openEditModal($event)"
+        (eventDrop)="onEventDrop($event)"
+      ></app-day-view>
+
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal de Gerenciamento de Agenda ── -->
+<app-calendar-manager
+  *ngIf="showCalendarManager"
+  [calendar]="editingCalendar"
+  (closed)="closeCalendarManager()"
+  (saved)="onCalendarSaved()"
+></app-calendar-manager>

@@ -1,0 +1,82 @@
+<div class="view-day">
+  <!-- Cabeçalho do dia -->
+  <div class="day-header-bar">
+    <span class="day-name">{{ dayName }}</span>
+    <span class="day-num" [class.today]="isToday">{{ dayNum }}</span>
+    <span *ngIf="holiday" class="holiday-tag">🎌 {{ holiday.name }}</span>
+  </div>
+
+  <!-- Eventos de dia inteiro -->
+  <div *ngIf="allDayEvents.length" class="all-day-bar">
+    <span class="all-day-label">Dia inteiro</span>
+    <div class="all-day-events">
+      <div
+        *ngFor="let ev of allDayEvents"
+        class="event-pill"
+        [style.background]="colorMap[ev.color]"
+        (click)="eventClick.emit(ev)"
+      >
+        <span class="event-title">{{ ev.title }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Timeline de horas -->
+  <div class="day-body">
+    <!-- Coluna de horas -->
+    <div class="day-time-col">
+      <div *ngFor="let h of HOURS" class="time-label">{{ formatHour(h) }}</div>
+    </div>
+
+    <!-- Coluna de eventos -->
+    <div
+      #colRef
+      class="day-events-col"
+      (dragover)="onDragOver($event, colRef)"
+      (dragleave)="onDragLeave(colRef)"
+      (drop)="onDrop($event, colRef)"
+    >
+      <div *ngFor="let h of HOURS" class="day-hour-row">
+        <div class="half-hour-line"></div>
+      </div>
+
+      <!-- Linha hora atual -->
+      <div *ngIf="isToday" class="current-time-line" [style.top.px]="currentTimeTop"></div>
+
+      <!-- Eventos posicionados -->
+      <div
+        *ngFor="let ev of positionedEvents"
+        class="day-event"
+        [class.is-resizing]="resizingEventId === ev.id"
+        [style.top.px]="ev.top"
+        [style.height.px]="ev.height"
+        [style.left]="'calc(' + ev.left + '% + 4px)'"
+        [style.width]="'calc(' + ev.width + '% - 8px)'"
+        [style.z-index]="resizingEventId === ev.id ? 100 : (10 + ev.column)"
+        [style.background]="colorMap[ev.color]"
+        [attr.draggable]="isResizing ? null : true"
+        (dragstart)="onDragStart($event, ev)"
+        (dragend)="onDragEnd($event)"
+        (click)="$event.stopPropagation(); onCardClick($event, ev)"
+        [matTooltip]="ev.title + ' · ' + ev.startTime + ' - ' + ev.endTime"
+      >
+        <!-- Alça de Redimensionamento Superior (Início) -->
+        <div
+          class="event-resize-handle top"
+          (mousedown)="onResizeStart($event, ev, colRef, 'top')"
+          title="Arrastar para alterar horário de início"
+        ></div>
+
+        <div class="ev-title">{{ ev.title }}</div>
+        <div class="ev-time" *ngIf="ev.height >= 40">{{ ev.startTime }} – {{ ev.endTime }}</div>
+
+        <!-- Alça de Redimensionamento Inferior (Término) -->
+        <div
+          class="event-resize-handle bottom"
+          (mousedown)="onResizeStart($event, ev, colRef, 'bottom')"
+          title="Arrastar para alterar horário de término"
+        ></div>
+      </div>
+    </div>
+  </div>
+</div>

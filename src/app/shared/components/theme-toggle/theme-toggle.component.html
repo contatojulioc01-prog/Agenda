@@ -1,0 +1,14 @@
+<button
+  class="theme-toggle-btn"
+  [class.dark]="theme.isDark()"
+  (click)="toggle()"
+  [title]="theme.isDark() ? 'Ativar modo claro' : 'Ativar modo escuro'"
+  id="btn-theme-toggle"
+>
+  <!-- Ícone sol -->
+  <span class="toggle-icon icon-sun">☀️</span>
+  <!-- Ícone lua -->
+  <span class="toggle-icon icon-moon">🌙</span>
+  <!-- Thumb deslizante -->
+  <span class="toggle-thumb"></span>
+</button>
