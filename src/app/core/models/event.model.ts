@@ -4,8 +4,10 @@ export interface CalendarEvent {
   title: string;
   description: string;
   date: string;        // 'YYYY-MM-DD'
-  startTime: string;   // 'HH:MM'
-  endTime: string;     // 'HH:MM'
+  endDate?: string;    // 'YYYY-MM-DD' (para eventos que duram múltiplos dias)
+  startTime: string;   // 'HH:MM' (horário padrão ou do primeiro dia)
+  endTime: string;     // 'HH:MM' (horário padrão ou do último dia)
+  dayTimes?: Record<string, { startTime: string; endTime: string }>; // Horários individuais por dia ('YYYY-MM-DD' -> { startTime, endTime })
   color: EventColor;
   category: string;
   allDay: boolean;

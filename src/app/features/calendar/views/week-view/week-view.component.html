@@ -29,8 +29,10 @@
       *ngFor="let day of weekDays"
       #colRef
       class="week-day-col"
+      [attr.data-date]="day.dateStr"
+      (dragenter)="onDragEnter($event, colRef)"
       (dragover)="onDragOver($event, colRef)"
-      (dragleave)="onDragLeave(colRef)"
+      (dragleave)="onDragLeave($event, colRef)"
       (drop)="onDrop($event, day, colRef)"
       (click)="dayClick.emit(day.dateStr)"
     >
@@ -57,31 +59,46 @@
         [style.width]="'calc(' + ev.width + '% - 4px)'"
         [style.z-index]="resizingEventId === ev.id ? 100 : (10 + ev.column)"
         [style.background]="colorMap[ev.color]"
-        [attr.draggable]="isResizing ? null : true"
+        [attr.draggable]="isResizing || (ev.endDate && ev.endDate !== ev.date) ? null : true"
         (dragstart)="onDragStart($event, ev)"
         (dragend)="onDragEnd($event)"
         (click)="$event.stopPropagation(); onCardClick($event, ev)"
-        [matTooltip]="ev.title + ' · ' + ev.startTime + ' - ' + ev.endTime"
+        [matTooltip]="ev.title + ' · ' + ev.startTime + ' - ' + ev.endTime + (ev.endDate && ev.endDate !== ev.date ? ' (' + ev.date + ' até ' + ev.endDate + ')' : '')"
       >
-        <!-- Alça de Redimensionamento Superior (Início) -->
+        <!-- Alça de Redimensionamento Esquerda (Dias) -->
+        <div
+          class="event-resize-handle-x left"
+          (mousedown)="onResizeHorizontalStart($event, ev, 'left')"
+          title="Arrastar para esquerda/direita para alterar dia de início"
+        ></div>
+
+        <!-- Alça de Redimensionamento Superior (Horário de Início deste dia) -->
         <div
           class="event-resize-handle top"
-          (mousedown)="onResizeStart($event, ev, colRef, 'top')"
-          title="Arrastar para alterar horário de início"
+          (mousedown)="onResizeStart($event, ev, colRef, 'top', day.dateStr)"
+          title="Arrastar para alterar horário de início deste dia"
         ></div>
 
         <div class="ev-title-row">
           <span class="ev-title">{{ ev.title }}</span>
+          <span *ngIf="ev.endDate && ev.endDate !== ev.date" class="multi-day-badge">📅</span>
         </div>
         <div class="ev-time" *ngIf="ev.height >= 32">
           {{ ev.startTime }} – {{ ev.endTime }}
         </div>
 
-        <!-- Alça de Redimensionamento Inferior (Término) -->
+        <!-- Alça de Redimensionamento Inferior (Horário de Término deste dia) -->
         <div
           class="event-resize-handle bottom"
-          (mousedown)="onResizeStart($event, ev, colRef, 'bottom')"
-          title="Arrastar para alterar horário de término"
+          (mousedown)="onResizeStart($event, ev, colRef, 'bottom', day.dateStr)"
+          title="Arrastar para alterar horário de término deste dia"
+        ></div>
+
+        <!-- Alça de Redimensionamento Direita (Dias) -->
+        <div
+          class="event-resize-handle-x right"
+          (mousedown)="onResizeHorizontalStart($event, ev, 'right')"
+          title="Arrastar para esquerda/direita para alterar dia de término"
         ></div>
       </div>
     </div>

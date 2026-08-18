@@ -2,13 +2,12 @@ import { Injectable, signal, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, of, forkJoin } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
-import { UserMe, UserAll, UserResponse, UserProfile } from '../models/user.model';
+import { UserMe, UserAll, UserResponse, UserProfile, DEFAULT_AVATAR } from '../models/user.model';
 
 function getApiBase(): string {
-  if (typeof window !== 'undefined' && window.location.hostname) {
-    return `http://${window.location.hostname}:9900/api`;
-  }
-  return 'http://192.168.13.244:9900/api';
+  // Retorna caminho relativo para ser interceptado pelo proxy.conf.json do Angular
+  // escondendo totalmente o IP e Porta reais do backend no F12 -> Network
+  return '/api';
 }
 
 @Injectable({ providedIn: 'root' })
@@ -80,20 +79,26 @@ export class AuthService {
         const userList = (users && users.length > 0) ? users : this.getSampleUsers();
         this.allUsers.set(userList);
 
-        if (me && me.data) {
+        const meAny = me as any;
+        const meData = me?.data || meAny?.user || meAny;
+        if (me && (me.data || meAny.id || meAny.email)) {
+          const userEmail = meData?.email || meAny.email || '';
+          const userId = meData?.id || meAny.id || '';
           const matchingUser = userList.find(u =>
-            (u.email && u.email.toLowerCase() === me.data.email.toLowerCase()) ||
-            u.id === me.data.id
+            (u.email && userEmail && u.email.toLowerCase() === userEmail.toLowerCase()) ||
+            (u.id && userId && u.id === userId)
           );
 
+          const avatarUrl = meData?.avatar || meAny.avatar || meData?.icon || meAny.icon || matchingUser?.avatar || DEFAULT_AVATAR;
+
           const profile: UserProfile = {
-            id: me.data.id,
-            email: me.data.email,
-            roles: me.data.roles || [],
-            permissions: me.data.permissions || [],
-            name: matchingUser ? matchingUser.name : me.data.email.split('@')[0],
-            avatar: matchingUser?.avatar,
-            departamentName: matchingUser?.departament?.name || 'Geral',
+            id: userId || matchingUser?.id || 'usr-me',
+            email: userEmail || matchingUser?.email || '',
+            roles: meData?.roles || meAny.roles || [],
+            permissions: meData?.permissions || meAny.permissions || [],
+            name: meData?.name || meAny.name || matchingUser?.name || userEmail.split('@')[0] || 'Usuário',
+            avatar: avatarUrl,
+            departamentName: meData?.departament?.name || meData?.departamentName || matchingUser?.departament?.name || 'Geral',
           };
           this.currentUser.set(profile);
           this.isAuthenticated.set(true);
@@ -103,12 +108,14 @@ export class AuthService {
             id: 'user-me',
             name: 'Meu Usuário',
             email: 'usuario@empresa.com.br',
-            departament: { id: 'd1', name: 'Tecnologia' }
+            departament: { id: 'd1', name: 'Tecnologia' },
+            avatar: DEFAULT_AVATAR,
           };
           this.currentUser.set({
             id: defaultUser.id,
             name: defaultUser.name,
             email: defaultUser.email,
+            avatar: defaultUser.avatar || DEFAULT_AVATAR,
             departamentName: defaultUser.departament?.name || 'Corporativo',
             roles: ['USER'],
             permissions: [],
@@ -124,6 +131,7 @@ export class AuthService {
           id: 'user-me',
           name: 'Meu Usuário',
           email: 'usuario@empresa.com.br',
+          avatar: DEFAULT_AVATAR,
           departamentName: 'Tecnologia da Informação',
           roles: ['ADMIN'],
           permissions: [],
@@ -158,14 +166,17 @@ export class AuthService {
   }
 
   private extractUserList(res: any): UserResponse[] {
-    if (!res) return [];
-    if (Array.isArray(res)) return res;
-    if (Array.isArray(res.data?.userResponses)) return res.data.userResponses;
-    if (Array.isArray(res.data?.users)) return res.data.users;
-    if (Array.isArray(res.data)) return res.data;
-    if (Array.isArray(res.userResponses)) return res.userResponses;
-    if (Array.isArray(res.users)) return res.users;
-    return [];
+    let list: UserResponse[] = [];
+    if (!res) list = [];
+    else if (Array.isArray(res)) list = res;
+    else if (Array.isArray(res.data?.userResponses)) list = res.data.userResponses;
+    else if (Array.isArray(res.data?.users)) list = res.data.users;
+    else if (Array.isArray(res.data)) list = res.data;
+    else if (Array.isArray(res.userResponses)) list = res.userResponses;
+    else if (Array.isArray(res.users)) list = res.users;
+
+    // Filtra estritamente usuários com isActive === true
+    return list.filter(u => u && (u.isActive === true || (u as any).isActive === 'true' || (u as any).isActive === 1));
   }
 
   logout(): void {

@@ -8,55 +8,55 @@
     >{{ d }}</div>
   </div>
 
-  <!-- Grade do mês -->
+  <!-- Grade do mês dividida em linhas de semanas -->
   <div class="month-grid">
-    <ng-container *ngFor="let week of weeks">
-      <div
-        *ngFor="let day of week"
-        class="day-cell"
-        [class.other-month]="!day.isCurrentMonth"
-        [class.today-cell]="day.isToday"
-        [class.weekend-cell]="day.isWeekend && !day.isToday && !day.holiday"
-        [class.holiday-cell]="!!day.holiday"
-        (click)="dayClick.emit(day.dateStr)"
-        (dragover)="onDragOver($event, $any($event.currentTarget))"
-        (dragleave)="onDragLeave($any($event.currentTarget))"
-        (drop)="onDrop($event, day, $any($event.currentTarget))"
-      >
-        <!-- Número do dia -->
-        <span class="day-number">{{ day.dayNum }}</span>
-
-        <!-- Tag feriado -->
-        <span *ngIf="day.holiday" class="holiday-tag" [matTooltip]="day.holiday.name">
-          🎌 {{ day.holiday.name | slice:0:18 }}{{ day.holiday.name.length > 18 ? '…' : '' }}
-        </span>
-
-        <!-- Eventos -->
-        <div class="day-events">
-          <ng-container *ngFor="let ev of day.events; let i = index">
-            <div
-              *ngIf="i < 3"
-              class="event-pill"
-              [style.background]="colorMap[ev.color]"
-              draggable="true"
-              (dragstart)="onDragStart($event, ev)"
-              (dragend)="onDragEnd($event)"
-              (click)="$event.stopPropagation(); eventClick.emit(ev)"
-              [matTooltip]="ev.title + (ev.allDay ? '' : ' · ' + ev.startTime + ' - ' + ev.endTime)"
-            >
-              <span *ngIf="!ev.allDay" class="event-time">{{ ev.startTime }}</span>
-              <span class="event-title">{{ ev.title }}</span>
-            </div>
-          </ng-container>
-          <button
-            *ngIf="day.events.length > 3"
-            class="more-events-btn"
-            (click)="$event.stopPropagation(); dayClick.emit(day.dateStr)"
-          >
-            +{{ day.events.length - 3 }} mais
-          </button>
+    <div *ngFor="let week of monthWeeks" class="month-week-row">
+      <!-- Camada de Células de Fundo (7 colunas) -->
+      <div class="week-cells-layer">
+        <div
+          *ngFor="let day of week.days"
+          #cellRef
+          class="day-cell"
+          [class.other-month]="!day.isCurrentMonth"
+          [class.today-cell]="day.isToday"
+          [class.weekend-cell]="day.isWeekend && !day.isToday && !day.holiday"
+          [class.holiday-cell]="!!day.holiday"
+          (click)="dayClick.emit(day.dateStr)"
+          (dragenter)="onDragEnter($event, cellRef)"
+          (dragover)="onDragOver($event, cellRef)"
+          (dragleave)="onDragLeave($event, cellRef)"
+          (drop)="onDrop($event, day, cellRef)"
+        >
+          <div class="day-cell-header">
+            <span class="day-number">{{ day.dayNum }}</span>
+            <span *ngIf="day.holiday" class="holiday-tag" [matTooltip]="day.holiday.name">
+              🎌 {{ day.holiday.name | slice:0:16 }}{{ day.holiday.name.length > 16 ? '…' : '' }}
+            </span>
+          </div>
         </div>
       </div>
-    </ng-container>
+
+      <!-- Camada de Barras de Eventos (Grid contínuo de 7 colunas sobreposto) -->
+      <div class="week-events-layer">
+        <div
+          *ngFor="let seg of week.segments"
+          class="month-event-bar"
+          [class.bar-start]="seg.isStart"
+          [class.bar-end]="seg.isEnd"
+          [class.bar-single]="seg.isStart && seg.isEnd && seg.span === 1"
+          [style.grid-column]="(seg.startCol + 1) + ' / span ' + seg.span"
+          [style.top.px]="32 + seg.rowSlot * 24"
+          [style.background]="colorMap[seg.event.color]"
+          [attr.draggable]="seg.event.endDate && seg.event.endDate !== seg.event.date ? null : true"
+          (dragstart)="onDragStart($event, seg.event)"
+          (dragend)="onDragEnd($event)"
+          (click)="$event.stopPropagation(); eventClick.emit(seg.event)"
+          [matTooltip]="seg.event.title + (seg.event.allDay ? '' : ' · ' + seg.event.startTime + ' - ' + seg.event.endTime) + (seg.event.endDate && seg.event.endDate !== seg.event.date ? ' (' + seg.event.date + ' até ' + seg.event.endDate + ')' : '')"
+        >
+          <span *ngIf="!seg.event.allDay && seg.isStart" class="bar-time">{{ seg.event.startTime }}</span>
+          <span class="bar-title">{{ seg.event.title }}</span>
+        </div>
+      </div>
+    </div>
   </div>
 </div>

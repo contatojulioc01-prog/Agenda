@@ -8,7 +8,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { Calendar, CalendarMember, CalendarPermission, CALENDAR_COLORS } from '../../../core/models/calendar.model';
 import { CalendarsService } from '../../../core/services/calendars.service';
 import { AuthService } from '../../../core/services/auth.service';
-import { UserResponse } from '../../../core/models/user.model';
+import { UserResponse, DEFAULT_AVATAR } from '../../../core/models/user.model';
 
 export interface NameSuggestion {
   title: string;
@@ -28,6 +28,8 @@ export interface NameSuggestion {
 export class CalendarManagerComponent implements OnInit {
   private calendarsService = inject(CalendarsService);
   public authService = inject(AuthService);
+
+  readonly defaultAvatar = DEFAULT_AVATAR;
 
   /** null = criando nova, Calendar = editando existente */
   @Input() calendar: Calendar | null = null;

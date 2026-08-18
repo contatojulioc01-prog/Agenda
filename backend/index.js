@@ -58,6 +58,18 @@ const handleUsersProxy = async (req, res) => {
     }
 
     const data = await response.json();
+
+    // Filtra estritamente usuários ativos (isActive: true)
+    if (data && data.data && Array.isArray(data.data.userResponses)) {
+      data.data.userResponses = data.data.userResponses.filter(u => u.isActive === true || u.isActive === 'true' || u.isActive === 1);
+    } else if (data && data.data && Array.isArray(data.data.users)) {
+      data.data.users = data.data.users.filter(u => u.isActive === true || u.isActive === 'true' || u.isActive === 1);
+    } else if (data && Array.isArray(data.data)) {
+      data.data = data.data.filter(u => u.isActive === true || u.isActive === 'true' || u.isActive === 1);
+    } else if (Array.isArray(data)) {
+      return res.json(data.filter(u => u.isActive === true || u.isActive === 'true' || u.isActive === 1));
+    }
+
     res.json(data);
   } catch (err) {
     console.error('[PROXY] Erro ao buscar /users/all da API corporativa:', err.message);
@@ -87,6 +99,22 @@ app.get('/api/auth/me', async (req, res) => {
     res.json(data);
   } catch (err) {
     console.error('[PROXY] Erro ao buscar /auth/me da API corporativa:', err.message);
+    res.status(502).json({ error: err.message, fallback: true });
+  }
+});
+
+app.get('/api/holidays/:year', async (req, res) => {
+  try {
+    const year = req.params.year;
+    // O Node nativo >= 18 tem fetch global, caso seja antigo usaríamos node-fetch (mas assumimos que suporta fetch como nas rotas acima)
+    const response = await fetch(`https://brasilapi.com.br/api/feriados/v1/${year}`);
+    if (!response.ok) {
+      return res.status(response.status).json({ error: `Erro HTTP ${response.status} na BrasilAPI` });
+    }
+    const data = await response.json();
+    res.json(data);
+  } catch (err) {
+    console.error('[PROXY] Erro ao buscar feriados:', err.message);
     res.status(502).json({ error: err.message, fallback: true });
   }
 });

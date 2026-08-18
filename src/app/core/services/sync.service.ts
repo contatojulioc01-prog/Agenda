@@ -7,17 +7,14 @@ export type SyncStatus = 'connected' | 'connecting' | 'disconnected';
 
 function getWsUrl(): string {
   if (typeof window !== 'undefined' && window.location.hostname) {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    return `${protocol}//${window.location.hostname}:9900`;
+    // Usa a mesma porta/hostname do frontend (o proxy da porta 9990 irá encaminhar websockets para 9900)
+    return `ws://${window.location.host}/ws`;
   }
   return 'ws://192.168.13.244:9900';
 }
 
 function getHttpUrl(): string {
-  if (typeof window !== 'undefined' && window.location.hostname) {
-    return `http://${window.location.hostname}:9900`;
-  }
-  return 'http://192.168.13.244:9900';
+  return '';
 }
 
 @Injectable({ providedIn: 'root' })

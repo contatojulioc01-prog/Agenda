@@ -144,8 +144,11 @@
             type="button"
           >
             <div class="user-avatar-sm" [style.background]="'#4f46e5'">
-              <img *ngIf="user.avatar" [src]="user.avatar" [alt]="user.name" />
-              <span *ngIf="!user.avatar">{{ user.name.slice(0,2).toUpperCase() }}</span>
+              <img
+                [src]="user.avatar || defaultAvatar"
+                [alt]="user.name"
+                (error)="$any($event.target).src = defaultAvatar"
+              />
             </div>
             <div class="user-result-info">
               <span class="user-result-name">{{ user.name }}</span>

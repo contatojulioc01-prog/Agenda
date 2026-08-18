@@ -149,6 +149,28 @@
   letter-spacing: 0.08em;
 }
 
+.sidebar-section-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-text-action {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 2px 5px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  transition: all var(--transition);
+
+  &:hover {
+    color: var(--brand-500);
+    background: var(--bg-hover);
+  }
+}
+
 .btn-add-calendar {
   width: 22px; height: 22px;
   border-radius: 6px;
@@ -163,7 +185,7 @@
 .calendar-list {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
 }
 
 .calendar-item {
@@ -171,9 +193,31 @@
   align-items: center;
   gap: 2px;
   border-radius: 8px;
-  transition: background var(--transition);
-  &:hover { background: var(--bg-hover); }
-  &:hover .btn-cal-menu { opacity: 1; }
+  padding: 1px 2px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all var(--transition);
+
+  &:hover {
+    background: var(--bg-hover);
+  }
+
+  &.is-active {
+    background: var(--bg-active);
+    border-color: rgba(79, 70, 229, 0.15);
+
+    .calendar-name {
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+  }
+
+  &.is-solo {
+    box-shadow: inset 2px 0 0 var(--brand-500);
+    background: var(--bg-active);
+  }
+
+  &:hover .btn-cal-menu { opacity: 0.8; }
 }
 
 .calendar-checkbox-label {
@@ -187,22 +231,18 @@
 }
 
 .calendar-checkbox {
-  display: none;
+  width: 14px;
+  height: 14px;
+  accent-color: var(--brand-500);
+  cursor: pointer;
 }
 
 .calendar-dot {
-  width: 12px; height: 12px;
-  border-radius: 3px;
+  width: 10px; height: 10px;
+  border-radius: 50%;
   flex-shrink: 0;
-  transition: opacity 0.15s;
-  position: relative;
-  border: 2px solid transparent;
-}
-
-/* Checkmark quando marcado */
-.calendar-checkbox:checked + .calendar-dot {
-  border-color: rgba(255,255,255,0.6);
-  box-shadow: 0 0 0 1.5px currentColor;
+  transition: transform 0.15s;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.1);
 }
 
 .calendar-name {
@@ -237,8 +277,22 @@
   transition: all var(--transition);
   flex-shrink: 0;
   mat-icon { font-size: 15px; width: 15px; height: 15px; }
-  &:hover { background: var(--bg-surface); color: var(--text-primary); }
-  &.danger:hover { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+
+  &:hover {
+    opacity: 1 !important;
+    background: var(--bg-surface);
+    color: var(--text-primary);
+  }
+
+  &.solo-btn:hover {
+    color: var(--brand-500);
+    background: rgba(79, 70, 229, 0.12);
+  }
+
+  &.danger:hover {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+  }
 }
 
 .no-calendars-hint {
@@ -379,11 +433,137 @@
 /* ── GRUPO 1: Header ── */
 .header-panel {
   display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-shrink: 0;
+  padding: 12px 20px 10px;
+}
+
+.header-main-row {
+  display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-direction: row;
+  width: 100%;
+}
+
+/* ── Barra de Pílulas de Seleção Rápida de Agendas ── */
+.agenda-pills-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border-light);
+  overflow: hidden;
+}
+
+.pills-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   flex-shrink: 0;
-  padding: 12px 20px;
+}
+
+.pills-scroll {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+}
+
+.agenda-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+  transition: all var(--transition);
+  flex-shrink: 0;
+
+  &:hover {
+    background: var(--bg-surface);
+    border-color: var(--text-muted);
+    color: var(--text-primary);
+    transform: translateY(-1px);
+  }
+
+  &.active {
+    background: var(--bg-active);
+    border-color: rgba(79, 70, 229, 0.4);
+    color: var(--text-primary);
+    font-weight: 600;
+    box-shadow: 0 1px 4px rgba(79, 70, 229, 0.12);
+
+    .pill-dot {
+      transform: scale(1.15);
+    }
+  }
+
+  .pill-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    transition: transform 0.15s;
+
+    &.rainbow {
+      background: linear-gradient(135deg, #4f46e5, #ec4899, #f59e0b, #10b981);
+    }
+  }
+
+  .pill-name {
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .pill-count {
+    font-size: 10px;
+    padding: 1px 5px;
+    border-radius: 99px;
+    background: var(--bg-surface);
+    color: var(--text-muted);
+    font-weight: 700;
+  }
+
+  .pill-solo-btn {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    margin-left: 2px;
+    color: var(--text-muted);
+    transition: color var(--transition);
+
+    mat-icon {
+      font-size: 13px;
+      width: 13px;
+      height: 13px;
+    }
+
+    &:hover {
+      color: var(--brand-500);
+    }
+  }
+
+  &:hover .pill-solo-btn {
+    display: inline-flex;
+  }
 }
 
 .header-left {

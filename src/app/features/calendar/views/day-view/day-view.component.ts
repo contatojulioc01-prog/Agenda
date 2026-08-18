@@ -70,6 +70,8 @@ export class DayViewComponent implements OnInit, OnChanges {
     const endMins = timeToMinutes(event.endTime);
     const rect = columnElement.getBoundingClientRect();
 
+    const targetDateStr = this.toStr(this.selectedDate || new Date());
+
     const onMouseMove = (moveEvent: MouseEvent) => {
       const relY = moveEvent.clientY - rect.top;
       const rawMin = Math.max(0, Math.min(24 * 60, relY)); // 1px = 1minuto
@@ -83,7 +85,13 @@ export class DayViewComponent implements OnInit, OnChanges {
         if (newEndTime !== event.endTime) {
           event.endTime = newEndTime;
           const orig = (this.events || []).find(e => e.id === event.id);
-          if (orig) orig.endTime = newEndTime;
+          if (orig) {
+            orig.dayTimes = orig.dayTimes || {};
+            orig.dayTimes[targetDateStr] = {
+              startTime: orig.dayTimes[targetDateStr]?.startTime || event.startTime || orig.startTime || '09:00',
+              endTime: newEndTime,
+            };
+          }
           changed = true;
         }
       } else {
@@ -92,7 +100,13 @@ export class DayViewComponent implements OnInit, OnChanges {
         if (newStartTime !== event.startTime) {
           event.startTime = newStartTime;
           const orig = (this.events || []).find(e => e.id === event.id);
-          if (orig) orig.startTime = newStartTime;
+          if (orig) {
+            orig.dayTimes = orig.dayTimes || {};
+            orig.dayTimes[targetDateStr] = {
+              startTime: newStartTime,
+              endTime: orig.dayTimes[targetDateStr]?.endTime || event.endTime || orig.endTime || '10:00',
+            };
+          }
           changed = true;
         }
       }
@@ -112,9 +126,13 @@ export class DayViewComponent implements OnInit, OnChanges {
 
       const orig = (this.events || []).find(e => e.id === event.id);
       if (orig) {
+        const updatedDayTimes = { ...(orig.dayTimes || {}) };
+        updatedDayTimes[targetDateStr] = {
+          startTime: event.startTime,
+          endTime: event.endTime,
+        };
         this.eventsService.update(event.id, {
-          startTime: orig.startTime,
-          endTime: orig.endTime,
+          dayTimes: updatedDayTimes,
         });
       }
 
@@ -133,42 +151,72 @@ export class DayViewComponent implements OnInit, OnChanges {
   }
 
   /* ── Drag & Drop ── */
+  private dragEnterCounters = new WeakMap<HTMLElement, number>();
+
   onDragStart(ev: DragEvent, event: CalendarEvent): void {
     if (this.isResizing) {
       ev.preventDefault();
       return;
     }
     this.draggingEvent = event;
-    this.dragOffsetY = ev.offsetY || 0;
+
+    const target = ev.target as HTMLElement;
+    const card = target ? (target.closest('.day-event') as HTMLElement) || target : null;
+    if (card) {
+      const cardRect = card.getBoundingClientRect();
+      this.dragOffsetY = ev.clientY - cardRect.top;
+      card.classList.add('dragging');
+    } else {
+      this.dragOffsetY = ev.offsetY || 0;
+    }
 
     if (ev.dataTransfer) {
       ev.dataTransfer.setData('text/plain', event.id);
       ev.dataTransfer.effectAllowed = 'move';
     }
-    (ev.target as HTMLElement).classList.add('dragging');
+    document.body.classList.add('dragging-active');
   }
 
   onDragEnd(ev: DragEvent): void {
-    (ev.target as HTMLElement).classList.remove('dragging');
+    const target = ev.target as HTMLElement;
+    const card = target ? (target.closest('.day-event') as HTMLElement) || target : null;
+    if (card) card.classList.remove('dragging');
     this.draggingEvent = null;
     this.dragOffsetY = 0;
+    document.body.classList.remove('dragging-active');
+    this.dragEnterCounters = new WeakMap();
+  }
+
+  onDragEnter(ev: DragEvent, cell: HTMLElement): void {
+    ev.preventDefault();
+    if (!cell) return;
+    const count = (this.dragEnterCounters.get(cell) ?? 0) + 1;
+    this.dragEnterCounters.set(cell, count);
+    if (count === 1) cell.classList.add('drag-over');
   }
 
   onDragOver(ev: DragEvent, cell: HTMLElement): void {
     ev.preventDefault();
     if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'move';
-    cell.classList.add('drag-over');
   }
 
-  onDragLeave(cell: HTMLElement): void {
-    cell.classList.remove('drag-over');
+  onDragLeave(ev: DragEvent, cell: HTMLElement): void {
+    if (!cell) return;
+    const count = Math.max(0, (this.dragEnterCounters.get(cell) ?? 0) - 1);
+    this.dragEnterCounters.set(cell, count);
+    if (count === 0) cell.classList.remove('drag-over');
   }
 
   onDrop(ev: DragEvent, cell: HTMLElement): void {
     ev.preventDefault();
-    cell.classList.remove('drag-over');
+    ev.stopPropagation();
+    document.body.classList.remove('dragging-active');
+    if (cell) {
+      cell.classList.remove('drag-over');
+      this.dragEnterCounters.set(cell, 0);
+    }
 
-    const eventId = ev.dataTransfer ? ev.dataTransfer.getData('text/plain') : null;
+    const eventId = (ev.dataTransfer ? ev.dataTransfer.getData('text/plain') : null) || this.draggingEvent?.id;
     if (!eventId) return;
 
     const event = this.draggingEvent || (this.events || []).find(e => e.id === eventId);
@@ -177,7 +225,8 @@ export class DayViewComponent implements OnInit, OnChanges {
     if (event) {
       const rect = cell.getBoundingClientRect();
       const clickY = ev.clientY - rect.top;
-      const targetTopY = Math.max(0, clickY - (this.dragOffsetY || 10));
+      const offset = (this.dragOffsetY > 0 && this.dragOffsetY < rect.height) ? this.dragOffsetY : 0;
+      const targetTopY = Math.max(0, clickY - offset);
       const snappedMinutes = Math.min(23 * 60 + 45, Math.max(0, Math.round(targetTopY / 15) * 15));
 
       const [sh, sm] = (event.startTime || '09:00').split(':').map(Number);
@@ -195,7 +244,7 @@ export class DayViewComponent implements OnInit, OnChanges {
       const newStartTime = `${pad(newStartHour)}:${pad(newStartMin)}`;
       const newEndTime = `${pad(newEndHour)}:${pad(newEndMin)}`;
 
-      this.eventDrop.emit({ eventId: event.id, newDate: dateStr, newStartTime, newEndTime });
+      this.eventDrop.emit({ eventId: event.id, oldDate: event.date, oldEndDate: event.endDate || event.date, newDate: dateStr, newStartTime, newEndTime });
     }
   }
 
@@ -214,9 +263,18 @@ export class DayViewComponent implements OnInit, OnChanges {
     this.dayName = this.DAY_NAMES[d.getDay()];
     this.dayNum = d.getDate();
     this.holiday = (this.holidays || []).find(h => h.date === ds) ?? null;
-    this.allDayEvents = (this.events || []).filter(e => e.date === ds && e.allDay);
+    this.allDayEvents = (this.events || []).filter(e => e.date <= ds && (e.endDate || e.date) >= ds && e.allDay);
 
-    const timedEvents = (this.events || []).filter(e => e.date === ds && !e.allDay);
+    const timedEvents = (this.events || [])
+      .filter(e => e.date <= ds && (e.endDate || e.date) >= ds && !e.allDay)
+      .map(e => {
+        const daySchedule = e.dayTimes?.[ds];
+        return {
+          ...e,
+          startTime: daySchedule?.startTime || e.startTime || '09:00',
+          endTime: daySchedule?.endTime || e.endTime || '10:00',
+        };
+      });
     this.positionedEvents = resolveDayOverlaps(timedEvents, 60);
 
     const now = new Date();

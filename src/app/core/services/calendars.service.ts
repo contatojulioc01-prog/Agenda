@@ -6,10 +6,9 @@ import { AuthService } from './auth.service';
 import { UserResponse } from '../models/user.model';
 
 export function getBackendUrl(): string {
-  if (typeof window !== 'undefined' && window.location.hostname) {
-    return `http://${window.location.hostname}:9900`;
-  }
-  return 'http://192.168.13.244:9900';
+  // Retorna string vazia para usar caminhos relativos (ex: /api/calendars)
+  // O Angular proxy.conf.json irá redirecionar para o backend Node
+  return '';
 }
 
 function genLocalId(): string {
@@ -198,6 +197,36 @@ export class CalendarsService {
       }
       return next;
     });
+  }
+
+  /** Seleciona exclusivamente apenas esta agenda */
+  selectOnly(calendarId: string): void {
+    this.visibleCalendarIds.set(new Set([calendarId]));
+  }
+
+  /** Seleciona todas as agendas */
+  selectAll(): void {
+    const allIds = this.calendars().map(c => c.id);
+    this.visibleCalendarIds.set(new Set(allIds));
+  }
+
+  /** Desmarca todas as agendas */
+  deselectAll(): void {
+    this.visibleCalendarIds.set(new Set());
+  }
+
+  /** Verifica se todas estão selecionadas */
+  isAllSelected(): boolean {
+    const all = this.calendars();
+    if (all.length === 0) return false;
+    const current = this.visibleCalendarIds();
+    return all.every(c => current.has(c.id));
+  }
+
+  /** Verifica se apenas uma específica está selecionada */
+  isOnlySelected(calendarId: string): boolean {
+    const current = this.visibleCalendarIds();
+    return current.size === 1 && current.has(calendarId);
   }
 
   /** Verifica se o usuário pode editar (owner/editor) */

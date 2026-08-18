@@ -11,6 +11,8 @@ import { EventsService } from '../../../../core/services/events.service';
 
 export interface EventDropPayload {
   eventId: string;
+  oldDate: string;
+  oldEndDate?: string;
   newDate: string;
   newStartTime?: string;
   newEndTime?: string;
@@ -57,6 +59,9 @@ export class WeekViewComponent implements OnInit, OnChanges, OnDestroy {
   // Estado de arrasto
   private draggingEvent: CalendarEvent | null = null;
   private dragOffsetY = 0;
+  private dragOverCell: HTMLElement | null = null;
+  // Contador de dragenter por célula (para highlight confiável sem flickering)
+  private dragEnterCounters = new WeakMap<HTMLElement, number>();
 
   // Estado de redimensionamento em tempo real
   isResizing = false;
@@ -66,6 +71,7 @@ export class WeekViewComponent implements OnInit, OnChanges, OnDestroy {
     this.build();
     this.updateCurrentTime();
     this.timeInterval = setInterval(() => this.updateCurrentTime(), 60000);
+    this.injectScrollbarWidth();
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -77,8 +83,20 @@ export class WeekViewComponent implements OnInit, OnChanges, OnDestroy {
     if (this.timeInterval) clearInterval(this.timeInterval);
   }
 
+  /** Mede a largura da scrollbar do SO e injeta como variável CSS para alinhar header com body */
+  private injectScrollbarWidth(): void {
+    const outer = document.createElement('div');
+    outer.style.cssText = 'visibility:hidden;overflow:scroll;position:absolute;top:-9999px;';
+    document.body.appendChild(outer);
+    const inner = document.createElement('div');
+    outer.appendChild(inner);
+    const scrollbarWidth = outer.offsetWidth - inner.offsetWidth;
+    document.body.removeChild(outer);
+    document.documentElement.style.setProperty('--scrollbar-width', scrollbarWidth + 'px');
+  }
+
   /* ── Redimensionamento Manual em Tempo Real (Resize Handle) ── */
-  onResizeStart(mouseEvent: MouseEvent, event: PositionedEvent, columnElement: HTMLElement, edge: 'top' | 'bottom' = 'bottom'): void {
+  onResizeStart(mouseEvent: MouseEvent, event: PositionedEvent, columnElement: HTMLElement, edge: 'top' | 'bottom' = 'bottom', dayDateStr?: string): void {
     mouseEvent.stopPropagation();
     mouseEvent.preventDefault();
 
@@ -86,6 +104,7 @@ export class WeekViewComponent implements OnInit, OnChanges, OnDestroy {
     this.resizingEventId = event.id;
     document.body.classList.add('resizing-active');
 
+    const targetDateStr = dayDateStr || event.date;
     const startMins = timeToMinutes(event.startTime);
     const endMins = timeToMinutes(event.endTime);
     const rect = columnElement.getBoundingClientRect();
@@ -103,9 +122,14 @@ export class WeekViewComponent implements OnInit, OnChanges, OnDestroy {
 
         if (newEndTime !== event.endTime) {
           event.endTime = newEndTime;
-          // Atualiza também na lista original para que o resolveDayOverlaps reconstrua corretamente
           const orig = (this.events || []).find(e => e.id === event.id);
-          if (orig) orig.endTime = newEndTime;
+          if (orig) {
+            orig.dayTimes = orig.dayTimes || {};
+            orig.dayTimes[targetDateStr] = {
+              startTime: orig.dayTimes[targetDateStr]?.startTime || event.startTime || orig.startTime || '09:00',
+              endTime: newEndTime,
+            };
+          }
           changed = true;
         }
       } else {
@@ -115,7 +139,13 @@ export class WeekViewComponent implements OnInit, OnChanges, OnDestroy {
         if (newStartTime !== event.startTime) {
           event.startTime = newStartTime;
           const orig = (this.events || []).find(e => e.id === event.id);
-          if (orig) orig.startTime = newStartTime;
+          if (orig) {
+            orig.dayTimes = orig.dayTimes || {};
+            orig.dayTimes[targetDateStr] = {
+              startTime: newStartTime,
+              endTime: orig.dayTimes[targetDateStr]?.endTime || event.endTime || orig.endTime || '10:00',
+            };
+          }
           changed = true;
         }
       }
@@ -133,12 +163,105 @@ export class WeekViewComponent implements OnInit, OnChanges, OnDestroy {
       window.removeEventListener('mouseup', onMouseUp);
       document.body.classList.remove('resizing-active');
 
-      // Persiste o horário finalizado no service
+      // Persiste o horário do dia específico no service
+      const orig = (this.events || []).find(e => e.id === event.id);
+      if (orig) {
+        const updatedDayTimes = { ...(orig.dayTimes || {}) };
+        updatedDayTimes[targetDateStr] = {
+          startTime: event.startTime,
+          endTime: event.endTime,
+        };
+
+        this.eventsService.update(event.id, {
+          dayTimes: updatedDayTimes,
+        });
+      }
+
+      this.ngZone.run(() => {
+        setTimeout(() => {
+          this.isResizing = false;
+          this.resizingEventId = null;
+          this.build();
+          this.cdr.detectChanges();
+        }, 50);
+      });
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  }
+
+  /* ── Redimensionamento Horizontal entre Dias (Esquerda / Direita) ── */
+  onResizeHorizontalStart(mouseEvent: MouseEvent, event: PositionedEvent, edge: 'left' | 'right'): void {
+    mouseEvent.stopPropagation();
+    mouseEvent.preventDefault();
+
+    this.isResizing = true;
+    this.resizingEventId = event.id;
+    document.body.classList.add('resizing-active');
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const clientX = moveEvent.clientX;
+
+      // Localiza a coluna do dia sobre a qual o mouse está passando
+      let targetDayStr: string | null = null;
+      for (const day of this.weekDays) {
+        const colEl = document.querySelector(`[data-date="${day.dateStr}"]`) as HTMLElement;
+        if (colEl) {
+          const rect = colEl.getBoundingClientRect();
+          if (clientX >= rect.left && clientX <= rect.right) {
+            targetDayStr = day.dateStr;
+            break;
+          }
+        }
+      }
+
+      if (!targetDayStr) return;
+
+      let changed = false;
+
+      if (edge === 'right') {
+        // Redimensiona término para a direita/esquerda
+        const currentStartDate = event.date;
+        const newEndDate = targetDayStr >= currentStartDate ? targetDayStr : currentStartDate;
+
+        if (newEndDate !== (event.endDate || event.date)) {
+          event.endDate = newEndDate;
+          const orig = (this.events || []).find(e => e.id === event.id);
+          if (orig) orig.endDate = newEndDate;
+          changed = true;
+        }
+      } else {
+        // Redimensiona início para a esquerda/direita
+        const currentEndDate = event.endDate || event.date;
+        const newStartDate = targetDayStr <= currentEndDate ? targetDayStr : currentEndDate;
+
+        if (newStartDate !== event.date) {
+          event.date = newStartDate;
+          const orig = (this.events || []).find(e => e.id === event.id);
+          if (orig) orig.date = newStartDate;
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        this.ngZone.run(() => {
+          this.build();
+          this.cdr.detectChanges();
+        });
+      }
+    };
+
+    const onMouseUp = () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      document.body.classList.remove('resizing-active');
+
       const orig = (this.events || []).find(e => e.id === event.id);
       if (orig) {
         this.eventsService.update(event.id, {
-          startTime: orig.startTime,
-          endTime: orig.endTime,
+          date: orig.date,
+          endDate: orig.endDate || orig.date,
         });
       }
 
@@ -163,36 +286,81 @@ export class WeekViewComponent implements OnInit, OnChanges, OnDestroy {
       return;
     }
     this.draggingEvent = event;
-    this.dragOffsetY = ev.offsetY || 0;
+
+    const target = ev.target as HTMLElement;
+    const card = target ? (target.closest('.week-event') as HTMLElement) || target : null;
+    if (card) {
+      const cardRect = card.getBoundingClientRect();
+      this.dragOffsetY = ev.clientY - cardRect.top;
+      card.classList.add('dragging');
+    } else {
+      this.dragOffsetY = ev.offsetY || 0;
+    }
 
     if (ev.dataTransfer) {
       ev.dataTransfer.setData('text/plain', event.id);
       ev.dataTransfer.effectAllowed = 'move';
     }
-    (ev.target as HTMLElement).classList.add('dragging');
+    document.body.classList.add('dragging-active');
   }
 
   onDragEnd(ev: DragEvent): void {
-    (ev.target as HTMLElement).classList.remove('dragging');
+    const target = ev.target as HTMLElement;
+    const card = target ? (target.closest('.week-event') as HTMLElement) || target : null;
+    if (card) card.classList.remove('dragging');
     this.draggingEvent = null;
     this.dragOffsetY = 0;
+    document.body.classList.remove('dragging-active');
+    // Limpa highlight e contadores residuais
+    if (this.dragOverCell) {
+      this.dragOverCell.classList.remove('drag-over');
+      this.dragEnterCounters.set(this.dragOverCell, 0);
+      this.dragOverCell = null;
+    }
+  }
+
+  onDragEnter(ev: DragEvent, cell: HTMLElement): void {
+    ev.preventDefault();
+    if (!cell) return;
+    const count = (this.dragEnterCounters.get(cell) ?? 0) + 1;
+    this.dragEnterCounters.set(cell, count);
+    if (count === 1) {
+      // Saindo de outra coluna — limpa highlight anterior
+      if (this.dragOverCell && this.dragOverCell !== cell) {
+        this.dragOverCell.classList.remove('drag-over');
+        this.dragEnterCounters.set(this.dragOverCell, 0);
+      }
+      cell.classList.add('drag-over');
+      this.dragOverCell = cell;
+    }
   }
 
   onDragOver(ev: DragEvent, cell: HTMLElement): void {
     ev.preventDefault();
     if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'move';
-    cell.classList.add('drag-over');
   }
 
-  onDragLeave(cell: HTMLElement): void {
-    cell.classList.remove('drag-over');
+  onDragLeave(ev: DragEvent, cell: HTMLElement): void {
+    if (!cell) return;
+    const count = Math.max(0, (this.dragEnterCounters.get(cell) ?? 0) - 1);
+    this.dragEnterCounters.set(cell, count);
+    if (count === 0) {
+      cell.classList.remove('drag-over');
+      if (this.dragOverCell === cell) this.dragOverCell = null;
+    }
   }
 
   onDrop(ev: DragEvent, day: WeekDay, cell: HTMLElement): void {
     ev.preventDefault();
-    cell.classList.remove('drag-over');
+    ev.stopPropagation();
+    document.body.classList.remove('dragging-active');
+    if (cell) {
+      cell.classList.remove('drag-over');
+      this.dragEnterCounters.set(cell, 0);
+    }
+    if (this.dragOverCell === cell) this.dragOverCell = null;
 
-    const eventId = ev.dataTransfer ? ev.dataTransfer.getData('text/plain') : null;
+    const eventId = (ev.dataTransfer ? ev.dataTransfer.getData('text/plain') : null) || this.draggingEvent?.id;
     if (!eventId) return;
 
     const event = this.draggingEvent || (this.events || []).find(e => e.id === eventId);
@@ -200,7 +368,8 @@ export class WeekViewComponent implements OnInit, OnChanges, OnDestroy {
     if (event) {
       const rect = cell.getBoundingClientRect();
       const clickY = ev.clientY - rect.top;
-      const targetTopY = Math.max(0, clickY - (this.dragOffsetY || 10));
+      const offset = (this.dragOffsetY > 0 && this.dragOffsetY < rect.height) ? this.dragOffsetY : 0;
+      const targetTopY = Math.max(0, clickY - offset);
       const snappedMinutes = Math.min(23 * 60 + 45, Math.max(0, Math.round(targetTopY / 15) * 15));
 
       const [sh, sm] = (event.startTime || '09:00').split(':').map(Number);
@@ -220,12 +389,20 @@ export class WeekViewComponent implements OnInit, OnChanges, OnDestroy {
 
       this.eventDrop.emit({
         eventId: event.id,
+        oldDate: event.date,
+        oldEndDate: event.endDate || event.date,
         newDate: day.dateStr,
         newStartTime,
         newEndTime,
       });
     } else {
-      this.eventDrop.emit({ eventId, newDate: day.dateStr });
+      const fallback = (this.events || []).find(e => e.id === eventId);
+      this.eventDrop.emit({
+        eventId,
+        oldDate: fallback?.date || day.dateStr,
+        oldEndDate: fallback?.endDate || fallback?.date,
+        newDate: day.dateStr,
+      });
     }
   }
 
@@ -245,7 +422,18 @@ export class WeekViewComponent implements OnInit, OnChanges, OnDestroy {
     for (let i = 0; i < 7; i++) {
       const cur = new Date(d.getFullYear(), d.getMonth(), d.getDate() + i);
       const ds = this.toStr(cur);
-      const dayEvents = (this.events || []).filter(e => e.date === ds);
+      const dayEvents = (this.events || [])
+        .filter(e => e.date <= ds && (e.endDate || e.date) >= ds)
+        .map(e => {
+          const daySchedule = e.dayTimes?.[ds];
+          const st = daySchedule?.startTime || e.startTime || '09:00';
+          const et = daySchedule?.endTime || e.endTime || '10:00';
+          return {
+            ...e,
+            startTime: st,
+            endTime: et,
+          };
+        });
       const positioned = resolveDayOverlaps(dayEvents, 60);
 
       this.weekDays.push({

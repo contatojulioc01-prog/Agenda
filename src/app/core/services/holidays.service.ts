@@ -1,11 +1,14 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, of, tap } from 'rxjs';
+import { Observable, of, tap, catchError } from 'rxjs';
 import { Holiday } from '../models/holiday.model';
+
+function getBackendUrl(): string {
+  return '';
+}
 
 @Injectable({ providedIn: 'root' })
 export class HolidaysService {
-  private readonly API = 'https://brasilapi.com.br/api/feriados/v1';
   private cache = new Map<number, Holiday[]>();
 
   constructor(private http: HttpClient) {}
@@ -14,8 +17,9 @@ export class HolidaysService {
     if (this.cache.has(year)) {
       return of(this.cache.get(year)!);
     }
-    return this.http.get<Holiday[]>(`${this.API}/${year}`).pipe(
-      tap(data => this.cache.set(year, data))
+    return this.http.get<Holiday[]>(`${getBackendUrl()}/api/holidays/${year}`).pipe(
+      tap(data => this.cache.set(year, data)),
+      catchError(() => of([]))
     );
   }
 

@@ -97,9 +97,9 @@
         </div>
 
         <div class="form-grid">
-          <!-- Data -->
-          <div class="form-field col-span-2">
-            <label for="ev-date">Data <span class="required">*</span></label>
+          <!-- Data de Início -->
+          <div class="form-field">
+            <label for="ev-date">Data de Início <span class="required">*</span></label>
             <input
               id="ev-date"
               type="date"
@@ -112,6 +112,19 @@
             <span *ngIf="holidayWarning" class="holiday-warning">
               {{ holidayWarning }}
             </span>
+          </div>
+
+          <!-- Data de Término -->
+          <div class="form-field">
+            <label for="ev-end-date">Data de Término</label>
+            <input
+              id="ev-end-date"
+              type="date"
+              [(ngModel)]="formData.endDate"
+              name="endDate"
+              [min]="formData.date"
+              placeholder="Mesmo dia"
+            />
           </div>
 
           <!-- Dia inteiro toggle -->
@@ -163,8 +176,11 @@
             (click)="toggleAttendee(user.id)"
           >
             <div class="chip-avatar">
-              <img *ngIf="user.avatar" [src]="user.avatar" [alt]="user.name" />
-              <span *ngIf="!user.avatar">{{ user.name.slice(0, 2).toUpperCase() }}</span>
+              <img
+                [src]="user.avatar || defaultAvatar"
+                [alt]="user.name"
+                (error)="$any($event.target).src = defaultAvatar"
+              />
             </div>
             <div class="chip-details">
               <span class="chip-name">{{ user.name }}</span>

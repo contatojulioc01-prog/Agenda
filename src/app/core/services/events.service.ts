@@ -11,10 +11,7 @@ function generateUniqueId(): string {
 }
 
 function getBackendUrl(): string {
-  if (typeof window !== 'undefined' && window.location.hostname) {
-    return `http://${window.location.hostname}:9900`;
-  }
-  return 'http://192.168.13.244:9900';
+  return '';
 }
 
 @Injectable({ providedIn: 'root' })
@@ -33,14 +30,14 @@ export class EventsService {
   /** Retorna eventos de uma data específica */
   getByDate(date: string): CalendarEvent[] {
     return this.events()
-      .filter(e => e.date === date)
+      .filter(e => e.date <= date && (e.endDate || e.date) >= date)
       .sort((a, b) => a.startTime.localeCompare(b.startTime));
   }
 
   /** Retorna eventos de um mês/ano */
   getByMonth(year: number, month: number): CalendarEvent[] {
     const prefix = `${year}-${String(month + 1).padStart(2, '0')}`;
-    return this.events().filter(e => e.date.startsWith(prefix));
+    return this.events().filter(e => e.date.startsWith(prefix) || (e.endDate && e.endDate.startsWith(prefix)));
   }
 
   /** Carrega eventos de uma agenda específica do backend */
@@ -93,8 +90,10 @@ export class EventsService {
         title: event.title,
         description: event.description,
         date: event.date,
+        endDate: event.endDate || event.date,
         startTime: event.startTime,
         endTime: event.endTime,
+        dayTimes: event.dayTimes || {},
         color: event.color,
         category: event.category,
         allDay: event.allDay,
@@ -124,8 +123,10 @@ export class EventsService {
     if (changes.title !== undefined) body['title'] = changes.title;
     if (changes.description !== undefined) body['description'] = changes.description;
     if (changes.date !== undefined) body['date'] = changes.date;
+    if (changes.endDate !== undefined) body['endDate'] = changes.endDate;
     if (changes.startTime !== undefined) body['startTime'] = changes.startTime;
     if (changes.endTime !== undefined) body['endTime'] = changes.endTime;
+    if (changes.dayTimes !== undefined) body['dayTimes'] = changes.dayTimes;
     if (changes.color !== undefined) body['color'] = changes.color;
     if (changes.category !== undefined) body['category'] = changes.category;
     if (changes.allDay !== undefined) body['allDay'] = changes.allDay;

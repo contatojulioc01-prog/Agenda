@@ -13,6 +13,7 @@ import { SyncService } from '../../../core/services/sync.service';
 import { Holiday } from '../../../core/models/holiday.model';
 import { CalendarEvent } from '../../../core/models/event.model';
 import { Calendar } from '../../../core/models/calendar.model';
+import { DEFAULT_AVATAR } from '../../../core/models/user.model';
 
 import { MonthViewComponent } from '../views/month-view/month-view.component';
 import { WeekViewComponent } from '../views/week-view/week-view.component';
@@ -43,6 +44,8 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
   public calendarsService = inject(CalendarsService);
   public syncService = inject(SyncService);
   private router = inject(Router);
+
+  readonly defaultAvatar = DEFAULT_AVATAR;
 
   // ── Estado ──
   currentView: CalendarView = 'month';
@@ -151,6 +154,25 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
     }
   }
 
+  selectOnlyCalendar(calendarId: string, ev?: Event): void {
+    if (ev) ev.stopPropagation();
+    this.calendarsService.selectOnly(calendarId);
+    // Descarrega as demais e carrega apenas a selecionada
+    this.eventsService.events.update(list => list.filter(e => e.calendarId === calendarId));
+    this.eventsService.loadFromCalendar(calendarId);
+  }
+
+  selectAllCalendars(): void {
+    this.calendarsService.selectAll();
+    const ids = this.calendarsService.calendars().map(c => c.id);
+    this.eventsService.loadFromCalendars(ids);
+  }
+
+  deselectAllCalendars(): void {
+    this.calendarsService.deselectAll();
+    this.eventsService.events.set([]);
+  }
+
   removeCalendar(cal: Calendar): void {
     if (confirm(`Remover a agenda "${cal.name}"? Esta ação não pode ser desfeita.`)) {
       this.eventsService.unloadCalendar(cal.id);
@@ -205,12 +227,25 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
     });
   }
 
-  onEventDrop(payload: { eventId: string; newDate: string; newStartTime?: string; newEndTime?: string }): void {
-    if (payload.newStartTime && payload.newEndTime) {
-      this.eventsService.update(payload.eventId, { date: payload.newDate, startTime: payload.newStartTime, endTime: payload.newEndTime });
-    } else {
-      this.eventsService.moveToDate(payload.eventId, payload.newDate);
-    }
+  onEventDrop(payload: { eventId: string; oldDate: string; oldEndDate?: string; newDate: string; newStartTime?: string; newEndTime?: string }): void {
+    // Calcula o delta em dias entre a data original e a nova data
+    const oldMs = new Date(payload.oldDate + 'T00:00:00').getTime();
+    const newMs = new Date(payload.newDate + 'T00:00:00').getTime();
+    const deltaDays = Math.round((newMs - oldMs) / (1000 * 60 * 60 * 24));
+
+    // Aplica o mesmo deslocamento ao endDate para preservar a duração do evento
+    const oldEnd = payload.oldEndDate || payload.oldDate;
+    const endMs = new Date(oldEnd + 'T00:00:00').getTime() + deltaDays * 24 * 60 * 60 * 1000;
+    const newEndDate = new Date(endMs).toISOString().slice(0, 10);
+
+    const changes: Record<string, string> = {
+      date: payload.newDate,
+      endDate: newEndDate,
+    };
+    if (payload.newStartTime) changes['startTime'] = payload.newStartTime;
+    if (payload.newEndTime) changes['endTime'] = payload.newEndTime;
+
+    this.eventsService.update(payload.eventId, changes);
   }
 
   logout(): void {
