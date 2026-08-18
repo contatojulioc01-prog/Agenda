@@ -12,7 +12,9 @@ function hasAccess(calendarId, userId, requireWrite = false) {
   if (!cal) return true; // Agenda padrão/local
   if (cal.owner_id === userId) return true;
 
-  const member = db.get('SELECT permission FROM calendar_members WHERE calendar_id = ? AND user_id = ?', [calendarId, userId]);
+  if (!userId) return cal.is_private === 0 && !requireWrite;
+
+  const member = db.get('SELECT permission FROM calendar_members WHERE calendar_id = ? AND user_id = ?', [calendarId, String(userId)]);
   if (member) {
     if (requireWrite) return ['owner', 'editor'].includes(member.permission);
     return true;

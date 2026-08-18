@@ -9,8 +9,9 @@ function genId() {
 // GET /api/calendars/:id/members
 router.get('/:id/members', (req, res) => {
   const userId = req.headers['x-user-id'];
+  if (!userId) return res.status(403).json({ error: 'x-user-id obrigatório' });
   const { id } = req.params;
-  const access = db.get('SELECT 1 FROM calendar_members WHERE calendar_id = ? AND user_id = ?', [id, userId]);
+  const access = db.get('SELECT 1 FROM calendar_members WHERE calendar_id = ? AND user_id = ?', [id, String(userId)]);
   if (!access) return res.status(403).json({ error: 'Sem acesso' });
   res.json(db.all('SELECT * FROM calendar_members WHERE calendar_id = ?', [id]));
 });
