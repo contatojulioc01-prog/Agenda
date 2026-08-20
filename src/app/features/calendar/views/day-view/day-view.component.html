@@ -13,7 +13,10 @@
       <div
         *ngFor="let ev of allDayEvents"
         class="event-pill"
+        [class.system-event]="ev.isSystem"
+        [class.task-deadline]="ev.isTaskDeadline"
         [style.background]="colorMap[ev.color]"
+        [matTooltip]="ev.isTaskDeadline ? 'Prazo fixo — edite pelo card em Tarefas' : ev.title"
         (click)="eventClick.emit(ev)"
       >
         <span class="event-title">{{ ev.title }}</span>
@@ -48,6 +51,8 @@
       <div
         *ngFor="let ev of positionedEvents"
         class="day-event"
+        [class.system-event]="ev.isSystem"
+        [class.task-deadline]="ev.isTaskDeadline"
         [class.is-resizing]="resizingEventId === ev.id"
         [style.top.px]="ev.top"
         [style.height.px]="ev.height"
@@ -55,14 +60,15 @@
         [style.width]="'calc(' + ev.width + '% - 8px)'"
         [style.z-index]="resizingEventId === ev.id ? 100 : (10 + ev.column)"
         [style.background]="colorMap[ev.color]"
-        [attr.draggable]="isResizing || (ev.endDate && ev.endDate !== ev.date) ? null : true"
+        [attr.draggable]="isResizing || ev.isSystem || (ev.endDate && ev.endDate !== ev.date) ? null : true"
         (dragstart)="onDragStart($event, ev)"
         (dragend)="onDragEnd($event)"
         (click)="$event.stopPropagation(); onCardClick($event, ev)"
-        [matTooltip]="ev.title + ' · ' + ev.startTime + ' - ' + ev.endTime"
+        [matTooltip]="ev.title + ' · ' + ev.startTime + ' - ' + ev.endTime + (ev.isTaskDeadline ? ' · Prazo fixo — edite pelo card em Tarefas' : '')"
       >
         <!-- Alça de Redimensionamento Superior (Início) -->
         <div
+          *ngIf="!ev.isSystem"
           class="event-resize-handle top"
           (mousedown)="onResizeStart($event, ev, colRef, 'top')"
           title="Arrastar para alterar horário de início"
@@ -73,6 +79,7 @@
 
         <!-- Alça de Redimensionamento Inferior (Término) -->
         <div
+          *ngIf="!ev.isSystem"
           class="event-resize-handle bottom"
           (mousedown)="onResizeStart($event, ev, colRef, 'bottom')"
           title="Arrastar para alterar horário de término"

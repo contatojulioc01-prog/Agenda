@@ -29,6 +29,16 @@ interface WeekDay {
   positionedEvents: PositionedEvent[];
 }
 
+interface WeekEventSpan {
+  event: CalendarEvent;
+  startCol: number;
+  span: number;
+  top: number;
+  height: number;
+  left: number;
+  width: number;
+}
+
 @Component({
   selector: 'app-week-view',
   standalone: true,
@@ -53,6 +63,7 @@ export class WeekViewComponent implements OnInit, OnChanges, OnDestroy {
   readonly HOURS = Array.from({ length: 24 }, (_, i) => i);
 
   weekDays: WeekDay[] = [];
+  multiDaySpans: WeekEventSpan[] = [];
   currentTimeTop = 0;
   private timeInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -99,6 +110,7 @@ export class WeekViewComponent implements OnInit, OnChanges, OnDestroy {
   onResizeStart(mouseEvent: MouseEvent, event: PositionedEvent, columnElement: HTMLElement, edge: 'top' | 'bottom' = 'bottom', dayDateStr?: string): void {
     mouseEvent.stopPropagation();
     mouseEvent.preventDefault();
+    if (event.isSystem) return;
 
     this.isResizing = true;
     this.resizingEventId = event.id;
@@ -192,13 +204,14 @@ export class WeekViewComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   /* ── Redimensionamento Horizontal entre Dias (Esquerda / Direita) ── */
-  onResizeHorizontalStart(mouseEvent: MouseEvent, event: PositionedEvent, edge: 'left' | 'right'): void {
+  onResizeHorizontalStart(mouseEvent: MouseEvent, event: CalendarEvent, edge: 'left' | 'right'): void {
     mouseEvent.stopPropagation();
     mouseEvent.preventDefault();
+    if (event.isSystem) return;
 
     this.isResizing = true;
     this.resizingEventId = event.id;
-    document.body.classList.add('resizing-active');
+    document.body.classList.add('resizing-x-active');
 
     const onMouseMove = (moveEvent: MouseEvent) => {
       const clientX = moveEvent.clientX;
@@ -255,7 +268,7 @@ export class WeekViewComponent implements OnInit, OnChanges, OnDestroy {
     const onMouseUp = () => {
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mouseup', onMouseUp);
-      document.body.classList.remove('resizing-active');
+      document.body.classList.remove('resizing-x-active');
 
       const orig = (this.events || []).find(e => e.id === event.id);
       if (orig) {
@@ -281,7 +294,7 @@ export class WeekViewComponent implements OnInit, OnChanges, OnDestroy {
 
   /* ── Drag & Drop de Eventos ── */
   onDragStart(ev: DragEvent, event: CalendarEvent): void {
-    if (this.isResizing) {
+    if (this.isResizing || event.isSystem) {
       ev.preventDefault();
       return;
     }
@@ -418,12 +431,33 @@ export class WeekViewComponent implements OnInit, OnChanges, OnDestroy {
     const d = new Date(this.selectedDate || new Date());
     d.setDate(d.getDate() - d.getDay());
 
+    const weekDates = Array.from({ length: 7 }, (_, i) => this.toStr(new Date(d.getFullYear(), d.getMonth(), d.getDate() + i)));
+    const weekStart = weekDates[0];
+    const weekEnd = weekDates[6];
+    this.multiDaySpans = (this.events || [])
+      .filter(event => {
+        const end = event.endDate || event.date;
+        return end !== event.date && event.date <= weekEnd && end >= weekStart;
+      })
+      .map(event => {
+        const end = event.endDate || event.date;
+        const startCol = event.date < weekStart ? 0 : weekDates.indexOf(event.date);
+        const endCol = end > weekEnd ? 6 : weekDates.indexOf(end);
+        const start = timeToMinutes(event.startTime || '09:00');
+        const finish = Math.max(start + 15, timeToMinutes(event.endTime || '10:00'));
+        const span = endCol - startCol + 1;
+        return {
+          event, startCol, span, top: start, height: Math.max(22, finish - start),
+          left: (startCol / 7) * 100, width: (span / 7) * 100,
+        };
+      });
+
     this.weekDays = [];
     for (let i = 0; i < 7; i++) {
       const cur = new Date(d.getFullYear(), d.getMonth(), d.getDate() + i);
       const ds = this.toStr(cur);
       const dayEvents = (this.events || [])
-        .filter(e => e.date <= ds && (e.endDate || e.date) >= ds)
+        .filter(e => e.date <= ds && (e.endDate || e.date) >= ds && (e.endDate || e.date) === e.date)
         .map(e => {
           const daySchedule = e.dayTimes?.[ds];
           const st = daySchedule?.startTime || e.startTime || '09:00';

@@ -52,6 +52,8 @@
       <div
         *ngFor="let ev of day.positionedEvents"
         class="week-event"
+        [class.system-event]="ev.isSystem"
+        [class.task-deadline]="ev.isTaskDeadline"
         [class.is-resizing]="resizingEventId === ev.id"
         [style.top.px]="ev.top"
         [style.height.px]="ev.height"
@@ -59,14 +61,15 @@
         [style.width]="'calc(' + ev.width + '% - 4px)'"
         [style.z-index]="resizingEventId === ev.id ? 100 : (10 + ev.column)"
         [style.background]="colorMap[ev.color]"
-        [attr.draggable]="isResizing || (ev.endDate && ev.endDate !== ev.date) ? null : true"
+        [attr.draggable]="isResizing || ev.isSystem || (ev.endDate && ev.endDate !== ev.date) ? null : true"
         (dragstart)="onDragStart($event, ev)"
         (dragend)="onDragEnd($event)"
         (click)="$event.stopPropagation(); onCardClick($event, ev)"
-        [matTooltip]="ev.title + ' · ' + ev.startTime + ' - ' + ev.endTime + (ev.endDate && ev.endDate !== ev.date ? ' (' + ev.date + ' até ' + ev.endDate + ')' : '')"
+        [matTooltip]="ev.title + ' · ' + ev.startTime + ' - ' + ev.endTime + (ev.endDate && ev.endDate !== ev.date ? ' (' + ev.date + ' até ' + ev.endDate + ')' : '') + (ev.isTaskDeadline ? ' · Prazo fixo — edite pelo card em Tarefas' : '')"
       >
         <!-- Alça de Redimensionamento Esquerda (Dias) -->
         <div
+          *ngIf="!ev.isSystem"
           class="event-resize-handle-x left"
           (mousedown)="onResizeHorizontalStart($event, ev, 'left')"
           title="Arrastar para esquerda/direita para alterar dia de início"
@@ -74,6 +77,7 @@
 
         <!-- Alça de Redimensionamento Superior (Horário de Início deste dia) -->
         <div
+          *ngIf="!ev.isSystem"
           class="event-resize-handle top"
           (mousedown)="onResizeStart($event, ev, colRef, 'top', day.dateStr)"
           title="Arrastar para alterar horário de início deste dia"
@@ -89,6 +93,7 @@
 
         <!-- Alça de Redimensionamento Inferior (Horário de Término deste dia) -->
         <div
+          *ngIf="!ev.isSystem"
           class="event-resize-handle bottom"
           (mousedown)="onResizeStart($event, ev, colRef, 'bottom', day.dateStr)"
           title="Arrastar para alterar horário de término deste dia"
@@ -96,10 +101,34 @@
 
         <!-- Alça de Redimensionamento Direita (Dias) -->
         <div
+          *ngIf="!ev.isSystem"
           class="event-resize-handle-x right"
           (mousedown)="onResizeHorizontalStart($event, ev, 'right')"
           title="Arrastar para esquerda/direita para alterar dia de término"
         ></div>
+      </div>
+    </div>
+
+    <!-- Eventos de vários dias usam uma única barra contínua sobre as colunas. -->
+    <div class="week-multiday-layer">
+      <div
+        *ngFor="let span of multiDaySpans"
+        class="week-event week-multiday-event"
+        [class.system-event]="span.event.isSystem"
+        [class.task-deadline]="span.event.isTaskDeadline"
+        [class.is-resizing]="resizingEventId === span.event.id"
+        [style.left.%]="span.left"
+        [style.width.%]="span.width"
+        [style.top.px]="span.top"
+        [style.height.px]="span.height"
+        [style.background]="colorMap[span.event.color]"
+        (click)="$event.stopPropagation(); onCardClick($event, span.event)"
+        [matTooltip]="span.event.title + ' · ' + span.event.startTime + ' - ' + span.event.endTime + (span.event.isTaskDeadline ? ' · Prazo fixo — edite pelo card em Tarefas' : '')"
+      >
+        <div *ngIf="!span.event.isSystem" class="event-resize-handle-x left" (mousedown)="onResizeHorizontalStart($event, span.event, 'left')"></div>
+        <div class="ev-title-row"><span class="ev-title">{{ span.event.title }}</span></div>
+        <div class="ev-time" *ngIf="span.height >= 32">{{ span.event.startTime }} – {{ span.event.endTime }}</div>
+        <div *ngIf="!span.event.isSystem" class="event-resize-handle-x right" (mousedown)="onResizeHorizontalStart($event, span.event, 'right')"></div>
       </div>
     </div>
   </div>

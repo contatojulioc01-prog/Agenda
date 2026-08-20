@@ -61,6 +61,7 @@ export class DayViewComponent implements OnInit, OnChanges {
   onResizeStart(mouseEvent: MouseEvent, event: PositionedEvent, columnElement: HTMLElement, edge: 'top' | 'bottom' = 'bottom'): void {
     mouseEvent.stopPropagation();
     mouseEvent.preventDefault();
+    if (event.isSystem) return;
 
     this.isResizing = true;
     this.resizingEventId = event.id;
@@ -154,7 +155,7 @@ export class DayViewComponent implements OnInit, OnChanges {
   private dragEnterCounters = new WeakMap<HTMLElement, number>();
 
   onDragStart(ev: DragEvent, event: CalendarEvent): void {
-    if (this.isResizing) {
+    if (this.isResizing || event.isSystem) {
       ev.preventDefault();
       return;
     }

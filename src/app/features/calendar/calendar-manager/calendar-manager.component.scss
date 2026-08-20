@@ -69,6 +69,49 @@
   mat-icon { font-size: 20px; width: 20px; height: 20px; }
 }
 
+.delete-confirmation-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1010;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.62);
+  backdrop-filter: blur(4px);
+}
+
+.delete-confirmation-modal {
+  width: min(420px, 100%);
+  padding: 26px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.34);
+  text-align: center;
+
+  h3 { margin: 12px 0 8px; font-size: 19px; }
+  p { margin: 0 0 7px; color: var(--text-secondary); }
+  small { display: block; color: var(--text-muted); line-height: 1.45; }
+  > div { display: flex; justify-content: center; gap: 10px; margin-top: 22px; }
+  button { min-height: 38px; padding: 0 14px; border-radius: 9px; font-weight: 600; cursor: pointer; }
+}
+
+.delete-confirmation-icon {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--text-danger, #dc2626);
+}
+
+.delete-cancel { border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-secondary); }
+.delete-accept { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--text-danger, #dc2626); background: var(--text-danger, #dc2626); color: #fff; }
+.delete-accept mat-icon { width: 18px; height: 18px; font-size: 18px; }
+
 /* ── Body ── */
 .modal-body {
   padding: 20px;
@@ -98,15 +141,6 @@
   display: flex;
   align-items: center;
   gap: 4px;
-}
-
-.label-hint {
-  font-size: 10.5px;
-  font-weight: 400;
-  color: var(--text-muted);
-  text-transform: none;
-  letter-spacing: normal;
-  margin-left: 4px;
 }
 
 .label-icon { font-size: 14px; width: 14px; height: 14px; }
@@ -282,16 +316,6 @@
   }
 }
 
-.select-badge {
-  margin-left: auto;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--brand-500);
-  background: rgba(var(--brand-500-rgb, 79, 70, 229), 0.1);
-  padding: 3px 8px;
-  border-radius: 6px;
-}
-
 .user-avatar-sm {
   width: 32px; height: 32px;
   border-radius: 50%;
@@ -302,7 +326,6 @@
   flex-shrink: 0;
   overflow: hidden;
   img { width: 100%; height: 100%; object-fit: cover; }
-  .dept-icon { font-size: 16px; width: 16px; height: 16px; color: #fff; }
 }
 
 .user-result-info { display: flex; flex-direction: column; flex: 1; min-width: 0; }

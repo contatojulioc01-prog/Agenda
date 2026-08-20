@@ -11,10 +11,6 @@ export function getBackendUrl(): string {
   return '';
 }
 
-function genLocalId(): string {
-  return 'cal-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
-}
-
 @Injectable({ providedIn: 'root' })
 export class CalendarsService {
   private http = inject(HttpClient);
@@ -28,6 +24,7 @@ export class CalendarsService {
 
   /** Loading state */
   isLoading = signal(false);
+  error = signal('');
 
   /** Agendas visíveis calculadas */
   visibleCalendars = computed(() =>
@@ -46,22 +43,23 @@ export class CalendarsService {
   loadAll(): void {
     if (!this.userId || this.userId === 'anonymous') return;
     this.isLoading.set(true);
+    this.error.set('');
 
     this.http.get<Calendar[]>(`${getBackendUrl()}/api/calendars`, { headers: this.headers })
       .pipe(
         catchError(err => {
-          console.warn('[CalendarsService] Backend indisponível, usando agenda local:', err.message);
-          return of(this.getDefaultCalendar());
+          console.warn('[CalendarsService] PostgreSQL/backend indisponível:', err.message);
+          this.error.set('Não foi possível carregar as agendas do PostgreSQL.');
+          return of([] as Calendar[]);
         }),
         tap(cals => {
-          const list = Array.isArray(cals) ? cals : this.getDefaultCalendar();
-
-          // Se o backend não retornou nada, criar agenda padrão
-          const finalList = list.length > 0 ? list : this.getDefaultCalendar();
+          const finalList = Array.isArray(cals) ? cals : [];
           this.calendars.set(finalList);
 
           // Tornar todas visíveis por padrão
-          this.visibleCalendarIds.set(new Set(finalList.map(c => c.id)));
+          const currentId = [...this.visibleCalendarIds()][0];
+          const selectedId = finalList.some(calendar => calendar.id === currentId) ? currentId : finalList[0]?.id;
+          this.visibleCalendarIds.set(new Set(selectedId ? [selectedId] : []));
           this.isLoading.set(false);
         })
       ).subscribe();
@@ -75,40 +73,25 @@ export class CalendarsService {
     initialMembers: { user_id: string; permission: CalendarPermission }[] = []
   ): void {
     const payload = { name, color, isPrivate, members: initialMembers };
+    this.error.set('');
     this.http.post<Calendar>(`${getBackendUrl()}/api/calendars`, payload, { headers: this.headers })
-      .pipe(catchError(() => {
-        const localCal: Calendar = {
-          id: genLocalId(),
-          name,
-          color,
-          isPrivate,
-          owner_id: this.userId,
-          created_at: new Date().toISOString(),
-          members: [
-            { id: genLocalId(), calendar_id: '', user_id: this.userId, permission: 'owner' },
-            ...initialMembers.map(m => ({
-              id: genLocalId(),
-              calendar_id: '',
-              user_id: m.user_id,
-              permission: m.permission
-            }))
-          ],
-          my_permission: 'owner',
-        };
-        return of(localCal);
+      .pipe(catchError(err => {
+        this.error.set(err.error?.error || 'Não foi possível salvar a agenda no PostgreSQL.');
+        return of(null);
       }))
       .subscribe(cal => {
         if (cal) {
           this.calendars.update(list => [...list, cal]);
-          this.visibleCalendarIds.update(ids => new Set([...ids, cal.id]));
+          this.visibleCalendarIds.set(new Set([cal.id]));
         }
       });
   }
 
   /** Atualiza agenda existente */
   update(id: string, changes: Partial<Pick<Calendar, 'name' | 'color' | 'isPrivate'>>): void {
+    this.error.set('');
     this.http.put<Calendar>(`${getBackendUrl()}/api/calendars/${id}`, changes, { headers: this.headers })
-      .pipe(catchError(() => of(null)))
+      .pipe(catchError(err => { this.error.set(err.error?.error || 'Não foi possível atualizar a agenda no PostgreSQL.'); return of(null); }))
       .subscribe(updated => {
         if (updated) {
           this.calendars.update(list => list.map(c => c.id === id ? { ...c, ...updated } : c));
@@ -118,14 +101,16 @@ export class CalendarsService {
 
   /** Remove agenda */
   remove(id: string): void {
+    this.error.set('');
     this.http.delete(`${getBackendUrl()}/api/calendars/${id}`, { headers: this.headers })
-      .pipe(catchError(() => of(null)))
-      .subscribe(() => {
+      .pipe(catchError(err => { this.error.set(err.error?.error || 'Não foi possível excluir a agenda no PostgreSQL.'); return of(null); }))
+      .subscribe(result => {
+        if (!result) return;
         this.calendars.update(list => list.filter(c => c.id !== id));
-        this.visibleCalendarIds.update(ids => {
-          ids.delete(id);
-          return new Set(ids);
-        });
+        const remaining = this.calendars();
+        const selected = [...this.visibleCalendarIds()][0];
+        const nextId = selected === id || !remaining.some(calendar => calendar.id === selected) ? remaining[0]?.id : selected;
+        this.visibleCalendarIds.set(new Set(nextId ? [nextId] : []));
       });
   }
 
@@ -135,9 +120,9 @@ export class CalendarsService {
       `${getBackendUrl()}/api/calendars/${calendarId}/members`,
       { userId, permission },
       { headers: this.headers }
-    ).pipe(catchError(() => of(null)))
+    ).pipe(catchError(err => { this.error.set(err.error?.error || 'Não foi possível compartilhar a agenda.'); return of(null); }))
       .subscribe(member => {
-        if (member) {
+        if (member && (member as CalendarMember & { status?: string }).status !== 'pending') {
           this.calendars.update(list =>
             list.map(c => c.id === calendarId
               ? { ...c, members: [...(c.members || []), member] }
@@ -154,8 +139,9 @@ export class CalendarsService {
       `${getBackendUrl()}/api/calendars/${calendarId}/members/${memberId}`,
       { permission },
       { headers: this.headers }
-    ).pipe(catchError(() => of(null)))
-      .subscribe(() => {
+    ).pipe(catchError(err => { this.error.set(err.error?.error || 'Não foi possível atualizar a permissão.'); return of(null); }))
+      .subscribe(result => {
+        if (!result) return;
         this.calendars.update(list =>
           list.map(c => c.id === calendarId
             ? {
@@ -175,8 +161,9 @@ export class CalendarsService {
     this.http.delete(
       `${getBackendUrl()}/api/calendars/${calendarId}/members/${memberId}`,
       { headers: this.headers }
-    ).pipe(catchError(() => of(null)))
-      .subscribe(() => {
+    ).pipe(catchError(err => { this.error.set(err.error?.error || 'Não foi possível remover o membro.'); return of(null); }))
+      .subscribe(result => {
+        if (!result) return;
         this.calendars.update(list =>
           list.map(c => c.id === calendarId
             ? { ...c, members: c.members.filter(m => m.id !== memberId) }
@@ -188,15 +175,7 @@ export class CalendarsService {
 
   /** Toggle visibilidade de uma agenda */
   toggleVisibility(calendarId: string): void {
-    this.visibleCalendarIds.update(ids => {
-      const next = new Set(ids);
-      if (next.has(calendarId)) {
-        next.delete(calendarId);
-      } else {
-        next.add(calendarId);
-      }
-      return next;
-    });
+    this.visibleCalendarIds.set(new Set([calendarId]));
   }
 
   /** Seleciona exclusivamente apenas esta agenda */
@@ -206,13 +185,13 @@ export class CalendarsService {
 
   /** Seleciona todas as agendas */
   selectAll(): void {
-    const allIds = this.calendars().map(c => c.id);
-    this.visibleCalendarIds.set(new Set(allIds));
+    const firstId = this.calendars()[0]?.id;
+    this.visibleCalendarIds.set(new Set(firstId ? [firstId] : []));
   }
 
   /** Desmarca todas as agendas */
   deselectAll(): void {
-    this.visibleCalendarIds.set(new Set());
+    this.selectAll();
   }
 
   /** Verifica se todas estão selecionadas */
@@ -262,20 +241,6 @@ export class CalendarsService {
       .subscribe(cals => {
         if (cals) this.calendars.set(cals);
       });
-  }
-
-  /** Agenda padrão quando backend não disponível (fallback local) */
-  private getDefaultCalendar(): Calendar[] {
-    return [{
-      id: 'local-default',
-      name: 'Minha Agenda',
-      color: '#4f46e5',
-      isPrivate: true,
-      owner_id: this.userId,
-      created_at: new Date().toISOString(),
-      members: [],
-      my_permission: 'owner',
-    }];
   }
 
   getBackendUrl(): string {

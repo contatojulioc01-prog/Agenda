@@ -5,12 +5,16 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "npx nodemon index.js"
+    "dev": "npx nodemon index.js",
+    "db:setup": "node scripts/setup-postgres.js",
+    "db:migrate:sqlite": "node scripts/migrate-sqlite-to-postgres.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
     "express": "^4.18.3",
-    "ws": "^8.16.0",
-    "sql.js": "^1.10.2"
+    "pg": "^8.23.0",
+    "sql.js": "^1.10.2",
+    "ws": "^8.16.0"
   }
 }

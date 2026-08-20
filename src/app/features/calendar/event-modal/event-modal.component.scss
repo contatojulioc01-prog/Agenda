@@ -196,3 +196,15 @@
     stroke: rgba(255, 255, 255, 0.85);
   }
 }
+
+.duplicate-event-section { padding: 0 24px 16px; }
+.no-calendar-warning { margin: 0 0 14px; padding: 10px; border-radius: 8px; background: #fef3c7; color: #92400e; font-size: 13px; }
+.btn-duplicate-toggle, .btn-duplicate-confirm { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 8px; padding: 8px 11px; cursor: pointer; }
+.btn-duplicate-toggle { margin-left: 10px; border-color: #c4b5fd; background: #ede9fe; color: #6d28d9; font-weight: 600; }
+.btn-duplicate-toggle:hover { background: #ddd6fe; border-color: #8b5cf6; }
+.btn-duplicate-toggle mat-icon { width: 18px; height: 18px; font-size: 18px; }
+.duplicate-calendar-options { display: grid; gap: 8px; margin-top: 10px; padding: 10px; border: 1px solid var(--border-light); border-radius: 8px; }
+.duplicate-calendar-options label { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.duplicate-dot { width: 9px; height: 9px; border-radius: 50%; }
+.btn-duplicate-confirm { justify-content: center; color: #fff; background: var(--brand-500); border-color: var(--brand-500); }
+.btn-duplicate-confirm:disabled { opacity: .5; cursor: not-allowed; }

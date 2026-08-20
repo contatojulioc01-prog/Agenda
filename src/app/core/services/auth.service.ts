@@ -36,6 +36,10 @@ export class AuthService {
         const urlToken = urlParams.get('token');
         if (urlToken && urlToken.trim().length > 0) {
           localStorage.setItem(this.TOKEN_KEY, urlToken.trim());
+          urlParams.delete('token');
+          const remainingQuery = urlParams.toString();
+          const cleanUrl = `${window.location.pathname}${remainingQuery ? `?${remainingQuery}` : ''}${window.location.hash}`;
+          window.history.replaceState(window.history.state, document.title, cleanUrl);
           return urlToken.trim();
         }
         return localStorage.getItem(this.TOKEN_KEY);

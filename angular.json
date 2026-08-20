@@ -57,6 +57,7 @@
           },
           "configurations": {
             "production": {
+              "baseHref": "/agenda/",
               "budgets": [
                 {
                   "type": "initial",

@@ -25,6 +25,8 @@
   <div class="modal-body">
     <form class="form-container" #eventForm="ngForm">
 
+      <p class="no-calendar-warning" *ngIf="!isEdit && !hasTargetCalendars">Selecione ao menos uma agenda na lateral antes de criar o evento.</p>
+
       <!-- SKILL: Form Groups — Grupo 1: Dados do Evento -->
       <div class="form-card">
         <div class="card-header">
@@ -162,7 +164,7 @@
       </div>
 
       <!-- SKILL: Form Groups — Grupo 3: Participantes & Colaboradores -->
-      <div class="form-card" *ngIf="allUsers().length > 0">
+      <div class="form-card" *ngIf="false">
         <div class="card-header">
           <mat-icon class="section-icon color-purple">group</mat-icon>
           <h3>Participantes (Equipe Corporativa)</h3>
@@ -195,6 +197,17 @@
   </div>
 
   <!-- ── Footer fixo ── -->
+  <div class="duplicate-event-section" *ngIf="isEdit && duplicateCalendars().length > 0">
+    <div class="duplicate-calendar-options" *ngIf="showDuplicateOptions">
+      <label *ngFor="let calendar of duplicateCalendars()">
+        <input type="checkbox" [checked]="duplicateCalendarIds().has(calendar.id)" (change)="toggleDuplicateCalendar(calendar.id)" />
+        <span class="duplicate-dot" [style.background]="calendar.color"></span>
+        {{ calendar.name }}
+      </label>
+      <button type="button" class="btn-duplicate-confirm" [disabled]="duplicateCalendarIds().size === 0" (click)="duplicateToSelectedCalendars()">Duplicar evento</button>
+    </div>
+  </div>
+
   <div class="modal-footer">
     <!-- Botão excluir (apenas no edit) -->
     <button
@@ -208,18 +221,24 @@
       <mat-icon>delete</mat-icon>
     </button>
 
-    <div class="footer-spacer"></div>
-
-    <button type="button" class="btn-cancel" (click)="dialogRef.close()" id="btn-cancelar-modal">
-      Cancelar
+    <button
+      *ngIf="isEdit && duplicateCalendars().length > 0"
+      type="button"
+      class="btn-duplicate-toggle"
+      (click)="showDuplicateOptions = !showDuplicateOptions"
+    >
+      <mat-icon>content_copy</mat-icon>
+      Duplicar
     </button>
+
+    <div class="footer-spacer"></div>
 
     <!-- SKILL: Angular Button HTTP Loading -->
     <button
       type="button"
       class="btn-save"
       (click)="salvar()"
-      [disabled]="loadingSalvar || !formData.title.trim() || !formData.date"
+      [disabled]="loadingSalvar || !formData.title.trim() || !formData.date || !hasTargetCalendars"
       id="btn-salvar-evento"
     >
       <mat-progress-spinner

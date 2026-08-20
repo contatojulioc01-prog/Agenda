@@ -44,14 +44,16 @@
           [class.bar-start]="seg.isStart"
           [class.bar-end]="seg.isEnd"
           [class.bar-single]="seg.isStart && seg.isEnd && seg.span === 1"
+          [class.system-event]="seg.event.isSystem"
+          [class.task-deadline]="seg.event.isTaskDeadline"
           [style.grid-column]="(seg.startCol + 1) + ' / span ' + seg.span"
           [style.top.px]="32 + seg.rowSlot * 24"
           [style.background]="colorMap[seg.event.color]"
-          [attr.draggable]="seg.event.endDate && seg.event.endDate !== seg.event.date ? null : true"
+          [attr.draggable]="seg.event.isSystem || (seg.event.endDate && seg.event.endDate !== seg.event.date) ? null : true"
           (dragstart)="onDragStart($event, seg.event)"
           (dragend)="onDragEnd($event)"
           (click)="$event.stopPropagation(); eventClick.emit(seg.event)"
-          [matTooltip]="seg.event.title + (seg.event.allDay ? '' : ' · ' + seg.event.startTime + ' - ' + seg.event.endTime) + (seg.event.endDate && seg.event.endDate !== seg.event.date ? ' (' + seg.event.date + ' até ' + seg.event.endDate + ')' : '')"
+          [matTooltip]="seg.event.title + (seg.event.allDay ? '' : ' · ' + seg.event.startTime + ' - ' + seg.event.endTime) + (seg.event.endDate && seg.event.endDate !== seg.event.date ? ' (' + seg.event.date + ' até ' + seg.event.endDate + ')' : '') + (seg.event.isTaskDeadline ? ' · Prazo fixo — edite pelo card em Tarefas' : '')"
         >
           <span *ngIf="!seg.event.allDay && seg.isStart" class="bar-time">{{ seg.event.startTime }}</span>
           <span class="bar-title">{{ seg.event.title }}</span>

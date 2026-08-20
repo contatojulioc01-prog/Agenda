@@ -11,7 +11,11 @@ export interface CalendarEvent {
   color: EventColor;
   category: string;
   allDay: boolean;
-  attendees?: string[]; // IDs ou nomes de participantes
+  copyGroupId?: string;
+  /** Evento calculado pelo sistema, sem edição manual. */
+  isSystem?: boolean;
+  /** Prazo sincronizado de uma tarefa; editável somente pelo card no Kanban. */
+  isTaskDeadline?: boolean;
 }
 
 export type EventColor =

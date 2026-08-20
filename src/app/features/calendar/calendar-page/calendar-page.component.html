@@ -10,8 +10,15 @@
     <div class="sidebar-top">
       <!-- Logo -->
       <div class="app-brand">
-        <div class="app-brand-icon">
-          <img src="/sidebar.png" alt="Sidebar Logo" style="width: 100%; height: 100%; object-fit: contain; background: transparent;">
+        <div
+          class="app-brand-icon"
+          [class.realm-angel]="themeService.realm() === 'angel'"
+          [class.realm-demon]="themeService.realm() === 'demon'"
+          (click)="themeService.cycleRealm()"
+          [title]="themeService.realm() === 'angel' ? '😇 Modo Angelical ativo — clique para Modo Demoníaco' : themeService.realm() === 'demon' ? '😈 Modo Demoníaco ativo — clique para sair' : '✨ Clique para entrar no Modo Angelical'"
+          style="cursor: pointer;"
+        >
+          <img src="sidebar.png" alt="Sidebar Logo" style="width: 100%; height: 100%; object-fit: contain; background: transparent;">
         </div>
         <div>
           <div class="app-brand-name">Agenda</div>
@@ -19,20 +26,33 @@
         </div>
       </div>
 
+      <nav class="app-section-tabs" aria-label="Módulos do sistema">
+        <button [class.active]="activeSection === 'calendar'" (click)="setSection('calendar')">
+          <mat-icon>calendar_month</mat-icon><span>Agenda</span>
+        </button>
+        <button [class.active]="activeSection === 'tasks'" (click)="setSection('tasks')">
+          <mat-icon>view_kanban</mat-icon><span>Tarefas</span>
+        </button>
+      </nav>
+
       <!-- Botão criar evento -->
-      <button class="btn-create" (click)="openCreateModal()" id="btn-create-event" matTooltip="Criar novo evento">
+      <button *ngIf="activeSection === 'calendar'" class="btn-create" (click)="openCreateModal()" id="btn-create-event" matTooltip="Criar novo evento">
         <span class="btn-create-icon">＋</span>
         <span>Criar evento</span>
+      </button>
+      <button *ngIf="activeSection === 'tasks'" class="btn-create" (click)="openTaskCreate()" id="btn-create-task" matTooltip="Criar nova tarefa">
+        <span class="btn-create-icon">＋</span>
+        <span>Criar tarefa</span>
       </button>
     </div>
 
     <!-- Conteúdo central rolável -->
-    <div class="sidebar-content">
+    <div class="sidebar-content" [hidden]="activeSection !== 'calendar'">
       <!-- Mini calendário -->
       <app-mini-calendar
         [selectedDate]="selectedDate"
         [holidays]="holidays"
-        [events]="events()"
+        [events]="displayedEvents()"
         (dateSelected)="onMiniCalDateSelected($event)"
         (monthChanged)="onMiniCalMonthChanged($event)"
       ></app-mini-calendar>
@@ -44,8 +64,7 @@
         <div class="sidebar-section-header">
           <span class="sidebar-section-title">Minhas Agendas</span>
           <div class="sidebar-section-actions">
-            <button class="btn-text-action" (click)="selectAllCalendars()" matTooltip="Selecionar todas as agendas">Todas</button>
-            <button class="btn-text-action" (click)="deselectAllCalendars()" matTooltip="Desmarcar todas">Nenhuma</button>
+            <span class="single-calendar-hint">Uma por vez</span>
             <button class="btn-add-calendar" (click)="openCreateCalendar()" matTooltip="Nova agenda" id="btn-new-calendar">
               <mat-icon>add</mat-icon>
             </button>
@@ -62,7 +81,8 @@
           >
             <label class="calendar-checkbox-label" (click)="$event.stopPropagation()">
               <input
-                type="checkbox"
+                type="radio"
+                name="active-calendar"
                 class="calendar-checkbox"
                 [checked]="calendarsService.visibleCalendarIds().has(cal.id)"
                 (change)="toggleCalendarVisibility(cal.id)"
@@ -112,7 +132,8 @@
           >
             <label class="calendar-checkbox-label" (click)="$event.stopPropagation()">
               <input
-                type="checkbox"
+                type="radio"
+                name="active-calendar"
                 class="calendar-checkbox"
                 [checked]="calendarsService.visibleCalendarIds().has(cal.id)"
                 (change)="toggleCalendarVisibility(cal.id)"
@@ -134,6 +155,22 @@
             </div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <div class="sidebar-content tasks-sidebar" [hidden]="activeSection !== 'tasks'">
+      <div class="tasks-sidebar-hero">
+        <span class="tasks-sidebar-icon"><mat-icon>task_alt</mat-icon></span>
+        <h2>Central de tarefas</h2>
+        <p>Planeje, priorize e mova seus cartões por cada etapa do trabalho.</p>
+      </div>
+      <div class="sidebar-divider"></div>
+      <div class="sidebar-section task-tips">
+        <span class="sidebar-section-title">Como usar</span>
+        <div><mat-icon>drag_indicator</mat-icon><span>Arraste cartões entre as listas</span></div>
+        <div><mat-icon>edit_note</mat-icon><span>Clique para editar os detalhes</span></div>
+        <div><mat-icon>checklist</mat-icon><span>Acompanhe checklists e prazos</span></div>
+        <div><mat-icon>archive</mat-icon><span>Arquive sem perder o histórico</span></div>
       </div>
     </div>
 
@@ -166,7 +203,7 @@
   </aside>
 
   <!-- ══════════════ MAIN ══════════════ -->
-  <div class="main-area">
+  <div class="main-area" [hidden]="activeSection !== 'calendar'">
 
     <!-- ── GRUPO 1: Header ── -->
     <div class="group-panel header-panel">
@@ -205,17 +242,7 @@
 
       <!-- Barra de Filtros Rápidos de Agendas (Pills) -->
       <div class="agenda-pills-bar" *ngIf="calendars().length > 0">
-        <span class="pills-label">Agendas:</span>
-        <button
-          class="agenda-pill all-pill"
-          [class.active]="calendarsService.isAllSelected()"
-          (click)="selectAllCalendars()"
-          matTooltip="Mostrar todas as agendas"
-        >
-          <span class="pill-dot rainbow"></span>
-          <span>Todas</span>
-          <span class="pill-count">{{ calendars().length }}</span>
-        </button>
+        <span class="pills-label">Agenda:</span>
 
         <div class="pills-scroll">
           <button
@@ -224,17 +251,9 @@
             [class.active]="calendarsService.visibleCalendarIds().has(cal.id)"
             (click)="toggleCalendarVisibility(cal.id)"
             [matTooltip]="cal.name + ' · Clique para alternar | Duplo clique para ver apenas esta'"
-            (dblclick)="selectOnlyCalendar(cal.id, $event)"
           >
             <span class="pill-dot" [style.background]="cal.color"></span>
             <span class="pill-name">{{ cal.name }}</span>
-            <span
-              class="pill-solo-btn"
-              (click)="selectOnlyCalendar(cal.id, $event)"
-              matTooltip="Ver apenas esta agenda"
-            >
-              <mat-icon>filter_center_focus</mat-icon>
-            </span>
           </button>
         </div>
       </div>
@@ -246,7 +265,7 @@
       <app-month-view
         *ngIf="currentView === 'month'"
         [year]="year" [month]="month"
-        [events]="events()" [holidays]="holidays"
+        [events]="displayedEvents()" [holidays]="holidays"
         (dayClick)="openCreateModal($event)"
         (eventClick)="openEditModal($event)"
         (eventDrop)="onEventDrop($event)"
@@ -255,7 +274,7 @@
       <app-week-view
         *ngIf="currentView === 'week'"
         [selectedDate]="selectedDate"
-        [events]="events()" [holidays]="holidays"
+        [events]="displayedEvents()" [holidays]="holidays"
         (dayClick)="openCreateModal($event)"
         (eventClick)="openEditModal($event)"
         (eventDrop)="onEventDrop($event)"
@@ -264,13 +283,25 @@
       <app-day-view
         *ngIf="currentView === 'day'"
         [selectedDate]="selectedDate"
-        [events]="events()" [holidays]="holidays"
+        [events]="displayedEvents()" [holidays]="holidays"
         (eventClick)="openEditModal($event)"
         (eventDrop)="onEventDrop($event)"
       ></app-day-view>
 
     </div>
   </div>
+  <div class="main-area tasks-main" [hidden]="activeSection !== 'tasks'">
+    <app-kanban-board></app-kanban-board>
+  </div>
+</div>
+
+<div class="team-invitation-overlay" *ngIf="kanbanService.teamInvitations().length && kanbanService.teamInvitations()[0] as invitation">
+  <section class="team-invitation-modal" role="dialog" aria-modal="true">
+    <span class="invitation-team-icon" [style.background]="invitation.team_color"><mat-icon>group_add</mat-icon></span>
+    <h2>Convite para time</h2>
+    <p>Você foi convidado(a) para participar do time <strong>{{ invitation.team_name }}</strong> e colaborar no Kanban compartilhado.</p>
+    <div><button class="cancel-btn" (click)="kanbanService.respondToTeamInvitation(invitation, false)">Recusar</button><button class="primary-btn" (click)="kanbanService.respondToTeamInvitation(invitation, true)">Aceitar convite</button></div>
+  </section>
 </div>
 
 <!-- ── Modal de Gerenciamento de Agenda ── -->
@@ -280,3 +311,31 @@
   (closed)="closeCalendarManager()"
   (saved)="onCalendarSaved()"
 ></app-calendar-manager>
+
+<div class="invitation-overlay" *ngIf="calendarDeleteTarget as calendar" (mousedown)="cancelCalendarDelete()">
+  <section class="invitation-modal delete-calendar-modal" role="dialog" aria-modal="true" aria-labelledby="delete-calendar-title" (mousedown)="$event.stopPropagation()">
+    <div class="invitation-icon delete-icon"><mat-icon>delete_outline</mat-icon></div>
+    <h2 id="delete-calendar-title">Excluir agenda</h2>
+    <p>Deseja excluir <strong>{{ calendar.name }}</strong>?</p>
+    <p class="delete-warning">Todos os eventos vinculados serão removidos permanentemente.</p>
+    <div class="invitation-actions">
+      <button type="button" class="invitation-decline" (click)="cancelCalendarDelete()">Cancelar</button>
+      <button type="button" class="delete-calendar-confirm" (click)="confirmCalendarDelete()"><mat-icon>delete_outline</mat-icon>Excluir agenda</button>
+    </div>
+  </section>
+</div>
+
+<div class="invitation-overlay" *ngIf="invitationsService.invitations().length">
+  <section class="invitation-modal" role="dialog" aria-modal="true">
+    <div class="invitation-icon"><mat-icon>group_add</mat-icon></div>
+    <h2>Convite para agenda</h2>
+    <ng-container *ngIf="invitationsService.invitations()[0] as invitation">
+      <p>Você foi convidado(a) para participar da agenda <strong>{{ invitation.calendar_name }}</strong>.</p>
+      <p class="invitation-permission">Permissão: {{ invitation.permission === 'editor' ? 'leitura e gravação' : 'somente leitura' }}.</p>
+      <div class="invitation-actions">
+        <button type="button" class="invitation-decline" (click)="respondToInvitation(invitation, false)">Recusar</button>
+        <button type="button" class="invitation-accept" (click)="respondToInvitation(invitation, true)">Aceitar convite</button>
+      </div>
+    </ng-container>
+  </section>
+</div>

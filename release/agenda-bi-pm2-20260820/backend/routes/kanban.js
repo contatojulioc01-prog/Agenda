@@ -1,0 +1,456 @@
+const express = require('express');
+const router = express.Router();
+const db = require('../db');
+const asyncRoute = require('../async-route');
+
+const id = prefix => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+const userId = req => String(req.headers['x-user-id'] || '');
+const parseJson = (value, fallback) => { try { return JSON.parse(value); } catch { return fallback; } };
+
+async function boardAccess(boardId, uid, write = false) {
+  const board = await db.get('SELECT * FROM kanban_boards WHERE id = ?', [boardId]);
+  if (!board) return null;
+  if (board.scope_type !== 'team') return board.owner_id === uid ? { board, role: 'admin' } : null;
+  const member = await db.get('SELECT role FROM kanban_team_members WHERE team_id = ? AND user_id = ?', [board.team_id, uid]);
+  if (!member || (write && !['admin', 'member'].includes(member.role))) return null;
+  return { board, role: member.role };
+}
+
+async function teamAccess(teamId, uid, admin = false) {
+  const team = await db.get('SELECT * FROM kanban_teams WHERE id = ?', [teamId]);
+  if (!team) return null;
+  const member = await db.get('SELECT * FROM kanban_team_members WHERE team_id = ? AND user_id = ?', [teamId, uid]);
+  if (!member || (admin && member.role !== 'admin')) return null;
+  return { team, member };
+}
+
+async function validAssignees(board, assigneeIds) {
+  if (!Array.isArray(assigneeIds)) return false;
+  if (board.scope_type !== 'team') return assigneeIds.every(uid => uid === board.owner_id);
+  const checks = await Promise.all(assigneeIds.map(uid =>
+    db.get('SELECT 1 FROM kanban_team_members WHERE team_id = ? AND user_id = ?', [board.team_id, uid])));
+  return checks.every(Boolean);
+}
+
+function taskDto(task) {
+  const assigneeIds = parseJson(task.assignee_ids || '[]', []);
+  if (!assigneeIds.length && task.assignee_id) assigneeIds.push(task.assignee_id);
+  return {
+    ...task,
+    boardId: task.board_id,
+    columnId: task.column_id,
+    parentTaskId: task.parent_task_id || null,
+    dueDate: task.due_date,
+    assigneeId: task.assignee_id,
+    assigneeIds,
+    createdBy: task.created_by,
+    createdAt: task.created_at,
+    updatedAt: task.updated_at,
+    labels: parseJson(task.labels || '[]', []),
+    checklist: parseJson(task.checklist || '[]', []),
+    archived: task.archived === 1,
+  };
+}
+
+function boardDto(board, role) {
+  return { ...board, scopeType: board.scope_type || 'personal', teamId: board.team_id || null, myRole: role };
+}
+
+async function createBoard({ name, description = '', color = '#4f46e5', ownerId, scopeType = 'personal', teamId = null }, store = db) {
+  const boardId = id('brd');
+  const now = new Date().toISOString();
+  await store.run(`INSERT INTO kanban_boards
+    (id, name, description, color, owner_id, created_at, updated_at, scope_type, team_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, [boardId, name, description, color, ownerId, now, now, scopeType, teamId]);
+  const defaults = [['A fazer', '#64748b'], ['Em andamento', '#f59e0b'], ['Concluído', '#10b981']];
+  for (const [position, [title, columnColor]] of defaults.entries()) {
+    await store.run('INSERT INTO kanban_columns (id, board_id, title, color, position, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+      [id('col'), boardId, title, columnColor, position, now]);
+  }
+  return store.get('SELECT * FROM kanban_boards WHERE id = ?', [boardId]);
+}
+
+async function createDefaultPersonalBoard(uid) {
+  const existing = await db.get("SELECT * FROM kanban_boards WHERE owner_id = ? AND COALESCE(scope_type, 'personal') = 'personal' ORDER BY created_at LIMIT 1", [uid]);
+  return existing || createBoard({ name: 'Meu Kanban', description: 'Meu espaço pessoal de tarefas', ownerId: uid });
+}
+
+async function ensureDefaultCalendar(uid, broadcast) {
+  let calendar = await db.get('SELECT * FROM calendars WHERE owner_id = ? AND is_private = 1 ORDER BY created_at LIMIT 1', [uid]);
+  if (calendar) return calendar;
+  const calendarId = id('cal');
+  const now = new Date().toISOString();
+  await db.transaction(async tx => {
+    calendar = await tx.get('SELECT * FROM calendars WHERE owner_id = ? AND is_private = 1 ORDER BY created_at LIMIT 1', [uid]);
+    if (calendar) return;
+    await tx.run('INSERT INTO calendars (id, name, color, is_private, owner_id, created_at) VALUES (?, ?, ?, 1, ?, ?)',
+      [calendarId, 'Minha Agenda', '#4f46e5', uid, now]);
+    await tx.run('INSERT INTO calendar_members (id, calendar_id, user_id, permission) VALUES (?, ?, ?, ?)',
+      [id('mbr'), calendarId, uid, 'owner']);
+    calendar = await tx.get('SELECT * FROM calendars WHERE id = ?', [calendarId]);
+  });
+  if (calendar?.id === calendarId) broadcast({ type: 'calendar_created', calendarId, userId: uid });
+  return calendar;
+}
+
+async function syncTaskCalendarEvents(taskId, broadcast) {
+  const task = await db.get('SELECT * FROM kanban_tasks WHERE id = ?', [taskId]);
+  if (!task) return;
+  let responsibleIds = parseJson(task.assignee_ids || '[]', []);
+  if (!responsibleIds.length && task.assignee_id) responsibleIds = [task.assignee_id];
+  if (!responsibleIds.length && task.created_by) responsibleIds = [task.created_by];
+  const desired = new Set(task.archived || !task.due_date ? [] : responsibleIds.filter(Boolean));
+  const links = await db.all('SELECT * FROM kanban_task_events WHERE task_id = ?', [task.id]);
+
+  for (const link of links) {
+    if (desired.has(link.user_id)) continue;
+    await db.transaction(async tx => {
+      await tx.run('DELETE FROM events WHERE id = ?', [link.event_id]);
+      await tx.run('DELETE FROM kanban_task_events WHERE id = ?', [link.id]);
+    });
+    broadcast({ type: 'event_deleted', calendarId: link.calendar_id, eventId: link.event_id });
+  }
+
+  for (const uid of desired) {
+    const existing = links.find(link => link.user_id === uid);
+    const description = task.description ? `Prazo da tarefa Kanban.\n\n${task.description}` : 'Prazo da tarefa Kanban.';
+    if (existing) {
+      await db.run(`UPDATE events SET title = ?, description = ?, date = ?, end_date = ?, all_day = 1,
+        category = 'Tarefas', updated_at = ? WHERE id = ?`, [`📋 ${task.title}`, description, task.due_date, task.due_date, new Date().toISOString(), existing.event_id]);
+      broadcast({ type: 'event_updated', calendarId: existing.calendar_id, eventId: existing.event_id });
+      continue;
+    }
+
+    const calendar = await ensureDefaultCalendar(uid, broadcast);
+    const eventId = id('evt');
+    const now = new Date().toISOString();
+    await db.transaction(async tx => {
+      await tx.run(`INSERT INTO events (id, calendar_id, title, description, date, end_date, start_time, end_time,
+        day_times, color, category, all_day, created_by, copy_group_id, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, '00:00', '23:59', '{}', 'indigo', 'Tarefas', 1, ?, ?, ?)`,
+        [eventId, calendar.id, `📋 ${task.title}`, description, task.due_date, task.due_date, uid, `kanban-${task.id}`, now]);
+      await tx.run('INSERT INTO kanban_task_events (id, task_id, event_id, user_id, calendar_id) VALUES (?, ?, ?, ?, ?)',
+        [id('kte'), task.id, eventId, uid, calendar.id]);
+    });
+    broadcast({ type: 'event_created', calendarId: calendar.id, eventId });
+  }
+}
+
+async function deleteTaskCalendarEvents(taskId, broadcast) {
+  const links = await db.all('SELECT * FROM kanban_task_events WHERE task_id = ?', [taskId]);
+  for (const link of links) {
+    await db.transaction(async tx => {
+      await tx.run('DELETE FROM events WHERE id = ?', [link.event_id]);
+      await tx.run('DELETE FROM kanban_task_events WHERE id = ?', [link.id]);
+    });
+    broadcast({ type: 'event_deleted', calendarId: link.calendar_id, eventId: link.event_id });
+  }
+}
+
+async function deleteBoardCalendarEvents(boardId, broadcast) {
+  const tasks = await db.all('SELECT id FROM kanban_tasks WHERE board_id = ?', [boardId]);
+  for (const task of tasks) await deleteTaskCalendarEvents(task.id, broadcast);
+}
+
+router.use((req, res, next) => {
+  if (!userId(req)) return res.status(400).json({ error: 'x-user-id header obrigatório' });
+  next();
+});
+
+router.get('/teams', asyncRoute(async (req, res) => {
+  const teams = await db.all(`SELECT t.*, tm.role AS my_role,
+    (SELECT COUNT(*) FROM kanban_team_members x WHERE x.team_id = t.id) member_count,
+    (SELECT id FROM kanban_boards b WHERE b.team_id = t.id LIMIT 1) board_id
+    FROM kanban_teams t JOIN kanban_team_members tm ON tm.team_id = t.id
+    WHERE tm.user_id = ? ORDER BY t.created_at`, [userId(req)]);
+  res.json(teams.map(team => ({ ...team, myRole: team.my_role, memberCount: Number(team.member_count), boardId: team.board_id })));
+}));
+
+router.post('/teams', asyncRoute(async (req, res) => {
+  const name = String(req.body.name || '').trim();
+  if (!name) return res.status(400).json({ error: 'Nome do time é obrigatório' });
+  const uid = userId(req);
+  const teamId = id('team');
+  const now = new Date().toISOString();
+  const color = req.body.color || '#4f46e5';
+  let board;
+  await db.transaction(async tx => {
+    await tx.run('INSERT INTO kanban_teams (id, name, description, color, owner_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [teamId, name, req.body.description || '', color, uid, now, now]);
+    await tx.run('INSERT INTO kanban_team_members (id, team_id, user_id, role, joined_at) VALUES (?, ?, ?, ?, ?)',
+      [id('tm'), teamId, uid, 'admin', now]);
+    board = await createBoard({ name: `Kanban · ${name}`, description: `Quadro compartilhado do time ${name}`, color, ownerId: uid, scopeType: 'team', teamId }, tx);
+  });
+  req.broadcast({ type: 'kanban_team_updated', teamId, userId: uid });
+  const team = await db.get('SELECT * FROM kanban_teams WHERE id = ?', [teamId]);
+  res.status(201).json({ ...team, myRole: 'admin', memberCount: 1, boardId: board.id });
+}));
+
+router.put('/teams/:teamId', asyncRoute(async (req, res) => {
+  const access = await teamAccess(req.params.teamId, userId(req), true);
+  if (!access) return res.status(403).json({ error: 'Somente o administrador pode editar o time' });
+  const now = new Date().toISOString();
+  if (req.body.name !== undefined) await db.run('UPDATE kanban_teams SET name = ?, updated_at = ? WHERE id = ?', [String(req.body.name).trim(), now, access.team.id]);
+  if (req.body.description !== undefined) await db.run('UPDATE kanban_teams SET description = ?, updated_at = ? WHERE id = ?', [req.body.description, now, access.team.id]);
+  if (req.body.color !== undefined) await db.run('UPDATE kanban_teams SET color = ?, updated_at = ? WHERE id = ?', [req.body.color, now, access.team.id]);
+  req.broadcast({ type: 'kanban_team_updated', teamId: access.team.id });
+  res.json(await db.get('SELECT * FROM kanban_teams WHERE id = ?', [access.team.id]));
+}));
+
+router.delete('/teams/:teamId', asyncRoute(async (req, res) => {
+  const access = await teamAccess(req.params.teamId, userId(req), true);
+  if (!access) return res.status(403).json({ error: 'Somente o administrador pode excluir o time' });
+  const boards = await db.all('SELECT id FROM kanban_boards WHERE team_id = ?', [access.team.id]);
+  for (const board of boards) await deleteBoardCalendarEvents(board.id, req.broadcast);
+  await db.transaction(async tx => {
+    for (const board of boards) {
+      await tx.run('DELETE FROM kanban_tasks WHERE board_id = ?', [board.id]);
+      await tx.run('DELETE FROM kanban_columns WHERE board_id = ?', [board.id]);
+    }
+    await tx.run('DELETE FROM kanban_boards WHERE team_id = ?', [access.team.id]);
+    await tx.run('DELETE FROM kanban_team_invitations WHERE team_id = ?', [access.team.id]);
+    await tx.run('DELETE FROM kanban_team_members WHERE team_id = ?', [access.team.id]);
+    await tx.run('DELETE FROM kanban_teams WHERE id = ?', [access.team.id]);
+  });
+  req.broadcast({ type: 'kanban_team_updated', teamId: access.team.id });
+  res.json({ success: true });
+}));
+
+router.get('/teams/:teamId/members', asyncRoute(async (req, res) => {
+  const access = await teamAccess(req.params.teamId, userId(req));
+  if (!access) return res.status(403).json({ error: 'Sem acesso ao time' });
+  res.json(await db.all('SELECT * FROM kanban_team_members WHERE team_id = ? ORDER BY role, joined_at', [access.team.id]));
+}));
+
+router.post('/teams/:teamId/invitations', asyncRoute(async (req, res) => {
+  const access = await teamAccess(req.params.teamId, userId(req), true);
+  if (!access) return res.status(403).json({ error: 'Somente o administrador pode convidar pessoas' });
+  const invitedUser = String(req.body.userId || '');
+  if (!invitedUser || invitedUser === userId(req)) return res.status(400).json({ error: 'Selecione outro usuário' });
+  if (await db.get('SELECT 1 FROM kanban_team_members WHERE team_id = ? AND user_id = ?', [access.team.id, invitedUser])) {
+    return res.status(409).json({ error: 'Usuário já faz parte do time' });
+  }
+  await db.run(`INSERT INTO kanban_team_invitations (id, team_id, user_id, invited_by, status, created_at)
+    VALUES (?, ?, ?, ?, 'pending', ?) ON CONFLICT(team_id, user_id) DO UPDATE SET
+    invited_by = excluded.invited_by, status = 'pending', created_at = excluded.created_at`,
+    [id('tinv'), access.team.id, invitedUser, userId(req), new Date().toISOString()]);
+  req.broadcast({ type: 'kanban_team_invited', teamId: access.team.id, userId: invitedUser });
+  res.status(201).json({ success: true });
+}));
+
+router.delete('/teams/:teamId/members/:memberId', asyncRoute(async (req, res) => {
+  const access = await teamAccess(req.params.teamId, userId(req), true);
+  if (!access) return res.status(403).json({ error: 'Somente o administrador pode remover pessoas' });
+  const member = await db.get('SELECT * FROM kanban_team_members WHERE id = ? AND team_id = ?', [req.params.memberId, access.team.id]);
+  if (!member || member.role === 'admin') return res.status(400).json({ error: 'Administrador não pode ser removido' });
+  await db.run('DELETE FROM kanban_team_members WHERE id = ?', [member.id]);
+  const tasks = await db.all('SELECT kt.* FROM kanban_tasks kt JOIN kanban_boards kb ON kb.id = kt.board_id WHERE kb.team_id = ?', [access.team.id]);
+  for (const task of tasks) {
+    const assignees = parseJson(task.assignee_ids || '[]', []).filter(uid => uid !== member.user_id);
+    await db.run('UPDATE kanban_tasks SET assignee_ids = ?, assignee_id = ?, updated_at = ? WHERE id = ?',
+      [JSON.stringify(assignees), assignees[0] || null, new Date().toISOString(), task.id]);
+    await syncTaskCalendarEvents(task.id, req.broadcast);
+  }
+  req.broadcast({ type: 'kanban_team_updated', teamId: access.team.id, userId: member.user_id });
+  res.json({ success: true });
+}));
+
+router.get('/team-invitations', asyncRoute(async (req, res) => {
+  res.json(await db.all(`SELECT i.*, t.name AS team_name, t.color AS team_color
+    FROM kanban_team_invitations i JOIN kanban_teams t ON t.id = i.team_id
+    WHERE i.user_id = ? AND i.status = 'pending' ORDER BY i.created_at`, [userId(req)]));
+}));
+
+router.put('/team-invitations/:invitationId', asyncRoute(async (req, res) => {
+  const invitation = await db.get("SELECT * FROM kanban_team_invitations WHERE id = ? AND user_id = ? AND status = 'pending'",
+    [req.params.invitationId, userId(req)]);
+  if (!invitation) return res.status(404).json({ error: 'Convite não encontrado' });
+  const accepted = req.body.accept === true;
+  await db.transaction(async tx => {
+    if (accepted) {
+      await tx.run('INSERT INTO kanban_team_members (id, team_id, user_id, role, joined_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT (team_id, user_id) DO NOTHING',
+        [id('tm'), invitation.team_id, userId(req), 'member', new Date().toISOString()]);
+    }
+    await tx.run('UPDATE kanban_team_invitations SET status = ? WHERE id = ?', [accepted ? 'accepted' : 'declined', invitation.id]);
+  });
+  req.broadcast({ type: accepted ? 'kanban_team_joined' : 'kanban_team_declined', teamId: invitation.team_id, userId: userId(req) });
+  res.json({ success: true, accepted });
+}));
+
+router.get('/boards', asyncRoute(async (req, res) => {
+  await createDefaultPersonalBoard(userId(req));
+  const rows = await db.all(`SELECT DISTINCT b.*,
+    CASE WHEN b.scope_type = 'team' THEN tm.role ELSE 'admin' END AS my_role,
+    t.name AS team_name,
+    (SELECT COUNT(*) FROM kanban_tasks x WHERE x.board_id = b.id AND x.archived = 0) task_count
+    FROM kanban_boards b
+    LEFT JOIN kanban_team_members tm ON tm.team_id = b.team_id AND tm.user_id = ?
+    LEFT JOIN kanban_teams t ON t.id = b.team_id
+    WHERE (COALESCE(b.scope_type, 'personal') = 'personal' AND b.owner_id = ?)
+       OR (b.scope_type = 'team' AND tm.user_id = ?)
+    ORDER BY b.scope_type, b.created_at`, [userId(req), userId(req), userId(req)]);
+  res.json(rows.map(row => ({ ...boardDto(row, row.my_role), teamName: row.team_name, taskCount: Number(row.task_count) })));
+}));
+
+router.post('/boards', asyncRoute(async (req, res) => {
+  const name = String(req.body.name || '').trim();
+  if (!name) return res.status(400).json({ error: 'name é obrigatório' });
+  const board = await db.transaction(tx => createBoard({ name, description: req.body.description, color: req.body.color, ownerId: userId(req) }, tx));
+  req.broadcast({ type: 'kanban_updated', boardId: board.id });
+  res.status(201).json(boardDto(board, 'admin'));
+}));
+
+router.get('/boards/:boardId', asyncRoute(async (req, res) => {
+  const access = await boardAccess(req.params.boardId, userId(req));
+  if (!access) return res.status(404).json({ error: 'Quadro não encontrado' });
+  const columns = await db.all('SELECT * FROM kanban_columns WHERE board_id = ? ORDER BY position, created_at', [access.board.id]);
+  const tasks = (await db.all('SELECT * FROM kanban_tasks WHERE board_id = ? ORDER BY parent_task_id, column_id, position, created_at', [access.board.id])).map(taskDto);
+  res.json({ ...boardDto(access.board, access.role), columns, tasks });
+}));
+
+router.put('/boards/:boardId', asyncRoute(async (req, res) => {
+  const access = await boardAccess(req.params.boardId, userId(req), true);
+  if (!access) return res.status(403).json({ error: 'Sem permissão' });
+  const now = new Date().toISOString();
+  if (req.body.name !== undefined) await db.run('UPDATE kanban_boards SET name = ?, updated_at = ? WHERE id = ?', [String(req.body.name).trim(), now, access.board.id]);
+  if (req.body.description !== undefined) await db.run('UPDATE kanban_boards SET description = ?, updated_at = ? WHERE id = ?', [req.body.description, now, access.board.id]);
+  if (req.body.color !== undefined) await db.run('UPDATE kanban_boards SET color = ?, updated_at = ? WHERE id = ?', [req.body.color, now, access.board.id]);
+  req.broadcast({ type: 'kanban_updated', boardId: access.board.id });
+  res.json(boardDto(await db.get('SELECT * FROM kanban_boards WHERE id = ?', [access.board.id]), access.role));
+}));
+
+router.delete('/boards/:boardId', asyncRoute(async (req, res) => {
+  const access = await boardAccess(req.params.boardId, userId(req));
+  if (!access || access.board.scope_type === 'team' || access.board.owner_id !== userId(req)) return res.status(403).json({ error: 'Quadros de time são excluídos junto com o time' });
+  await deleteBoardCalendarEvents(access.board.id, req.broadcast);
+  await db.transaction(async tx => {
+    await tx.run('DELETE FROM kanban_tasks WHERE board_id = ?', [access.board.id]);
+    await tx.run('DELETE FROM kanban_columns WHERE board_id = ?', [access.board.id]);
+    await tx.run('DELETE FROM kanban_boards WHERE id = ?', [access.board.id]);
+  });
+  req.broadcast({ type: 'kanban_updated', boardId: access.board.id });
+  res.json({ success: true });
+}));
+
+router.post('/boards/:boardId/columns', asyncRoute(async (req, res) => {
+  const access = await boardAccess(req.params.boardId, userId(req), true);
+  if (!access) return res.status(403).json({ error: 'Sem permissão' });
+  const title = String(req.body.title || '').trim();
+  if (!title) return res.status(400).json({ error: 'title é obrigatório' });
+  const next = await db.get('SELECT COALESCE(MAX(position), -1) + 1 next FROM kanban_columns WHERE board_id = ?', [access.board.id]);
+  const columnId = id('col');
+  await db.run('INSERT INTO kanban_columns (id, board_id, title, color, position, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+    [columnId, access.board.id, title, req.body.color || '#64748b', Number(next.next), new Date().toISOString()]);
+  req.broadcast({ type: 'kanban_updated', boardId: access.board.id });
+  res.status(201).json(await db.get('SELECT * FROM kanban_columns WHERE id = ?', [columnId]));
+}));
+
+router.put('/columns/:columnId', asyncRoute(async (req, res) => {
+  const column = await db.get('SELECT * FROM kanban_columns WHERE id = ?', [req.params.columnId]);
+  const access = column && await boardAccess(column.board_id, userId(req), true);
+  if (!column || !access) return res.status(404).json({ error: 'Lista não encontrada' });
+  if (req.body.title !== undefined) await db.run('UPDATE kanban_columns SET title = ? WHERE id = ?', [String(req.body.title).trim(), column.id]);
+  if (req.body.color !== undefined) await db.run('UPDATE kanban_columns SET color = ? WHERE id = ?', [req.body.color, column.id]);
+  if (req.body.position !== undefined) await db.run('UPDATE kanban_columns SET position = ? WHERE id = ?', [Number(req.body.position), column.id]);
+  req.broadcast({ type: 'kanban_updated', boardId: column.board_id });
+  res.json(await db.get('SELECT * FROM kanban_columns WHERE id = ?', [column.id]));
+}));
+
+router.delete('/columns/:columnId', asyncRoute(async (req, res) => {
+  const column = await db.get('SELECT * FROM kanban_columns WHERE id = ?', [req.params.columnId]);
+  const access = column && await boardAccess(column.board_id, userId(req), true);
+  if (!column || !access) return res.status(404).json({ error: 'Lista não encontrada' });
+  const count = await db.get('SELECT COUNT(*) count FROM kanban_tasks WHERE column_id = ? AND archived = 0', [column.id]);
+  if (Number(count.count) > 0) return res.status(409).json({ error: 'Mova ou arquive os cartões antes de excluir a lista' });
+  const tasks = await db.all('SELECT id FROM kanban_tasks WHERE column_id = ?', [column.id]);
+  for (const task of tasks) await deleteTaskCalendarEvents(task.id, req.broadcast);
+  await db.transaction(async tx => {
+    await tx.run('DELETE FROM kanban_tasks WHERE column_id = ?', [column.id]);
+    await tx.run('DELETE FROM kanban_columns WHERE id = ?', [column.id]);
+  });
+  req.broadcast({ type: 'kanban_updated', boardId: column.board_id });
+  res.json({ success: true });
+}));
+
+router.post('/boards/:boardId/tasks', asyncRoute(async (req, res) => {
+  const access = await boardAccess(req.params.boardId, userId(req), true);
+  if (!access) return res.status(403).json({ error: 'Sem permissão' });
+  const column = await db.get('SELECT * FROM kanban_columns WHERE id = ? AND board_id = ?', [req.body.columnId, access.board.id]);
+  const title = String(req.body.title || '').trim();
+  const parentTaskId = req.body.parentTaskId || null;
+  const assigneeIds = [...new Set(Array.isArray(req.body.assigneeIds) ? req.body.assigneeIds.filter(Boolean) : (req.body.assigneeId ? [req.body.assigneeId] : []))];
+  if (!column || !title) return res.status(400).json({ error: 'title e columnId são obrigatórios' });
+  if (!(await validAssignees(access.board, assigneeIds))) return res.status(400).json({ error: 'Um ou mais responsáveis não pertencem a este Kanban' });
+  if (parentTaskId && !(await db.get('SELECT 1 FROM kanban_tasks WHERE id = ? AND board_id = ?', [parentTaskId, access.board.id]))) return res.status(400).json({ error: 'Tarefa principal inválida' });
+  const next = await db.get(`SELECT COALESCE(MAX(position), -1) + 1 next FROM kanban_tasks
+    WHERE column_id = ? AND archived = 0 AND COALESCE(parent_task_id, '') = COALESCE(?, '')`, [column.id, parentTaskId]);
+  const taskId = id('tsk');
+  const now = new Date().toISOString();
+  await db.run(`INSERT INTO kanban_tasks
+    (id, board_id, column_id, title, description, position, priority, due_date, labels, assignee_id, assignee_ids, checklist, archived, created_by, created_at, updated_at, parent_task_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`, [taskId, access.board.id, column.id, title,
+    req.body.description || '', Number(next.next), req.body.priority || 'medium', req.body.dueDate || null,
+    JSON.stringify(req.body.labels || []), assigneeIds[0] || null, JSON.stringify(assigneeIds), JSON.stringify(req.body.checklist || []), userId(req), now, now, parentTaskId]);
+  await syncTaskCalendarEvents(taskId, req.broadcast);
+  req.broadcast({ type: 'kanban_updated', boardId: access.board.id, taskId });
+  res.status(201).json(taskDto(await db.get('SELECT * FROM kanban_tasks WHERE id = ?', [taskId])));
+}));
+
+router.put('/tasks/:taskId', asyncRoute(async (req, res) => {
+  const task = await db.get('SELECT * FROM kanban_tasks WHERE id = ?', [req.params.taskId]);
+  const access = task && await boardAccess(task.board_id, userId(req), true);
+  if (!task || !access) return res.status(404).json({ error: 'Tarefa não encontrada' });
+  const nextAssigneeIds = req.body.assigneeIds !== undefined
+    ? [...new Set(Array.isArray(req.body.assigneeIds) ? req.body.assigneeIds.filter(Boolean) : [])]
+    : null;
+  if (nextAssigneeIds && !(await validAssignees(access.board, nextAssigneeIds))) return res.status(400).json({ error: 'Um ou mais responsáveis não pertencem a este Kanban' });
+  const fields = { title: 'title', description: 'description', columnId: 'column_id', position: 'position', priority: 'priority', dueDate: 'due_date', archived: 'archived' };
+  for (const [input, columnName] of Object.entries(fields)) {
+    if (req.body[input] === undefined) continue;
+    const value = input === 'archived' ? (req.body[input] ? 1 : 0) : req.body[input];
+    await db.run(`UPDATE kanban_tasks SET ${columnName} = ?, updated_at = ? WHERE id = ?`, [value ?? null, new Date().toISOString(), task.id]);
+  }
+  if (req.body.labels !== undefined) await db.run('UPDATE kanban_tasks SET labels = ?, updated_at = ? WHERE id = ?', [JSON.stringify(req.body.labels), new Date().toISOString(), task.id]);
+  if (req.body.checklist !== undefined) await db.run('UPDATE kanban_tasks SET checklist = ?, updated_at = ? WHERE id = ?', [JSON.stringify(req.body.checklist), new Date().toISOString(), task.id]);
+  if (nextAssigneeIds) await db.run('UPDATE kanban_tasks SET assignee_ids = ?, assignee_id = ?, updated_at = ? WHERE id = ?', [JSON.stringify(nextAssigneeIds), nextAssigneeIds[0] || null, new Date().toISOString(), task.id]);
+  await syncTaskCalendarEvents(task.id, req.broadcast);
+  req.broadcast({ type: 'kanban_updated', boardId: task.board_id, taskId: task.id });
+  res.json(taskDto(await db.get('SELECT * FROM kanban_tasks WHERE id = ?', [task.id])));
+}));
+
+router.post('/boards/:boardId/reorder', asyncRoute(async (req, res) => {
+  const access = await boardAccess(req.params.boardId, userId(req), true);
+  if (!access) return res.status(403).json({ error: 'Sem permissão' });
+  await db.transaction(async tx => {
+    for (const [position, columnId] of (req.body.columns || []).entries()) {
+      await tx.run('UPDATE kanban_columns SET position = ? WHERE id = ? AND board_id = ?', [position, columnId, access.board.id]);
+    }
+    for (const item of (req.body.tasks || [])) {
+      await tx.run('UPDATE kanban_tasks SET column_id = ?, position = ?, updated_at = ? WHERE id = ? AND board_id = ?',
+        [item.columnId, item.position, new Date().toISOString(), item.id, access.board.id]);
+    }
+  });
+  req.broadcast({ type: 'kanban_updated', boardId: access.board.id });
+  res.json({ success: true });
+}));
+
+router.delete('/tasks/:taskId', asyncRoute(async (req, res) => {
+  const task = await db.get('SELECT * FROM kanban_tasks WHERE id = ?', [req.params.taskId]);
+  const access = task && await boardAccess(task.board_id, userId(req), true);
+  if (!task || !access) return res.status(404).json({ error: 'Tarefa não encontrada' });
+  if (!task.archived) return res.status(409).json({ error: 'Arquive a tarefa antes de excluí-la' });
+  const descendants = await db.all(`WITH RECURSIVE tree(id) AS (
+    SELECT id FROM kanban_tasks WHERE parent_task_id = ?
+    UNION ALL SELECT t.id FROM kanban_tasks t JOIN tree ON t.parent_task_id = tree.id
+  ) SELECT id FROM tree`, [task.id]);
+  for (const child of descendants) await deleteTaskCalendarEvents(child.id, req.broadcast);
+  await deleteTaskCalendarEvents(task.id, req.broadcast);
+  await db.transaction(async tx => {
+    for (const child of [...descendants].reverse()) await tx.run('DELETE FROM kanban_tasks WHERE id = ?', [child.id]);
+    await tx.run('DELETE FROM kanban_tasks WHERE id = ?', [task.id]);
+  });
+  req.broadcast({ type: 'kanban_updated', boardId: task.board_id, taskId: task.id });
+  res.json({ success: true, deletedDescendants: descendants.length });
+}));
+
+module.exports = router;

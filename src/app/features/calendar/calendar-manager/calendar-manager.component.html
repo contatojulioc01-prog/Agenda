@@ -1,5 +1,5 @@
-<div class="modal-overlay" (click)="onClose()">
-  <div class="modal-card" (click)="$event.stopPropagation()">
+<div class="modal-overlay">
+  <div class="modal-card">
 
     <!-- Header -->
     <div class="modal-header">
@@ -18,52 +18,23 @@
     <!-- Body -->
     <div class="modal-body">
 
-      <!-- Nome com sugestões de usuários e setores -->
-      <div class="field-group input-relative">
-        <label class="field-label">
-          Nome da agenda
-          <span class="label-hint">(digite ou escolha um colaborador abaixo)</span>
-        </label>
+      <!-- Nome da agenda -->
+      <div class="field-group">
+        <label class="field-label">Nome da agenda</label>
         <div class="input-with-icon">
           <mat-icon class="input-icon">edit</mat-icon>
           <input
             type="text"
             class="field-input with-left-icon"
             [ngModel]="name()"
-            (focus)="onNameFocus()"
-            (ngModelChange)="name.set($event); onNameChange()"
-            (blur)="onNameBlur()"
-            placeholder="Ex: Agenda de Carlos, Equipe TI, Projetos..."
+            (ngModelChange)="name.set($event)"
+            placeholder="Ex: Projetos, Reuniões, Agenda comercial..."
             maxlength="60"
             autofocus
             autocomplete="off"
           />
         </div>
 
-        <!-- Dropdown com lista de usuários e setores para o Nome -->
-        <div class="user-dropdown name-suggestions-dropdown" *ngIf="showNameDropdown && nameSuggestions().length > 0">
-          <div class="dropdown-header">
-            <mat-icon>group</mat-icon>
-            <span>Sugestões rápidas por colaborador ou setor:</span>
-          </div>
-          <button
-            *ngFor="let sug of nameSuggestions()"
-            class="user-result-row"
-            (mousedown)="selectNameSuggestion(sug)"
-            type="button"
-          >
-            <div class="user-avatar-sm" [style.background]="sug.dept ? '#0d9488' : '#4f46e5'">
-              <img *ngIf="sug.avatar" [src]="sug.avatar" [alt]="sug.title" />
-              <mat-icon *ngIf="sug.dept" class="dept-icon">apartment</mat-icon>
-              <span *ngIf="!sug.avatar && !sug.dept">{{ sug.title.slice(10, 12).toUpperCase() }}</span>
-            </div>
-            <div class="user-result-info">
-              <span class="user-result-name">{{ sug.title }}</span>
-              <span class="user-result-dept">{{ sug.subtitle }}</span>
-            </div>
-            <span class="select-badge">Selecionar</span>
-          </button>
-        </div>
       </div>
 
       <!-- Cor -->
@@ -203,7 +174,6 @@
       </button>
 
       <div class="footer-right-actions">
-        <button class="btn-cancel" (click)="onClose()" type="button">Cancelar</button>
         <button
           class="btn-save"
           [disabled]="!name().trim() || isSaving"
@@ -215,6 +185,16 @@
           {{ isSaving ? 'Salvando...' : (isEditing ? 'Salvar' : 'Criar Agenda') }}
         </button>
       </div>
+    </div>
+
+    <div class="delete-confirmation-backdrop" *ngIf="showDeleteConfirmation" (mousedown)="cancelDelete()">
+      <section class="delete-confirmation-modal" role="dialog" aria-modal="true" aria-labelledby="manager-delete-title" (mousedown)="$event.stopPropagation()">
+        <span class="delete-confirmation-icon"><mat-icon>delete_outline</mat-icon></span>
+        <h3 id="manager-delete-title">Excluir agenda</h3>
+        <p>Deseja excluir <strong>{{ name() }}</strong>?</p>
+        <small>Todos os eventos vinculados serão removidos permanentemente.</small>
+        <div><button type="button" class="delete-cancel" (click)="cancelDelete()">Cancelar</button><button type="button" class="delete-accept" (click)="confirmDelete()"><mat-icon>delete_outline</mat-icon>Excluir agenda</button></div>
+      </section>
     </div>
   </div>
 </div>

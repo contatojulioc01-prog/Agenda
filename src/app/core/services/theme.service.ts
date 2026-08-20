@@ -1,47 +1,113 @@
 import { Injectable, signal, effect } from '@angular/core';
 
+/**
+ * Temas disponíveis:
+ *  - light       → modo claro padrão
+ *  - dark        → modo escuro padrão
+ *  - dark-angel  → reino angelical (fundo roxo/branco, partículas de luz)
+ *  - dark-demon  → reino demoníaco (fundo preto/vermelho, chamas)
+ *  - light-angel → reino angelical claro
+ *  - light-demon → reino demoníaco claro
+ */
+export type Theme = 'light' | 'dark' | 'dark-angel' | 'dark-demon' | 'light-angel' | 'light-demon';
+
+/** Qual "reino" especial está ativo (null = nenhum) */
+export type Realm = 'angel' | 'demon' | null;
+
 @Injectable({ providedIn: 'root' })
 export class ThemeService {
   private readonly STORAGE_KEY = 'agenda-theme';
 
-  isDark = signal<boolean>(this.loadTheme());
+  theme = signal<Theme>(this.loadTheme());
+
+  /** true quando qualquer variante escura está ativa */
+  isDark = (() => {
+    const t = this.theme;
+    return () => t() === 'dark' || t() === 'dark-angel' || t() === 'dark-demon';
+  })();
+
+  /** Qual reino especial está ativo */
+  realm = (() => {
+    const t = this.theme;
+    return (): Realm => {
+      if (t() === 'dark-angel' || t() === 'light-angel') return 'angel';
+      if (t() === 'dark-demon' || t() === 'light-demon')  return 'demon';
+      return null;
+    };
+  })();
 
   constructor() {
-    // Aplica imediatamente
-    this.applyTheme(this.isDark());
-
-    // E reage a mudanças
+    this.applyTheme(this.theme());
     effect(() => {
-      this.applyTheme(this.isDark());
+      this.applyTheme(this.theme());
     });
   }
 
+  /**
+   * Toggle normal do botão de tema:
+   *  - Sem reino: alterna light ↔ dark
+   *  - Com reino: alterna entre light e o tema do reino ativo
+   */
   toggle(): void {
-    this.isDark.update(v => !v);
+    const current = this.theme();
+    if (current === 'dark-angel') this.setTheme('light-angel');
+    else if (current === 'light-angel') this.setTheme('dark-angel');
+    else if (current === 'dark-demon') this.setTheme('light-demon');
+    else if (current === 'light-demon') this.setTheme('dark-demon');
+    else if (current === 'dark') this.setTheme('light');
+    else this.setTheme('dark');
+  }
+
+  /**
+   * Clique na imagem do sidebar:
+   * Cicla entre nenhum reino → angel → demon → nenhum
+   * Mantém o tom escuro/claro atual
+   */
+  cycleRealm(): void {
+    const current = this.theme();
+    if (current === 'dark-angel') {
+      this.setTheme('dark-demon');
+    } else if (current === 'dark-demon') {
+      this.setTheme('dark');
+    } else if (current === 'dark') {
+      this.setTheme('dark-angel');
+    } else if (current === 'light-angel') {
+      this.setTheme('light-demon');
+    } else if (current === 'light-demon') {
+      this.setTheme('light');
+    } else {
+      this.setTheme('light-angel');
+    }
+  }
+
+  setTheme(t: Theme): void {
+    this.theme.set(t);
     try {
-      localStorage.setItem(this.STORAGE_KEY, this.isDark() ? 'dark' : 'light');
+      localStorage.setItem(this.STORAGE_KEY, t);
     } catch {
       // Ignora
     }
   }
 
-  private loadTheme(): boolean {
+  private loadTheme(): Theme {
     try {
-      const saved = localStorage.getItem(this.STORAGE_KEY);
-      if (saved) return saved === 'dark';
-      return (
+      const saved = localStorage.getItem(this.STORAGE_KEY) as Theme | null;
+      if (saved === 'light' || saved === 'dark' || saved === 'dark-angel' || saved === 'dark-demon' || saved === 'light-angel' || saved === 'light-demon') {
+        return saved;
+      }
+      const prefersDark =
         typeof window !== 'undefined' &&
         !!window.matchMedia &&
-        window.matchMedia('(prefers-color-scheme: dark)').matches
-      );
+        window.matchMedia('(prefers-color-scheme: dark)').matches;
+      return prefersDark ? 'dark' : 'light';
     } catch {
-      return false;
+      return 'light';
     }
   }
 
-  private applyTheme(dark: boolean): void {
+  private applyTheme(t: Theme): void {
     if (typeof document !== 'undefined' && document.documentElement) {
-      document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', t);
     }
   }
 }

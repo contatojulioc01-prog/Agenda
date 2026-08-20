@@ -15,4 +15,12 @@ export class ThemeToggleComponent {
   toggle(): void {
     this.theme.toggle();
   }
+
+  get title(): string {
+    const t = this.theme.theme();
+    if (t === 'dark-angel' || t === 'light-angel') return 'Modo Angelical — clique para alternar modo claro/escuro';
+    if (t === 'dark-demon' || t === 'light-demon')  return 'Modo Demoníaco — clique para alternar modo claro/escuro';
+    if (t === 'dark')        return 'Ativar modo claro';
+    return 'Ativar modo escuro';
+  }
 }

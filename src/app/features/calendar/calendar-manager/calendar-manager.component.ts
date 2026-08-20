@@ -10,14 +10,6 @@ import { CalendarsService } from '../../../core/services/calendars.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { UserResponse, DEFAULT_AVATAR } from '../../../core/models/user.model';
 
-export interface NameSuggestion {
-  title: string;
-  subtitle: string;
-  user?: UserResponse;
-  dept?: string;
-  avatar?: string;
-}
-
 @Component({
   selector: 'app-calendar-manager',
   standalone: true,
@@ -43,13 +35,13 @@ export class CalendarManagerComponent implements OnInit {
   // Form state
   name = signal('');
   selectedColor = '#4f46e5';
-  isPrivate = false;
+  isPrivate = true;
 
   // Dropdowns
-  showNameDropdown = false;
   showMemberDropdown = false;
   userSearch = signal('');
   isSaving = false;
+  showDeleteConfirmation = false;
 
   // Membros adicionados
   members = signal<(CalendarMember & { userName?: string; userEmail?: string })[]>([]);
@@ -78,39 +70,6 @@ export class CalendarManagerComponent implements OnInit {
     ).slice(0, 15);
   });
 
-  /** Sugestões automáticas no campo "Nome da Agenda" (atualiza em tempo real) */
-  readonly nameSuggestions = computed<NameSuggestion[]>(() => {
-    const q = this.name().toLowerCase().trim();
-    const users = this.allUsers();
-    const suggestions: NameSuggestion[] = [];
-
-    // Sugestões por colaborador
-    users.forEach(u => {
-      if (!q || (u.name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q)) {
-        suggestions.push({
-          title: `Agenda de ${u.name}`,
-          subtitle: `${u.departament?.name || 'Colaborador'} · ${u.email}`,
-          user: u,
-          avatar: u.avatar,
-        });
-      }
-    });
-
-    // Sugestões por setor / departamento
-    const depts = Array.from(new Set(users.map(u => u.departament?.name).filter(Boolean))) as string[];
-    depts.forEach(d => {
-      if (!q || d.toLowerCase().includes(q)) {
-        suggestions.push({
-          title: `Equipe ${d}`,
-          subtitle: `Departamento ${d}`,
-          dept: d,
-        });
-      }
-    });
-
-    return suggestions.slice(0, 10);
-  });
-
   ngOnInit(): void {
     if (this.calendar) {
       this.name.set(this.calendar.name);
@@ -126,30 +85,6 @@ export class CalendarManagerComponent implements OnInit {
             return { ...m, userName: user?.name, userEmail: user?.email };
           })
       );
-    }
-  }
-
-  /* ── Sugestões no campo de Nome ── */
-  onNameFocus(): void {
-    this.showNameDropdown = true;
-  }
-
-  onNameChange(): void {
-    this.showNameDropdown = true;
-  }
-
-  onNameBlur(): void {
-    setTimeout(() => {
-      this.showNameDropdown = false;
-    }, 250);
-  }
-
-  selectNameSuggestion(sug: NameSuggestion): void {
-    this.name.set(sug.title);
-    this.showNameDropdown = false;
-
-    if (sug.user && !this.members().some(m => m.user_id === sug.user!.id)) {
-      this.addMember(sug.user);
     }
   }
 
@@ -236,15 +171,23 @@ export class CalendarManagerComponent implements OnInit {
 
   onDelete(): void {
     if (!this.calendar) return;
-    if (confirm(`Tem certeza que deseja excluir a agenda "${this.name()}"?\nTodos os eventos vinculados a ela serão removidos.`)) {
-      this.isSaving = true;
-      this.calendarsService.remove(this.calendar.id);
-      setTimeout(() => {
-        this.isSaving = false;
-        this.saved.emit();
-        this.closed.emit();
-      }, 400);
-    }
+    this.showDeleteConfirmation = true;
+  }
+
+  cancelDelete(): void {
+    this.showDeleteConfirmation = false;
+  }
+
+  confirmDelete(): void {
+    if (!this.calendar) return;
+    this.showDeleteConfirmation = false;
+    this.isSaving = true;
+    this.calendarsService.remove(this.calendar.id);
+    setTimeout(() => {
+      this.isSaving = false;
+      this.saved.emit();
+      this.closed.emit();
+    }, 400);
   }
 
   onClose(): void {

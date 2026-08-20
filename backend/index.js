@@ -1,3 +1,11 @@
+const fs = require('fs');
+const path = require('path');
+
+const dotenv = require('dotenv');
+const envPaths = [path.join(__dirname, '..', '.env'), path.join(__dirname, '.env')];
+for (const envPath of envPaths) {
+  if (fs.existsSync(envPath)) dotenv.config({ path: envPath, override: false, quiet: true });
+}
 const express = require('express');
 const http = require('http');
 const { WebSocketServer } = require('ws');
@@ -5,7 +13,7 @@ const cors = require('cors');
 const { initDb } = require('./db');
 
 const PORT = process.env.PORT || 9900;
-const HOST = '0.0.0.0';
+const HOST = process.env.HOST || '0.0.0.0';
 
 const app = express();
 const server = http.createServer(app);
@@ -124,22 +132,64 @@ initDb().then(() => {
   const calendarsRouter = require('./routes/calendars');
   const membersRouter   = require('./routes/members');
   const eventsRouter    = require('./routes/events');
+  const kanbanRouter    = require('./routes/kanban');
 
   app.use('/api/calendars', calendarsRouter);
   app.use('/api/calendars', membersRouter);  // /:id/members
   app.use('/api/calendars', eventsRouter);   // /:calendarId/events
   app.use('/api/events',    eventsRouter);   // /:id (edit/delete)
+  app.use('/api/kanban',    kanbanRouter);
+
+  // Em producao, o mesmo processo entrega Angular, API e WebSocket.
+  const frontendCandidates = [
+    process.env.FRONTEND_PATH
+      ? path.resolve(__dirname, '..', process.env.FRONTEND_PATH)
+      : null,
+    path.join(__dirname, '..', 'frontend'),
+    path.join(__dirname, '..', 'dist', 'agenda', 'browser'),
+  ].filter(Boolean);
+  const frontendPath = frontendCandidates.find(candidate =>
+    fs.existsSync(path.join(candidate, 'index.html'))
+  );
+
+  if (frontendPath) {
+    app.use(express.static(frontendPath, {
+      index: false,
+      maxAge: process.env.NODE_ENV === 'production' ? '1h' : 0,
+    }));
+  } else {
+    console.warn('[WEB] Frontend compilado nao encontrado; somente API/WS estarao disponiveis.');
+  }
+
+  app.use('/api', (_req, res) => res.status(404).json({ error: 'Rota nao encontrada' }));
+
+  if (frontendPath) {
+    app.get('*', (_req, res) => {
+      res.setHeader('Cache-Control', 'no-cache');
+      res.sendFile(path.join(frontendPath, 'index.html'));
+    });
+  }
+
+  app.use((err, req, res, next) => {
+    console.error('[API]', err);
+    if (res.headersSent) return next(err);
+    res.status(500).json({ error: 'Erro interno no servidor' });
+  });
 
   server.listen(PORT, HOST, () => {
     console.log('');
     console.log('╔══════════════════════════════════════════════════╗');
     console.log('║       Agenda Corporativa — Backend v1.0         ║');
     console.log('╠══════════════════════════════════════════════════╣');
-    console.log(`║  REST → http://0.0.0.0:${PORT}/api              ║`);
-    console.log(`║  WS   → ws://0.0.0.0:${PORT}                   ║`);
+    console.log(`║  REST → http://${HOST}:${PORT}/api`);
+    console.log(`║  WS   → ws://${HOST}:${PORT}`);
+    if (frontendPath) console.log(`║  WEB  → ${frontendPath}`);
     console.log('╚══════════════════════════════════════════════════╝');
   });
 }).catch(err => {
   console.error('[FATAL] Falha ao inicializar banco de dados:', err);
   process.exit(1);
+}).catch(error => {
+  console.error('[DB] Não foi possível iniciar o PostgreSQL:', error.message);
+  process.exitCode = 1;
 });

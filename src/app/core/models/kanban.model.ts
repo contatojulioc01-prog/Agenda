@@ -1,0 +1,83 @@
+export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
+
+export interface KanbanBoardSummary {
+  id: string;
+  name: string;
+  description: string;
+  color: string;
+  owner_id: string;
+  task_count?: number;
+  taskCount?: number;
+  scopeType: 'personal' | 'team';
+  teamId: string | null;
+  teamName?: string;
+  myRole?: 'admin' | 'member';
+}
+
+export interface KanbanColumn {
+  id: string;
+  board_id: string;
+  title: string;
+  color: string;
+  position: number;
+}
+
+export interface ChecklistItem {
+  id: string;
+  text: string;
+  done: boolean;
+}
+
+export interface KanbanTask {
+  id: string;
+  boardId: string;
+  columnId: string;
+  title: string;
+  description: string;
+  position: number;
+  priority: TaskPriority;
+  dueDate: string | null;
+  labels: string[];
+  assigneeId: string | null;
+  assigneeIds: string[];
+  checklist: ChecklistItem[];
+  archived: boolean;
+  createdAt: string;
+  updatedAt: string;
+  parentTaskId: string | null;
+}
+
+export interface KanbanBoard extends KanbanBoardSummary {
+  columns: KanbanColumn[];
+  tasks: KanbanTask[];
+}
+
+export type KanbanTaskInput = Pick<KanbanTask, 'title' | 'description' | 'columnId' | 'priority' | 'dueDate' | 'labels' | 'assigneeIds' | 'checklist' | 'parentTaskId'>;
+
+export interface KanbanTeam {
+  id: string;
+  name: string;
+  description: string;
+  color: string;
+  owner_id: string;
+  myRole: 'admin' | 'member';
+  memberCount: number;
+  boardId: string;
+}
+
+export interface KanbanTeamMember {
+  id: string;
+  team_id: string;
+  user_id: string;
+  role: 'admin' | 'member';
+  joined_at: string;
+}
+
+export interface KanbanTeamInvitation {
+  id: string;
+  team_id: string;
+  user_id: string;
+  invited_by: string;
+  team_name: string;
+  team_color: string;
+}

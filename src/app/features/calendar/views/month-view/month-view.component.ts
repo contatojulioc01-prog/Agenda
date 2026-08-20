@@ -176,6 +176,10 @@ export class MonthViewComponent implements OnInit, OnChanges {
   }
 
   onDragStart(ev: DragEvent, event: CalendarEvent): void {
+    if (event.isSystem) {
+      ev.preventDefault();
+      return;
+    }
     this.dragEventId = event.id;
     if (ev.dataTransfer) {
       ev.dataTransfer.setData('text/plain', event.id);
