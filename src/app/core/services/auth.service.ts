@@ -1,8 +1,9 @@
 import { Injectable, signal, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, of, forkJoin } from 'rxjs';
+import { Router } from '@angular/router';
+import { Observable, of, forkJoin, throwError } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
-import { UserMe, UserAll, UserResponse, UserProfile, DEFAULT_AVATAR } from '../models/user.model';
+import { UserMe, UserResponse, UserProfile, DEFAULT_AVATAR } from '../models/user.model';
 
 function getApiBase(): string {
   // Retorna caminho relativo para ser interceptado pelo proxy.conf.json do Angular
@@ -13,14 +14,16 @@ function getApiBase(): string {
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly http = inject(HttpClient);
+  private readonly router = inject(Router);
   private readonly TOKEN_KEY = 'agenda_token';
+  private readonly initialToken = this.getInitialToken();
 
   // Signals de estado
-  token = signal<string | null>(this.getInitialToken());
+  token = signal<string | null>(this.initialToken);
   currentUser = signal<UserProfile | null>(null);
   allUsers = signal<UserResponse[]>([]);
   isLoading = signal<boolean>(false);
-  isAuthenticated = signal<boolean>(!!this.getInitialToken());
+  isAuthenticated = signal<boolean>(!!this.initialToken);
 
   constructor() {
     if (this.token()) {
@@ -35,14 +38,24 @@ export class AuthService {
         const urlParams = new URLSearchParams(window.location.search);
         const urlToken = urlParams.get('token');
         if (urlToken && urlToken.trim().length > 0) {
-          localStorage.setItem(this.TOKEN_KEY, urlToken.trim());
+          const cleanToken = urlToken.trim();
           urlParams.delete('token');
           const remainingQuery = urlParams.toString();
           const cleanUrl = `${window.location.pathname}${remainingQuery ? `?${remainingQuery}` : ''}${window.location.hash}`;
           window.history.replaceState(window.history.state, document.title, cleanUrl);
-          return urlToken.trim();
+          if (this.isTokenExpired(cleanToken)) {
+            localStorage.removeItem(this.TOKEN_KEY);
+            return null;
+          }
+          localStorage.setItem(this.TOKEN_KEY, cleanToken);
+          return cleanToken;
         }
-        return localStorage.getItem(this.TOKEN_KEY);
+        const storedToken = localStorage.getItem(this.TOKEN_KEY);
+        if (storedToken && this.isTokenExpired(storedToken)) {
+          localStorage.removeItem(this.TOKEN_KEY);
+          return null;
+        }
+        return storedToken;
       } catch {
         return null;
       }
@@ -51,13 +64,18 @@ export class AuthService {
   }
 
   /** Define um novo token manualmente ou vindo de navegação */
-  setToken(token: string): void {
-    if (token) {
-      localStorage.setItem(this.TOKEN_KEY, token);
-      this.token.set(token);
+  setToken(token: string): boolean {
+    const cleanToken = token.trim();
+    if (cleanToken && !this.isTokenExpired(cleanToken)) {
+      if (this.token() === cleanToken && this.isLoading()) return true;
+      localStorage.setItem(this.TOKEN_KEY, cleanToken);
+      this.token.set(cleanToken);
       this.isAuthenticated.set(true);
       this.loadUserData();
+      return true;
     }
+    this.clearSession();
+    return false;
   }
 
   getToken(): string | null {
@@ -80,7 +98,7 @@ export class AuthService {
       users: this.fetchUsers(),
     }).subscribe({
       next: ({ me, users }) => {
-        const userList = (users && users.length > 0) ? users : this.getSampleUsers();
+        const userList = users || [];
         this.allUsers.set(userList);
 
         const meAny = me as any;
@@ -92,11 +110,17 @@ export class AuthService {
             (u.email && userEmail && u.email.toLowerCase() === userEmail.toLowerCase()) ||
             (u.id && userId && u.id === userId)
           );
+          const resolvedUserId = userId || matchingUser?.id;
+          if (!resolvedUserId) {
+            this.invalidateSession();
+            this.isLoading.set(false);
+            return;
+          }
 
           const avatarUrl = meData?.avatar || meAny.avatar || meData?.icon || meAny.icon || matchingUser?.avatar || DEFAULT_AVATAR;
 
           const profile: UserProfile = {
-            id: userId || matchingUser?.id || 'usr-me',
+            id: resolvedUserId,
             email: userEmail || matchingUser?.email || '',
             roles: meData?.roles || meAny.roles || [],
             permissions: meData?.permissions || meAny.permissions || [],
@@ -106,52 +130,28 @@ export class AuthService {
           };
           this.currentUser.set(profile);
           this.isAuthenticated.set(true);
-        } else {
-          // Usuário padrão caso a resposta venha sem me.data
-          const defaultUser = userList[0] || {
-            id: 'user-me',
-            name: 'Meu Usuário',
-            email: 'usuario@empresa.com.br',
-            departament: { id: 'd1', name: 'Tecnologia' },
-            avatar: DEFAULT_AVATAR,
-          };
-          this.currentUser.set({
-            id: defaultUser.id,
-            name: defaultUser.name,
-            email: defaultUser.email,
-            avatar: defaultUser.avatar || DEFAULT_AVATAR,
-            departamentName: defaultUser.departament?.name || 'Corporativo',
-            roles: ['USER'],
-            permissions: [],
-          });
-          this.isAuthenticated.set(true);
-        }
+        } else this.invalidateSession();
         this.isLoading.set(false);
       },
-      error: () => {
-        const sampleList = this.getSampleUsers();
-        this.allUsers.set(sampleList);
-        this.currentUser.set({
-          id: 'user-me',
-          name: 'Meu Usuário',
-          email: 'usuario@empresa.com.br',
-          avatar: DEFAULT_AVATAR,
-          departamentName: 'Tecnologia da Informação',
-          roles: ['ADMIN'],
-          permissions: [],
-        });
+      error: err => {
+        if (err?.status === 401 || err?.status === 403) this.invalidateSession();
+        else {
+          this.currentUser.set(null);
+          this.allUsers.set([]);
+          this.isAuthenticated.set(false);
+        }
         this.isLoading.set(false);
       }
     });
   }
 
-  fetchMe(): Observable<UserMe | null> {
+  fetchMe(): Observable<UserMe> {
     const proxyUrl = `${getApiBase()}/auth/me`;
 
     return this.http.get<UserMe>(proxyUrl).pipe(
       catchError(err => {
         console.warn('[AuthService] /auth/me indisponível via proxy:', err.message);
-        return of(null);
+        return throwError(() => err);
       })
     );
   }
@@ -163,8 +163,8 @@ export class AuthService {
       catchError(() => this.http.get<any>(`${getApiBase()}/users`)),
       map(res => this.extractUserList(res)),
       catchError(err => {
-        console.warn('[AuthService] /users/all indisponível via proxy, carregando colaboradores locais:', err.message);
-        return of(this.getSampleUsers());
+        console.warn('[AuthService] /users/all indisponível via proxy:', err.message);
+        return of([]);
       })
     );
   }
@@ -184,6 +184,15 @@ export class AuthService {
   }
 
   logout(): void {
+    this.clearSession();
+  }
+
+  private invalidateSession(): void {
+    this.clearSession();
+    void this.router.navigate(['/unauthorized']);
+  }
+
+  private clearSession(): void {
     try {
       localStorage.removeItem(this.TOKEN_KEY);
     } catch {}
@@ -193,74 +202,16 @@ export class AuthService {
     this.isAuthenticated.set(false);
   }
 
-  /** Colaboradores corporativos para quando a API estiver em rede privada ou indisponível */
-  private getSampleUsers(): UserResponse[] {
-    return [
-      {
-        id: 'usr-carlos',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        name: 'Carlos Silva',
-        email: 'carlos.silva@empresa.com.br',
-        departamentId: 'dep-ti',
-        avatar: '',
-        isActive: true,
-        departament: { id: 'dep-ti', name: 'Tecnologia da Informação' },
-        roles: [{ id: '2', name: 'Desenvolvedor' }],
-        pemisssions: [],
-      },
-      {
-        id: 'usr-mariana',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        name: 'Mariana Souza',
-        email: 'mariana.souza@empresa.com.br',
-        departamentId: 'dep-comercial',
-        avatar: '',
-        isActive: true,
-        departament: { id: 'dep-comercial', name: 'Comercial' },
-        roles: [{ id: '3', name: 'Gerente Comercial' }],
-        pemisssions: [],
-      },
-      {
-        id: 'usr-rodrigo',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        name: 'Rodrigo Lima',
-        email: 'rodrigo.lima@empresa.com.br',
-        departamentId: 'dep-financeiro',
-        avatar: '',
-        isActive: true,
-        departament: { id: 'dep-financeiro', name: 'Financeiro' },
-        roles: [{ id: '4', name: 'Analista Financeiro' }],
-        pemisssions: [],
-      },
-      {
-        id: 'usr-fernanda',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        name: 'Fernanda Costa',
-        email: 'fernanda.costa@empresa.com.br',
-        departamentId: 'dep-rh',
-        avatar: '',
-        isActive: true,
-        departament: { id: 'dep-rh', name: 'Recursos Humanos' },
-        roles: [{ id: '5', name: 'Coordenadora RH' }],
-        pemisssions: [],
-      },
-      {
-        id: 'usr-lucas',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        name: 'Lucas Ferreira',
-        email: 'lucas.ferreira@empresa.com.br',
-        departamentId: 'dep-operacoes',
-        avatar: '',
-        isActive: true,
-        departament: { id: 'dep-operacoes', name: 'Operações' },
-        roles: [{ id: '6', name: 'Supervisor Operacional' }],
-        pemisssions: [],
-      },
-    ];
+  private isTokenExpired(token: string): boolean {
+    try {
+      const payloadPart = token.split('.')[1];
+      if (!payloadPart) return false;
+      const normalized = payloadPart.replace(/-/g, '+').replace(/_/g, '/');
+      const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+      const payload = JSON.parse(atob(padded));
+      return typeof payload.exp === 'number' && payload.exp * 1000 <= Date.now();
+    } catch {
+      return false;
+    }
   }
 }

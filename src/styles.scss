@@ -1175,6 +1175,8 @@ app-calendar-page {
 .blocked-warning { margin-top: 12px; padding: 10px; display: flex; align-items: flex-start; gap: 7px; border: 1px solid rgba(245,158,11,.25); border-radius: 9px; background: rgba(245,158,11,.1); color: #d97706; font-size: 10.5px; line-height: 1.45; }.blocked-warning mat-icon { flex: 0 0 auto; width: 17px; height: 17px; font-size: 17px; }
 .column-dialog > footer { display: flex; justify-content: flex-end; gap: 7px; padding: 12px 17px; border-top: 1px solid var(--border-light); }
 .delete-confirm-btn { height: 36px; padding: 0 13px; border-radius: 9px; display: inline-flex; align-items: center; gap: 5px; background: #dc2626; color: #fff; font-size: 12px; font-weight: 650; }.delete-confirm-btn:disabled { opacity: .4; cursor: not-allowed; }.delete-confirm-btn mat-icon { width: 17px; height: 17px; font-size: 17px; }
+.member-removal-warning { margin-top: 13px; display: flex; align-items: flex-start; gap: 8px; padding: 10px 11px; border: 1px solid rgba(239,68,68,.2); border-radius: 9px; background: rgba(239,68,68,.08); color: var(--text-secondary); font-size: 11px; line-height: 1.45; }
+.member-removal-warning mat-icon { flex: 0 0 auto; width: 17px; height: 17px; color: #ef4444; font-size: 17px; }
 
 /* ── Dark theme legibility pass ─────────────────────────────────────────── */
 :is([data-theme="dark"], [data-theme="dark-angel"], [data-theme="dark-demon"]) {

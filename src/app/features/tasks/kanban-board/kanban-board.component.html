@@ -102,6 +102,24 @@
   </main>
 </div>
 
+<div class="column-dialog-backdrop" *ngIf="memberRemovalTarget() as member" (mousedown)="cancelMemberRemoval()">
+  <section class="column-dialog member-removal-dialog" role="dialog" aria-modal="true" aria-labelledby="member-removal-title" (mousedown)="$event.stopPropagation()">
+    <header>
+      <span class="column-dialog-icon delete"><mat-icon>person_remove</mat-icon></span>
+      <div><h2 id="member-removal-title">Remover pessoa do time</h2><p>Confirme antes de alterar os participantes.</p></div>
+      <button class="icon-btn" type="button" (click)="cancelMemberRemoval()"><mat-icon>close</mat-icon></button>
+    </header>
+    <div class="column-dialog-body delete-copy">
+      <p>Deseja remover <strong>{{ memberName(member.user_id) }}</strong> do time <strong>{{ currentTeam()?.name }}</strong>?</p>
+      <div class="member-removal-warning"><mat-icon>info_outline</mat-icon><span>A pessoa perderá o acesso ao Kanban do time e será retirada das tarefas atribuídas a ela.</span></div>
+    </div>
+    <footer>
+      <button class="cancel-btn" type="button" (click)="cancelMemberRemoval()">Cancelar</button>
+      <button class="delete-confirm-btn" type="button" (click)="confirmMemberRemoval()"><mat-icon>person_remove</mat-icon>Remover pessoa</button>
+    </footer>
+  </section>
+</div>
+
 <div class="column-dialog-backdrop" *ngIf="columnDialog() && selectedColumn() as column" (mousedown)="closeColumnDialog()">
   <section class="column-dialog" role="dialog" aria-modal="true" (mousedown)="$event.stopPropagation()">
     <header>

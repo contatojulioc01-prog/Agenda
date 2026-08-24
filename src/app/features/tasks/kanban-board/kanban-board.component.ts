@@ -6,7 +6,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { AuthService } from '../../../core/services/auth.service';
 import { KanbanService } from '../../../core/services/kanban.service';
-import { KanbanColumn, KanbanTask, KanbanTaskInput, KanbanTeam, TaskPriority } from '../../../core/models/kanban.model';
+import { KanbanColumn, KanbanTask, KanbanTaskInput, KanbanTeam, KanbanTeamMember, TaskPriority } from '../../../core/models/kanban.model';
 import { DEFAULT_AVATAR } from '../../../core/models/user.model';
 
 @Component({
@@ -42,6 +42,7 @@ export class KanbanBoardComponent implements OnInit {
   readonly selectedColumn = signal<KanbanColumn | null>(null);
   readonly boardNameDialogOpen = signal(false);
   readonly branchConfirmationTask = signal<KanbanTask | null>(null);
+  readonly memberRemovalTarget = signal<KanbanTeamMember | null>(null);
 
   newColumnTitle = '';
   newBoardName = '';
@@ -287,8 +288,20 @@ export class KanbanBoardComponent implements OnInit {
   }
 
   removeMember(memberId: string): void {
+    const member = this.service.teamMembers().find(item => item.id === memberId);
+    if (member) this.memberRemovalTarget.set(member);
+  }
+
+  cancelMemberRemoval(): void {
+    this.memberRemovalTarget.set(null);
+  }
+
+  confirmMemberRemoval(): void {
     const team = this.currentTeam();
-    if (team && confirm('Remover esta pessoa do time?')) this.service.removeTeamMember(team.id, memberId);
+    const member = this.memberRemovalTarget();
+    if (!team || !member) return;
+    this.service.removeTeamMember(team.id, member.id);
+    this.memberRemovalTarget.set(null);
   }
 
   removeTeam(): void {

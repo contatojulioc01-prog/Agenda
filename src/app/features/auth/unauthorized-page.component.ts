@@ -190,8 +190,7 @@ export class UnauthorizedPageComponent {
   manualToken = '';
 
   applyToken(): void {
-    if (this.manualToken.trim()) {
-      this.authService.setToken(this.manualToken.trim());
+    if (this.manualToken.trim() && this.authService.setToken(this.manualToken.trim())) {
       this.router.navigate(['/']);
     }
   }
