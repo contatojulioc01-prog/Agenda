@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const asyncRoute = require('../async-route');
+const { validateEventInput } = require('../validation');
 
 function genId() {
   return 'evt-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
@@ -10,7 +11,7 @@ function genId() {
 async function hasAccess(calendarId, userId, requireWrite = false) {
   if (!calendarId) return true;
   const calendar = await db.get('SELECT * FROM calendars WHERE id = ?', [calendarId]);
-  if (!calendar) return true;
+  if (!calendar) return false;
   if (calendar.owner_id === userId) return true;
   if (!userId) return false;
 
@@ -59,14 +60,15 @@ router.post('/:calendarId/events', asyncRoute(async (req, res) => {
   if (!(await hasAccess(calendarId, userId, true))) return res.status(403).json({ error: 'Sem permissão para criar eventos' });
 
   const { title, description = '', date, endDate, startTime = '09:00', endTime = '10:00', dayTimes = {}, color = 'indigo', category = 'Geral', allDay = false, copyGroupId } = req.body;
-  if (!title || !date) return res.status(400).json({ error: 'title e date são obrigatórios' });
+  const validationError = validateEventInput({ title, description, date, endDate: endDate || date, startTime, endTime, dayTimes, color, category, allDay });
+  if (validationError) return res.status(400).json({ error: validationError });
 
   const id = genId();
   const now = new Date().toISOString();
   await db.run(`INSERT INTO events (id, calendar_id, title, description, date, end_date, start_time, end_time,
     day_times, color, category, all_day, created_by, copy_group_id, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [id, calendarId, title, description, date, endDate || date, startTime, endTime, JSON.stringify(dayTimes || {}), color, category, allDay ? 1 : 0, userId, copyGroupId || id, now]);
+    [id, calendarId, title.trim(), description, date, endDate || date, startTime, endTime, JSON.stringify(dayTimes || {}), color, category, allDay ? 1 : 0, userId, copyGroupId || id, now]);
 
   const event = await db.get('SELECT * FROM events WHERE id = ?', [id]);
   req.broadcast({ type: 'event_created', calendarId, eventId: id });
@@ -82,8 +84,10 @@ router.put('/:id', asyncRoute(async (req, res) => {
   if (await isTaskDeadlineEvent(id)) return res.status(409).json({ error: 'O prazo desta tarefa deve ser alterado pelo card no Kanban' });
 
   const { title, description, date, endDate, startTime, endTime, dayTimes, color, category, allDay } = req.body;
+  const validationError = validateEventInput({ ...eventDto(event), ...req.body });
+  if (validationError) return res.status(400).json({ error: validationError });
   const now = new Date().toISOString();
-  if (title) await db.run('UPDATE events SET title = ?, updated_at = ? WHERE id = ?', [title, now, id]);
+  if (title !== undefined) await db.run('UPDATE events SET title = ?, updated_at = ? WHERE id = ?', [title.trim(), now, id]);
   if (description !== undefined) await db.run('UPDATE events SET description = ?, updated_at = ? WHERE id = ?', [description, now, id]);
   if (date) await db.run('UPDATE events SET date = ?, updated_at = ? WHERE id = ?', [date, now, id]);
   if (endDate !== undefined) await db.run('UPDATE events SET end_date = ?, updated_at = ? WHERE id = ?', [endDate, now, id]);

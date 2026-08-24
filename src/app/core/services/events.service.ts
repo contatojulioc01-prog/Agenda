@@ -23,6 +23,7 @@ export class EventsService {
 
   /** IDs de agendas já carregadas para evitar recargas desnecessárias */
   private loadedCalendarIds = new Set<string>();
+  private loadVersions = new Map<string, number>();
 
   /** ID do usuário atual (definido pela CalendarPageComponent) */
   currentUserId = signal<string>('');
@@ -45,6 +46,8 @@ export class EventsService {
   loadFromCalendar(calendarId: string): void {
     const userId = this.currentUserId();
     if (!userId) return;
+    const version = (this.loadVersions.get(calendarId) || 0) + 1;
+    this.loadVersions.set(calendarId, version);
 
     this.http.get<CalendarEvent[]>(
       `${getBackendUrl()}/api/calendars/${calendarId}/events`,
@@ -52,9 +55,11 @@ export class EventsService {
     ).pipe(
       catchError(err => {
         console.warn(`[EventsService] Erro ao carregar eventos da agenda ${calendarId}:`, err.message);
-        return of([] as CalendarEvent[]);
+        return of(null);
       })
     ).subscribe(remoteEvents => {
+      if (this.loadVersions.get(calendarId) !== version) return;
+      if (remoteEvents === null) return;
       this.loadedCalendarIds.add(calendarId);
       // Substitui eventos desta agenda e mantém das demais
       this.events.update(current => [
@@ -71,15 +76,26 @@ export class EventsService {
 
   /** Remove eventos de uma agenda da memória (quando a agenda é ocultada) */
   unloadCalendar(calendarId: string): void {
+    this.loadVersions.set(calendarId, (this.loadVersions.get(calendarId) || 0) + 1);
     this.loadedCalendarIds.delete(calendarId);
     this.events.update(list => list.filter(e => e.calendarId !== calendarId));
   }
 
+  /** Descarta eventos de agendas que deixaram de estar acessíveis. */
+  retainCalendars(calendarIds: string[]): void {
+    const allowed = new Set(calendarIds);
+    for (const calendarId of [...this.loadedCalendarIds]) {
+      if (!allowed.has(calendarId)) this.unloadCalendar(calendarId);
+    }
+    this.events.update(list => list.filter(event => allowed.has(event.calendarId)));
+  }
+
   /** Cria novo evento no backend */
-  create(event: Omit<CalendarEvent, 'id'>): void {
+  create(event: Omit<CalendarEvent, 'id'>, onComplete?: (success: boolean) => void): void {
     const userId = this.currentUserId();
     if (!event.calendarId || !userId) {
       this.error.set('Não foi possível identificar o usuário ou a agenda para salvar no PostgreSQL.');
+      onComplete?.(false);
       return;
     }
     this.error.set('');
@@ -106,22 +122,33 @@ export class EventsService {
     }))
       .subscribe(created => {
         if (created) {
-          this.events.update(list => [...list, created]);
+          this.events.update(list => {
+            const exists = list.some(event => event.id === created.id);
+            return exists ? list.map(event => event.id === created.id ? created : event) : [...list, created];
+          });
         }
+        onComplete?.(!!created);
       });
   }
 
   /** Cria a mesma atividade em todas as agendas selecionadas. */
-  createInCalendars(event: Omit<CalendarEvent, 'id'>, calendarIds: string[]): void {
+  createInCalendars(event: Omit<CalendarEvent, 'id'>, calendarIds: string[], onComplete?: (success: boolean) => void): void {
     const copyGroupId = event.copyGroupId || generateUniqueId();
-    [...new Set(calendarIds)].forEach(calendarId => this.create({ ...event, calendarId, copyGroupId }));
+    const targets = [...new Set(calendarIds)];
+    if (!targets.length) { onComplete?.(false); return; }
+    let pending = targets.length;
+    let succeeded = true;
+    targets.forEach(calendarId => this.create({ ...event, calendarId, copyGroupId }, success => {
+      succeeded = succeeded && success;
+      if (--pending === 0) onComplete?.(succeeded);
+    }));
   }
 
   /** Atualiza evento existente no backend */
-  update(id: string, changes: Partial<Omit<CalendarEvent, 'id'>>): void {
-    if (this.events().find(event => event.id === id)?.isSystem) return;
+  update(id: string, changes: Partial<Omit<CalendarEvent, 'id'>>, onComplete?: (success: boolean) => void): void {
+    if (this.events().find(event => event.id === id)?.isSystem) { onComplete?.(false); return; }
     const userId = this.currentUserId();
-    if (!userId) { this.error.set('Usuário não identificado para salvar no PostgreSQL.'); return; }
+    if (!userId) { this.error.set('Usuário não identificado para salvar no PostgreSQL.'); onComplete?.(false); return; }
     this.error.set('');
 
     // Converte camelCase para o formato esperado pelo backend
@@ -146,14 +173,15 @@ export class EventsService {
       return of(null);
     })).subscribe(updated => {
       if (updated) this.events.update(list => list.map(event => event.id === id ? updated : event));
+      onComplete?.(!!updated);
     });
   }
 
   /** Remove evento no backend */
-  remove(id: string): void {
-    if (this.events().find(event => event.id === id)?.isSystem) return;
+  remove(id: string, onComplete?: (success: boolean) => void): void {
+    if (this.events().find(event => event.id === id)?.isSystem) { onComplete?.(false); return; }
     const userId = this.currentUserId();
-    if (!userId) { this.error.set('Usuário não identificado para excluir no PostgreSQL.'); return; }
+    if (!userId) { this.error.set('Usuário não identificado para excluir no PostgreSQL.'); onComplete?.(false); return; }
     this.error.set('');
     this.http.delete(`${getBackendUrl()}/api/events/${id}`, { headers: { 'x-user-id': userId } })
       .pipe(catchError(err => {
@@ -161,6 +189,7 @@ export class EventsService {
         return of(null);
       })).subscribe(result => {
         if (result) this.events.update(list => list.filter(event => event.id !== id));
+        onComplete?.(!!result);
       });
   }
 

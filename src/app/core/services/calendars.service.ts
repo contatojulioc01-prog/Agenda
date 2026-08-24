@@ -25,6 +25,7 @@ export class CalendarsService {
   /** Loading state */
   isLoading = signal(false);
   error = signal('');
+  private loadVersion = 0;
 
   /** Agendas visíveis calculadas */
   visibleCalendars = computed(() =>
@@ -40,8 +41,9 @@ export class CalendarsService {
   }
 
   /** Carrega todas as agendas do usuário do backend */
-  loadAll(): void {
+  loadAll(afterLoad?: (calendars: Calendar[]) => void): void {
     if (!this.userId || this.userId === 'anonymous') return;
+    const version = ++this.loadVersion;
     this.isLoading.set(true);
     this.error.set('');
 
@@ -50,9 +52,11 @@ export class CalendarsService {
         catchError(err => {
           console.warn('[CalendarsService] PostgreSQL/backend indisponível:', err.message);
           this.error.set('Não foi possível carregar as agendas do PostgreSQL.');
-          return of([] as Calendar[]);
+          return of(null);
         }),
         tap(cals => {
+          if (version !== this.loadVersion) return;
+          if (cals === null) { this.isLoading.set(false); return; }
           const finalList = Array.isArray(cals) ? cals : [];
           this.calendars.set(finalList);
 
@@ -61,6 +65,7 @@ export class CalendarsService {
           const selectedId = finalList.some(calendar => calendar.id === currentId) ? currentId : finalList[0]?.id;
           this.visibleCalendarIds.set(new Set(selectedId ? [selectedId] : []));
           this.isLoading.set(false);
+          afterLoad?.(finalList);
         })
       ).subscribe();
   }
@@ -70,7 +75,8 @@ export class CalendarsService {
     name: string,
     color: string,
     isPrivate: boolean,
-    initialMembers: { user_id: string; permission: CalendarPermission }[] = []
+    initialMembers: { user_id: string; permission: CalendarPermission }[] = [],
+    onComplete?: (success: boolean) => void
   ): void {
     const payload = { name, color, isPrivate, members: initialMembers };
     this.error.set('');
@@ -81,14 +87,18 @@ export class CalendarsService {
       }))
       .subscribe(cal => {
         if (cal) {
-          this.calendars.update(list => [...list, cal]);
+          this.calendars.update(list => {
+            const exists = list.some(calendar => calendar.id === cal.id);
+            return exists ? list.map(calendar => calendar.id === cal.id ? cal : calendar) : [...list, cal];
+          });
           this.visibleCalendarIds.set(new Set([cal.id]));
         }
+        onComplete?.(!!cal);
       });
   }
 
   /** Atualiza agenda existente */
-  update(id: string, changes: Partial<Pick<Calendar, 'name' | 'color' | 'isPrivate'>>): void {
+  update(id: string, changes: Partial<Pick<Calendar, 'name' | 'color' | 'isPrivate'>>, onComplete?: (success: boolean) => void): void {
     this.error.set('');
     this.http.put<Calendar>(`${getBackendUrl()}/api/calendars/${id}`, changes, { headers: this.headers })
       .pipe(catchError(err => { this.error.set(err.error?.error || 'Não foi possível atualizar a agenda no PostgreSQL.'); return of(null); }))
@@ -96,26 +106,33 @@ export class CalendarsService {
         if (updated) {
           this.calendars.update(list => list.map(c => c.id === id ? { ...c, ...updated } : c));
         }
+        onComplete?.(!!updated);
       });
   }
 
   /** Remove agenda */
-  remove(id: string): void {
+  remove(id: string, onComplete?: (success: boolean) => void): void {
+    if (this.calendars().find(calendar => calendar.id === id)?.isDefault) {
+      this.error.set('A agenda padrão não pode ser excluída.');
+      onComplete?.(false);
+      return;
+    }
     this.error.set('');
     this.http.delete(`${getBackendUrl()}/api/calendars/${id}`, { headers: this.headers })
       .pipe(catchError(err => { this.error.set(err.error?.error || 'Não foi possível excluir a agenda no PostgreSQL.'); return of(null); }))
       .subscribe(result => {
-        if (!result) return;
+        if (!result) { onComplete?.(false); return; }
         this.calendars.update(list => list.filter(c => c.id !== id));
         const remaining = this.calendars();
         const selected = [...this.visibleCalendarIds()][0];
         const nextId = selected === id || !remaining.some(calendar => calendar.id === selected) ? remaining[0]?.id : selected;
         this.visibleCalendarIds.set(new Set(nextId ? [nextId] : []));
+        onComplete?.(true);
       });
   }
 
   /** Adiciona membro à agenda */
-  addMember(calendarId: string, userId: string, permission: CalendarPermission): void {
+  addMember(calendarId: string, userId: string, permission: CalendarPermission, onComplete?: (success: boolean) => void): void {
     this.http.post<CalendarMember>(
       `${getBackendUrl()}/api/calendars/${calendarId}/members`,
       { userId, permission },
@@ -130,18 +147,19 @@ export class CalendarsService {
             )
           );
         }
+        onComplete?.(!!member);
       });
   }
 
   /** Atualiza permissão de membro */
-  updateMemberPermission(calendarId: string, memberId: string, permission: CalendarPermission): void {
+  updateMemberPermission(calendarId: string, memberId: string, permission: CalendarPermission, onComplete?: (success: boolean) => void): void {
     this.http.put(
       `${getBackendUrl()}/api/calendars/${calendarId}/members/${memberId}`,
       { permission },
       { headers: this.headers }
     ).pipe(catchError(err => { this.error.set(err.error?.error || 'Não foi possível atualizar a permissão.'); return of(null); }))
       .subscribe(result => {
-        if (!result) return;
+        if (!result) { onComplete?.(false); return; }
         this.calendars.update(list =>
           list.map(c => c.id === calendarId
             ? {
@@ -153,23 +171,25 @@ export class CalendarsService {
             : c
           )
         );
+        onComplete?.(true);
       });
   }
 
   /** Remove membro da agenda */
-  removeMember(calendarId: string, memberId: string): void {
+  removeMember(calendarId: string, memberId: string, onComplete?: (success: boolean) => void): void {
     this.http.delete(
       `${getBackendUrl()}/api/calendars/${calendarId}/members/${memberId}`,
       { headers: this.headers }
     ).pipe(catchError(err => { this.error.set(err.error?.error || 'Não foi possível remover o membro.'); return of(null); }))
       .subscribe(result => {
-        if (!result) return;
+        if (!result) { onComplete?.(false); return; }
         this.calendars.update(list =>
           list.map(c => c.id === calendarId
             ? { ...c, members: c.members.filter(m => m.id !== memberId) }
             : c
           )
         );
+        onComplete?.(true);
       });
   }
 

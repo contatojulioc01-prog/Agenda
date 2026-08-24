@@ -18,7 +18,7 @@ import { UserResponse, DEFAULT_AVATAR } from '../../../core/models/user.model';
   styleUrl: './calendar-manager.component.scss',
 })
 export class CalendarManagerComponent implements OnInit {
-  private calendarsService = inject(CalendarsService);
+  public calendarsService = inject(CalendarsService);
   public authService = inject(AuthService);
 
   readonly defaultAvatar = DEFAULT_AVATAR;
@@ -47,6 +47,8 @@ export class CalendarManagerComponent implements OnInit {
   members = signal<(CalendarMember & { userName?: string; userEmail?: string })[]>([]);
 
   get isEditing(): boolean { return !!this.calendar; }
+  get isOwner(): boolean { return !!this.calendar && this.calendarsService.isOwner(this.calendar.id); }
+  get canDelete(): boolean { return this.isOwner && !this.calendar?.isDefault; }
 
   /** Lista de colaboradores disponíveis (excluindo já adicionados e o próprio usuário logado) */
   readonly availableUsers = computed<UserResponse[]>(() => {
@@ -131,42 +133,37 @@ export class CalendarManagerComponent implements OnInit {
     this.isSaving = true;
 
     if (this.isEditing && this.calendar) {
-      this.calendarsService.update(this.calendar.id, {
-        name: val,
-        color: this.selectedColor,
-        isPrivate: this.isPrivate,
-      });
-
       const existing = this.calendar.members.filter(m => m.permission !== 'owner');
-      const current = this.members();
+      const current = this.isOwner ? (this.isPrivate ? [] : this.members()) : existing;
 
       const toAdd = current.filter(m => !existing.some(e => e.user_id === m.user_id));
-      toAdd.forEach(m => this.calendarsService.addMember(this.calendar!.id, m.user_id, m.permission));
-
       const toRemove = existing.filter(e => !current.some(m => m.user_id === e.user_id));
-      toRemove.forEach(m => this.calendarsService.removeMember(this.calendar!.id, m.id));
-
       const toUpdate = current.filter(m => {
         const e = existing.find(ex => ex.user_id === m.user_id);
         return e && e.permission !== m.permission;
       });
-      toUpdate.forEach(m => {
-        const e = existing.find(ex => ex.user_id === m.user_id)!;
-        this.calendarsService.updateMemberPermission(this.calendar!.id, e.id, m.permission);
-      });
+      const operations: Array<(done: (success: boolean) => void) => void> = [
+        done => this.calendarsService.update(this.calendar!.id, { name: val, color: this.selectedColor, isPrivate: this.isPrivate }, done),
+        ...toAdd.map(m => (done: (success: boolean) => void) => this.calendarsService.addMember(this.calendar!.id, m.user_id, m.permission, done)),
+        ...toRemove.map(m => (done: (success: boolean) => void) => this.calendarsService.removeMember(this.calendar!.id, m.id, done)),
+        ...toUpdate.map(m => (done: (success: boolean) => void) => {
+          const existingMember = existing.find(item => item.user_id === m.user_id)!;
+          this.calendarsService.updateMemberPermission(this.calendar!.id, existingMember.id, m.permission, done);
+        }),
+      ];
+      let pending = operations.length;
+      let succeeded = true;
+      operations.forEach(operation => operation(success => {
+        succeeded = succeeded && success;
+        if (--pending === 0) this.finishSave(succeeded);
+      }));
     } else {
-      const initialMembers = this.members().map(m => ({
+      const initialMembers = (this.isPrivate ? [] : this.members()).map(m => ({
         user_id: m.user_id,
         permission: m.permission,
       }));
-      this.calendarsService.create(val, this.selectedColor, this.isPrivate, initialMembers);
+      this.calendarsService.create(val, this.selectedColor, this.isPrivate, initialMembers, success => this.finishSave(success));
     }
-
-    setTimeout(() => {
-      this.isSaving = false;
-      this.saved.emit();
-      this.closed.emit();
-    }, 500);
   }
 
   onDelete(): void {
@@ -182,12 +179,13 @@ export class CalendarManagerComponent implements OnInit {
     if (!this.calendar) return;
     this.showDeleteConfirmation = false;
     this.isSaving = true;
-    this.calendarsService.remove(this.calendar.id);
-    setTimeout(() => {
+    this.calendarsService.remove(this.calendar.id, success => {
       this.isSaving = false;
-      this.saved.emit();
-      this.closed.emit();
-    }, 400);
+      if (success) {
+        this.saved.emit();
+        this.closed.emit();
+      }
+    });
   }
 
   onClose(): void {
@@ -196,5 +194,12 @@ export class CalendarManagerComponent implements OnInit {
 
   permissionLabel(p: CalendarPermission): string {
     return p === 'editor' ? 'Leitura e Gravação' : 'Somente Leitura';
+  }
+
+  private finishSave(success: boolean): void {
+    this.isSaving = false;
+    if (!success) return;
+    this.saved.emit();
+    this.closed.emit();
   }
 }

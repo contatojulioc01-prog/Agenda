@@ -3,7 +3,7 @@
      ║  GRUPO 1 — Header/Ações | GRUPO 2 — Conteúdo principal ║
      ╚══════════════════════════════════════════════════════════╝ -->
 
-<div class="page-layout">
+<div class="page-layout" (click)="closeCalendarContextMenus()">
 
   <!-- ══════════════ SIDEBAR ══════════════ -->
   <aside class="sidebar">
@@ -78,6 +78,7 @@
             [class.is-active]="calendarsService.visibleCalendarIds().has(cal.id)"
             [class.is-solo]="calendarsService.isOnlySelected(cal.id)"
             (click)="toggleCalendarVisibility(cal.id)"
+            (contextmenu)="openCalendarContextMenu($event, cal)"
           >
             <label class="calendar-checkbox-label" (click)="$event.stopPropagation()">
               <input
@@ -104,7 +105,7 @@
               <button class="btn-cal-menu" (click)="openEditCalendar(cal)" matTooltip="Editar agenda">
                 <mat-icon>edit</mat-icon>
               </button>
-              <button class="btn-cal-menu danger" (click)="removeCalendar(cal)" matTooltip="Excluir agenda">
+              <button *ngIf="!cal.isDefault" class="btn-cal-menu danger" (click)="removeCalendar(cal)" matTooltip="Excluir agenda">
                 <mat-icon>delete_outline</mat-icon>
               </button>
             </div>
@@ -129,6 +130,7 @@
             [class.is-active]="calendarsService.visibleCalendarIds().has(cal.id)"
             [class.is-solo]="calendarsService.isOnlySelected(cal.id)"
             (click)="toggleCalendarVisibility(cal.id)"
+            (contextmenu)="openCalendarContextMenu($event, cal)"
           >
             <label class="calendar-checkbox-label" (click)="$event.stopPropagation()">
               <input
@@ -267,7 +269,9 @@
         [year]="year" [month]="month"
         [events]="displayedEvents()" [holidays]="holidays"
         (dayClick)="openCreateModal($event)"
+        (dayContextMenu)="openDayContextMenu($event)"
         (eventClick)="openEditModal($event)"
+        (eventContextMenu)="openEventContextMenu($event)"
         (eventDrop)="onEventDrop($event)"
       ></app-month-view>
 
@@ -276,7 +280,10 @@
         [selectedDate]="selectedDate"
         [events]="displayedEvents()" [holidays]="holidays"
         (dayClick)="openCreateModal($event)"
+        (dayContextMenu)="openDayContextMenu($event)"
         (eventClick)="openEditModal($event)"
+        (dayContextMenu)="openDayContextMenu($event)"
+        (eventContextMenu)="openEventContextMenu($event)"
         (eventDrop)="onEventDrop($event)"
       ></app-week-view>
 
@@ -285,6 +292,7 @@
         [selectedDate]="selectedDate"
         [events]="displayedEvents()" [holidays]="holidays"
         (eventClick)="openEditModal($event)"
+        (eventContextMenu)="openEventContextMenu($event)"
         (eventDrop)="onEventDrop($event)"
       ></app-day-view>
 
@@ -293,6 +301,39 @@
   <div class="main-area tasks-main" [hidden]="activeSection !== 'tasks'">
     <app-kanban-board></app-kanban-board>
   </div>
+</div>
+
+<div class="agenda-context-menu" *ngIf="calendarContextMenu() as menu" [style.left.px]="menu.x" [style.top.px]="menu.y" (click)="$event.stopPropagation()">
+  <button type="button" (click)="selectCalendarFromContext(menu.calendar)"><mat-icon>filter_center_focus</mat-icon>Exibir esta agenda</button>
+  <button type="button" *ngIf="calendarsService.canEdit(menu.calendar.id)" (click)="editCalendarFromContext(menu.calendar)"><mat-icon>edit</mat-icon>Editar agenda</button>
+  <button type="button" class="danger" *ngIf="calendarsService.isOwner(menu.calendar.id) && !menu.calendar.isDefault" (click)="deleteCalendarFromContext(menu.calendar)"><mat-icon>delete_outline</mat-icon>Excluir agenda</button>
+</div>
+
+<div class="agenda-context-menu event-menu" *ngIf="eventContextMenu() as menu" [style.left.px]="menu.x" [style.top.px]="menu.y" (click)="$event.stopPropagation()">
+  <ng-container *ngIf="canManageEvent(menu.event); else protectedEventMenu">
+    <button type="button" (click)="editEventFromContext(menu.event)"><mat-icon>edit</mat-icon>Editar evento</button>
+    <button type="button" class="danger" (click)="requestEventDeletion(menu.event)"><mat-icon>delete_outline</mat-icon>Excluir evento</button>
+  </ng-container>
+  <ng-template #protectedEventMenu>
+    <div class="context-menu-notice"><mat-icon>lock</mat-icon><span>{{ menu.event.isTaskDeadline ? 'Edite este prazo pelo card em Tarefas' : menu.event.isSystem ? 'Evento gerenciado pelo sistema' : 'Você possui acesso somente para visualização' }}</span></div>
+  </ng-template>
+</div>
+
+<div class="agenda-context-menu day-menu" *ngIf="dayContextMenu() as menu" [style.left.px]="menu.x" [style.top.px]="menu.y" (click)="$event.stopPropagation()">
+  <button type="button" (click)="createEventFromContext(menu.date)"><mat-icon>add_circle_outline</mat-icon>Criar evento</button>
+</div>
+
+<div class="invitation-overlay" *ngIf="eventDeleteTarget() as event" (mousedown)="cancelEventDeletion()">
+  <section class="invitation-modal delete-calendar-modal" role="dialog" aria-modal="true" aria-labelledby="delete-event-title" (mousedown)="$event.stopPropagation()">
+    <div class="invitation-icon delete-icon"><mat-icon>event_busy</mat-icon></div>
+    <h2 id="delete-event-title">Excluir evento</h2>
+    <p>Deseja excluir <strong>{{ event.title }}</strong>?</p>
+    <p class="delete-warning">O evento será removido permanentemente da agenda.</p>
+    <div class="invitation-actions">
+      <button type="button" class="invitation-decline" [disabled]="eventDeleteLoading()" (click)="cancelEventDeletion()">Cancelar</button>
+      <button type="button" class="delete-calendar-confirm" [disabled]="eventDeleteLoading()" (click)="confirmEventDeletion()"><mat-icon>{{ eventDeleteLoading() ? 'hourglass_top' : 'delete_outline' }}</mat-icon>{{ eventDeleteLoading() ? 'Excluindo...' : 'Excluir evento' }}</button>
+    </div>
+  </section>
 </div>
 
 <div class="team-invitation-overlay" *ngIf="kanbanService.teamInvitations().length && kanbanService.teamInvitations()[0] as invitation">
@@ -319,8 +360,8 @@
     <p>Deseja excluir <strong>{{ calendar.name }}</strong>?</p>
     <p class="delete-warning">Todos os eventos vinculados serão removidos permanentemente.</p>
     <div class="invitation-actions">
-      <button type="button" class="invitation-decline" (click)="cancelCalendarDelete()">Cancelar</button>
-      <button type="button" class="delete-calendar-confirm" (click)="confirmCalendarDelete()"><mat-icon>delete_outline</mat-icon>Excluir agenda</button>
+      <button type="button" class="invitation-decline" [disabled]="calendarDeleteLoading" (click)="cancelCalendarDelete()">Cancelar</button>
+      <button type="button" class="delete-calendar-confirm" [disabled]="calendarDeleteLoading" (click)="confirmCalendarDelete()"><mat-icon>{{ calendarDeleteLoading ? 'hourglass_top' : 'delete_outline' }}</mat-icon>{{ calendarDeleteLoading ? 'Excluindo...' : 'Excluir agenda' }}</button>
     </div>
   </section>
 </div>

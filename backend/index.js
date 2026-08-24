@@ -10,28 +10,56 @@ const express = require('express');
 const http = require('http');
 const { WebSocketServer } = require('ws');
 const cors = require('cors');
-const { initDb } = require('./db');
+const { initDb, closeDb } = require('./db');
 
 const PORT = process.env.PORT || 9900;
 const HOST = process.env.HOST || '0.0.0.0';
 
 const app = express();
 const server = http.createServer(app);
+const realtimeClients = new Set();
+let realtimeSequence = 0;
+let shuttingDown = false;
+
+async function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`[SHUTDOWN] Encerrando com ${signal}...`);
+  realtimeClients.forEach(response => response.end());
+  wss.clients.forEach(client => client.close(1001, 'Servidor reiniciando'));
+  await new Promise(resolve => server.close(resolve));
+  await closeDb();
+  process.exit(0);
+}
+
+process.once('SIGINT', () => void shutdown('SIGINT'));
+process.once('SIGTERM', () => void shutdown('SIGTERM'));
 
 // ── WebSocket ────────────────────────────────────────────────────────────────
 const wss = new WebSocketServer({ server });
 
 function broadcast(data) {
-  const payload = JSON.stringify(data);
+  const message = { ...data, messageId: `${Date.now()}-${++realtimeSequence}` };
+  const payload = JSON.stringify(message);
   wss.clients.forEach(client => {
     if (client.readyState === 1) client.send(payload);
+  });
+  realtimeClients.forEach(response => {
+    try { response.write(`data: ${payload}\n\n`); }
+    catch { realtimeClients.delete(response); }
   });
 }
 
 wss.on('connection', (ws, req) => {
   const ip = req.socket.remoteAddress;
   console.log(`[WS] +1 cliente (${ip}) | Total: ${wss.clients.size}`);
-  const ping = setInterval(() => { if (ws.readyState === 1) ws.ping(); }, 25000);
+  ws.isAlive = true;
+  ws.on('pong', () => { ws.isAlive = true; });
+  const ping = setInterval(() => {
+    if (!ws.isAlive) return ws.terminate();
+    ws.isAlive = false;
+    if (ws.readyState === 1) ws.ping();
+  }, 25000);
   ws.on('close', () => {
     clearInterval(ping);
     console.log(`[WS] -1 cliente | Total: ${wss.clients.size}`);
@@ -45,10 +73,65 @@ app.use(express.json());
 app.use((req, _res, next) => { req.broadcast = broadcast; next(); });
 
 // ── Rotas ────────────────────────────────────────────────────────────────────
-app.get('/health', (_req, res) => res.json({ status: 'ok', clients: wss.clients.size, ts: new Date().toISOString() }));
+app.get('/health', (_req, res) => res.json({
+  status: 'ok',
+  clients: Math.max(wss.clients.size, realtimeClients.size),
+  transports: { websocket: wss.clients.size, eventStream: realtimeClients.size },
+  ts: new Date().toISOString(),
+}));
+
+// Canal HTTP contínuo usado como redundância quando proxies não encaminham WebSocket.
+app.get('/api/realtime', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders?.();
+  res.write(': connected\n\n');
+  realtimeClients.add(res);
+
+  const keepAlive = setInterval(() => res.write(': keep-alive\n\n'), 20000);
+  req.on('close', () => {
+    clearInterval(keepAlive);
+    realtimeClients.delete(res);
+  });
+});
 
 // Proxy transparente para a API corporativa (elimina problemas de CORS e rede do browser)
 const PORTAL_API = process.env.PORTAL_API || 'http://192.168.13.244:7000';
+const authCache = new Map();
+
+function extractAuthenticatedUserId(payload) {
+  const value = payload?.data?.user || payload?.data || payload?.user || payload;
+  return value?.id ? String(value.id) : '';
+}
+
+async function authenticateAgendaRequest(req, res, next) {
+  const authorization = String(req.headers.authorization || '');
+  const token = authorization.replace(/^Bearer\s+/i, '').trim();
+  if (!token) return res.status(401).json({ error: 'Autenticação obrigatória' });
+
+  try {
+    let cached = authCache.get(token);
+    if (!cached || cached.expiresAt <= Date.now()) {
+      const response = await fetch(`${PORTAL_API}/api/auth/me`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!response.ok) return res.status(response.status === 403 ? 403 : 401).json({ error: 'Sessão inválida ou expirada' });
+      const authenticatedUserId = extractAuthenticatedUserId(await response.json());
+      if (!authenticatedUserId) return res.status(401).json({ error: 'Usuário autenticado não identificado' });
+      cached = { userId: authenticatedUserId, expiresAt: Date.now() + 30000 };
+      if (authCache.size >= 500) authCache.delete(authCache.keys().next().value);
+      authCache.set(token, cached);
+    }
+
+    const requestedUserId = String(req.headers['x-user-id'] || '');
+    if (requestedUserId && requestedUserId !== cached.userId) return res.status(403).json({ error: 'Identidade da requisição não corresponde à sessão' });
+    req.headers['x-user-id'] = cached.userId;
+    next();
+  } catch (error) {
+    console.error('[AUTH] Falha ao validar sessão:', error.message);
+    res.status(503).json({ error: 'Serviço de autenticação indisponível' });
+  }
+}
 
 const handleUsersProxy = async (req, res) => {
   try {
@@ -134,11 +217,11 @@ initDb().then(() => {
   const eventsRouter    = require('./routes/events');
   const kanbanRouter    = require('./routes/kanban');
 
-  app.use('/api/calendars', calendarsRouter);
-  app.use('/api/calendars', membersRouter);  // /:id/members
-  app.use('/api/calendars', eventsRouter);   // /:calendarId/events
-  app.use('/api/events',    eventsRouter);   // /:id (edit/delete)
-  app.use('/api/kanban',    kanbanRouter);
+  app.use('/api/calendars', authenticateAgendaRequest, calendarsRouter);
+  app.use('/api/calendars', authenticateAgendaRequest, membersRouter);  // /:id/members
+  app.use('/api/calendars', authenticateAgendaRequest, eventsRouter);   // /:calendarId/events
+  app.use('/api/events',    authenticateAgendaRequest, eventsRouter);   // /:id (edit/delete)
+  app.use('/api/kanban',    authenticateAgendaRequest, kanbanRouter);
 
   // Em producao, o mesmo processo entrega Angular, API e WebSocket.
   const frontendCandidates = [

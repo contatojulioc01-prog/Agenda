@@ -780,3 +780,11 @@
 .delete-calendar-confirm mat-icon { width: 18px; height: 18px; font-size: 18px; }
 .invitation-decline { border: 1px solid var(--border, #cbd5e1); background: transparent; color: var(--text-secondary, #475569); }
 .invitation-accept { border: 1px solid #4f46e5; background: #4f46e5; color: #fff; }
+.agenda-context-menu { position:fixed;z-index:1500;width:198px;padding:5px;border:1px solid var(--border);border-radius:10px;background:var(--bg-surface);box-shadow:var(--shadow-lg); }
+.agenda-context-menu button { width:100%;min-height:36px;padding:0 10px;display:flex;align-items:center;gap:8px;border-radius:7px;color:var(--text-secondary);font-size:12px;font-weight:600;text-align:left; }
+.agenda-context-menu button:hover { color:var(--text-primary);background:var(--bg-hover); }
+.agenda-context-menu button.danger { color:#ef4444;border-top:1px solid var(--border-light); }
+.agenda-context-menu button.danger:hover { background:rgba(239,68,68,.1); }
+.agenda-context-menu mat-icon { width:17px;height:17px;font-size:17px;flex:0 0 auto; }
+.agenda-context-menu.event-menu { width:210px; }
+.context-menu-notice { display:flex;align-items:flex-start;gap:8px;padding:8px;color:var(--text-muted);font-size:11px;line-height:1.4; }

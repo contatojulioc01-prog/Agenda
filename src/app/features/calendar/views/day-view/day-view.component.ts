@@ -26,6 +26,8 @@ export class DayViewComponent implements OnInit, OnChanges {
   @Input() events: CalendarEvent[] = [];
   @Input() holidays: Holiday[] = [];
   @Output() eventClick = new EventEmitter<CalendarEvent>();
+  @Output() dayContextMenu = new EventEmitter<{ date: string; mouseEvent: MouseEvent }>();
+  @Output() eventContextMenu = new EventEmitter<{ event: CalendarEvent; mouseEvent: MouseEvent }>();
   @Output() eventDrop = new EventEmitter<EventDropPayload>();
 
   readonly colorMap = EVENT_COLOR_MAP;
@@ -252,6 +254,11 @@ export class DayViewComponent implements OnInit, OnChanges {
   onCardClick(ev: MouseEvent, event: CalendarEvent): void {
     if (this.isResizing) return;
     this.eventClick.emit(event);
+  }
+
+  openDayContextMenu(mouseEvent: MouseEvent): void {
+    mouseEvent.preventDefault();
+    this.dayContextMenu.emit({ date: this.toStr(this.selectedDate || new Date()), mouseEvent });
   }
 
   private build(): void {

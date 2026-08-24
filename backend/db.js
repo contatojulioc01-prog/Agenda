@@ -61,6 +61,7 @@ async function initDb() {
       color TEXT NOT NULL DEFAULT '#4f46e5',
       is_private INTEGER NOT NULL DEFAULT 0,
       owner_id TEXT NOT NULL,
+      is_default INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP::text)
     );
 
@@ -185,12 +186,23 @@ async function initDb() {
     CREATE INDEX IF NOT EXISTS idx_kanban_team_members_user ON kanban_team_members(user_id);
 
     ALTER TABLE events ADD COLUMN IF NOT EXISTS end_date TEXT;
+    ALTER TABLE calendars ADD COLUMN IF NOT EXISTS is_default INTEGER NOT NULL DEFAULT 0;
     ALTER TABLE events ADD COLUMN IF NOT EXISTS day_times TEXT DEFAULT '{}';
     ALTER TABLE events ADD COLUMN IF NOT EXISTS copy_group_id TEXT;
     ALTER TABLE kanban_boards ADD COLUMN IF NOT EXISTS scope_type TEXT NOT NULL DEFAULT 'personal';
     ALTER TABLE kanban_boards ADD COLUMN IF NOT EXISTS team_id TEXT;
     ALTER TABLE kanban_tasks ADD COLUMN IF NOT EXISTS parent_task_id TEXT;
     ALTER TABLE kanban_tasks ADD COLUMN IF NOT EXISTS assignee_ids TEXT NOT NULL DEFAULT '[]';
+
+    WITH defaults AS (
+      SELECT id, ROW_NUMBER() OVER (PARTITION BY owner_id ORDER BY created_at, id) row_number
+      FROM calendars WHERE name = 'Minha Agenda' AND is_private = 1
+    )
+    UPDATE calendars SET is_default = 1
+    FROM defaults WHERE calendars.id = defaults.id AND defaults.row_number = 1
+      AND NOT EXISTS (SELECT 1 FROM calendars existing WHERE existing.owner_id = calendars.owner_id AND existing.is_default = 1);
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_calendars_default_owner ON calendars(owner_id) WHERE is_default = 1;
   `);
 
   console.log(`[DB] PostgreSQL conectado em ${process.env.PGDATABASE || 'agenda'}`);

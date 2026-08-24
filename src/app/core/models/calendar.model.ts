@@ -16,6 +16,7 @@ export interface Calendar {
   name: string;
   color: string;
   isPrivate: boolean;
+  isDefault?: boolean;
   owner_id: string;
   created_at: string;
   members: CalendarMember[];

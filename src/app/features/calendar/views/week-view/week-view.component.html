@@ -9,6 +9,7 @@
       [class.weekend]="day.isWeekend"
       [class.holiday]="!!day.holiday"
       (click)="dayClick.emit(day.dateStr)"
+      (contextmenu)="$event.preventDefault(); dayContextMenu.emit({ date: day.dateStr, mouseEvent: $event })"
       [matTooltip]="day.holiday?.name ?? ''"
     >
       <span class="week-day-label">{{ day.dayLabel }}</span>
@@ -35,6 +36,7 @@
       (dragleave)="onDragLeave($event, colRef)"
       (drop)="onDrop($event, day, colRef)"
       (click)="dayClick.emit(day.dateStr)"
+      (contextmenu)="$event.preventDefault(); dayContextMenu.emit({ date: day.dateStr, mouseEvent: $event })"
     >
       <!-- Linhas de hora -->
       <div *ngFor="let h of HOURS" class="hour-row">
@@ -65,6 +67,7 @@
         (dragstart)="onDragStart($event, ev)"
         (dragend)="onDragEnd($event)"
         (click)="$event.stopPropagation(); onCardClick($event, ev)"
+        (contextmenu)="$event.preventDefault(); $event.stopPropagation(); eventContextMenu.emit({ event: ev, mouseEvent: $event })"
         [matTooltip]="ev.title + ' · ' + ev.startTime + ' - ' + ev.endTime + (ev.endDate && ev.endDate !== ev.date ? ' (' + ev.date + ' até ' + ev.endDate + ')' : '') + (ev.isTaskDeadline ? ' · Prazo fixo — edite pelo card em Tarefas' : '')"
       >
         <!-- Alça de Redimensionamento Esquerda (Dias) -->
@@ -123,6 +126,7 @@
         [style.height.px]="span.height"
         [style.background]="colorMap[span.event.color]"
         (click)="$event.stopPropagation(); onCardClick($event, span.event)"
+        (contextmenu)="$event.preventDefault(); $event.stopPropagation(); eventContextMenu.emit({ event: span.event, mouseEvent: $event })"
         [matTooltip]="span.event.title + ' · ' + span.event.startTime + ' - ' + span.event.endTime + (span.event.isTaskDeadline ? ' · Prazo fixo — edite pelo card em Tarefas' : '')"
       >
         <div *ngIf="!span.event.isSystem" class="event-resize-handle-x left" (mousedown)="onResizeHorizontalStart($event, span.event, 'left')"></div>

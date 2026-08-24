@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
 import { MatIconModule } from '@angular/material/icon';
@@ -16,7 +16,7 @@ import { DEFAULT_AVATAR } from '../../../core/models/user.model';
   templateUrl: './kanban-board.component.html',
   styleUrl: './kanban-board.component.scss',
 })
-export class KanbanBoardComponent implements OnInit {
+export class KanbanBoardComponent {
   readonly service = inject(KanbanService);
   readonly auth = inject(AuthService);
   readonly board = this.service.activeBoard;
@@ -25,6 +25,13 @@ export class KanbanBoardComponent implements OnInit {
   readonly teams = this.service.teams;
   readonly teamInvitations = this.service.teamInvitations;
   readonly defaultAvatar = DEFAULT_AVATAR;
+  private loadedWorkspaceUserId = '';
+  private readonly workspaceInitialization = effect(() => {
+    const userId = this.auth.currentUser()?.id;
+    if (!userId || userId === this.loadedWorkspaceUserId) return;
+    this.loadedWorkspaceUserId = userId;
+    this.service.loadWorkspace();
+  });
 
   readonly search = signal('');
   readonly priorityFilter = signal<TaskPriority | 'all'>('all');
@@ -43,6 +50,12 @@ export class KanbanBoardComponent implements OnInit {
   readonly boardNameDialogOpen = signal(false);
   readonly branchConfirmationTask = signal<KanbanTask | null>(null);
   readonly memberRemovalTarget = signal<KanbanTeamMember | null>(null);
+  readonly dragOverColumnId = signal<string | null>(null);
+  readonly teamContextMenu = signal<{ team: KanbanTeam; x: number; y: number } | null>(null);
+  readonly taskContextMenu = signal<{ task: KanbanTask; x: number; y: number } | null>(null);
+  readonly teamDeleteTarget = signal<KanbanTeam | null>(null);
+  readonly savingTask = signal(false);
+  readonly teamDeleteLoading = signal(false);
 
   newColumnTitle = '';
   newBoardName = '';
@@ -85,14 +98,6 @@ export class KanbanBoardComponent implements OnInit {
     return done ? (this.board()?.tasks || []).filter(task => task.parentTaskId === this.currentParentId() && !task.archived && task.columnId === done.id).length : 0;
   });
 
-  ngOnInit(): void {
-    const load = () => {
-      if (this.auth.currentUser()?.id) this.service.loadWorkspace();
-      else setTimeout(load, 300);
-    };
-    load();
-  }
-
   tasksFor(columnId: string): KanbanTask[] {
     return this.tasksByColumn().get(columnId) || [];
   }
@@ -100,18 +105,23 @@ export class KanbanBoardComponent implements OnInit {
   get dropListIds(): string[] { return (this.board()?.columns || []).map(column => column.id); }
 
   dropTask(event: CdkDragDrop<KanbanTask[]>, target: KanbanColumn): void {
+    this.dragOverColumnId.set(null);
     const board = this.board();
-    if (!board) return;
+    if (!board || this.showArchived()) return;
     const task = event.item.data as KanbanTask;
+    if (!task || task.archived) return;
     const sourceId = task.columnId;
     const source = board.tasks.filter(item => !item.archived && item.parentTaskId === this.currentParentId() && item.columnId === sourceId).sort((a, b) => a.position - b.position);
     const destination = sourceId === target.id ? source : board.tasks.filter(item => !item.archived && item.parentTaskId === this.currentParentId() && item.columnId === target.id).sort((a, b) => a.position - b.position);
 
     if (sourceId === target.id) {
       const from = source.findIndex(item => item.id === task.id);
+      if (from < 0) { this.service.loadBoard(board.id); return; }
       source.splice(event.currentIndex, 0, source.splice(from, 1)[0]);
     } else {
-      source.splice(source.findIndex(item => item.id === task.id), 1);
+      const from = source.findIndex(item => item.id === task.id);
+      if (from < 0) { this.service.loadBoard(board.id); return; }
+      source.splice(from, 1);
       destination.splice(event.currentIndex, 0, { ...task, columnId: target.id });
     }
 
@@ -120,6 +130,14 @@ export class KanbanBoardComponent implements OnInit {
     const changedMap = new Map(changed.map(item => [item.id, item]));
     this.service.activeBoard.set({ ...board, tasks: board.tasks.map(item => changedMap.get(item.id) || item) });
     this.service.reorder(board.id, [], changed.map(item => ({ id: item.id, columnId: item.columnId, position: item.position })));
+  }
+
+  enterColumn(columnId: string): void {
+    this.dragOverColumnId.set(columnId);
+  }
+
+  leaveColumn(columnId: string): void {
+    if (this.dragOverColumnId() === columnId) this.dragOverColumnId.set(null);
   }
 
   moveColumn(column: KanbanColumn, direction: -1 | 1): void {
@@ -164,14 +182,21 @@ export class KanbanBoardComponent implements OnInit {
     this.draft.title = title;
     this.draft.labels = this.labelText.split(',').map(value => value.trim()).filter(Boolean).slice(0, 8);
     const editing = this.editingId();
-    if (editing) this.service.updateTask(editing, this.draft);
-    else this.service.createTask(board.id, this.draft);
-    this.modalOpen.set(false);
+    this.savingTask.set(true);
+    const completed = (success: boolean) => {
+      this.savingTask.set(false);
+      if (success) this.modalOpen.set(false);
+    };
+    if (editing) this.service.updateTask(editing, this.draft, completed);
+    else this.service.createTask(board.id, this.draft, completed);
   }
 
   archiveTask(task: KanbanTask): void {
-    this.service.updateTask(task.id, { archived: !task.archived });
-    this.modalOpen.set(false);
+    this.savingTask.set(true);
+    this.service.updateTask(task.id, { archived: !task.archived }, success => {
+      this.savingTask.set(false);
+      if (success) this.modalOpen.set(false);
+    });
   }
 
   archiveEditing(): void {
@@ -186,8 +211,11 @@ export class KanbanBoardComponent implements OnInit {
 
   deleteTask(task: KanbanTask): void {
     if (task.archived && confirm(`Excluir permanentemente “${task.title}”?`)) {
-      this.service.deleteTask(task.id);
-      this.modalOpen.set(false);
+      this.savingTask.set(true);
+      this.service.deleteTask(task.id, success => {
+        this.savingTask.set(false);
+        if (success) this.modalOpen.set(false);
+      });
     }
   }
 
@@ -265,6 +293,86 @@ export class KanbanBoardComponent implements OnInit {
     this.service.loadBoard(boardId);
   }
 
+  openTeamContextMenu(event: MouseEvent, team: KanbanTeam): void {
+    if (team.myRole !== 'admin') return;
+    event.preventDefault();
+    event.stopPropagation();
+    this.taskContextMenu.set(null);
+    this.teamContextMenu.set({
+      team,
+      x: Math.min(event.clientX, window.innerWidth - 198),
+      y: Math.min(event.clientY, window.innerHeight - 56),
+    });
+  }
+
+  closeTeamContextMenu(): void {
+    this.teamContextMenu.set(null);
+  }
+
+  openTaskContextMenu(event: MouseEvent, task: KanbanTask): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.teamContextMenu.set(null);
+    const menuHeight = task.archived ? 184 : 144;
+    this.taskContextMenu.set({
+      task,
+      x: Math.max(8, Math.min(event.clientX, window.innerWidth - 206)),
+      y: Math.max(8, Math.min(event.clientY, window.innerHeight - menuHeight - 8)),
+    });
+  }
+
+  closeTaskContextMenu(): void {
+    this.taskContextMenu.set(null);
+  }
+
+  closeContextMenus(): void {
+    this.closeTeamContextMenu();
+    this.closeTaskContextMenu();
+  }
+
+  editTaskFromContext(task: KanbanTask): void {
+    this.closeTaskContextMenu();
+    this.openEdit(task);
+  }
+
+  openTaskBranchFromContext(task: KanbanTask): void {
+    this.closeTaskContextMenu();
+    this.openChildBoard(task);
+  }
+
+  toggleTaskArchiveFromContext(task: KanbanTask): void {
+    this.closeTaskContextMenu();
+    this.archiveTask(task);
+  }
+
+  deleteTaskFromContext(task: KanbanTask): void {
+    this.closeTaskContextMenu();
+    this.deleteTask(task);
+  }
+
+  requestTeamDeletion(team: KanbanTeam): void {
+    this.closeTeamContextMenu();
+    if (team.myRole === 'admin') this.teamDeleteTarget.set(team);
+  }
+
+  cancelTeamDeletion(): void {
+    if (this.teamDeleteLoading()) return;
+    this.teamDeleteTarget.set(null);
+  }
+
+  confirmTeamDeletion(): void {
+    const team = this.teamDeleteTarget();
+    if (!team || team.myRole !== 'admin') return;
+    this.teamDeleteLoading.set(true);
+    this.service.deleteTeam(team.id, success => {
+      this.teamDeleteLoading.set(false);
+      if (success) {
+        this.teamDeleteTarget.set(null);
+        this.teamModalOpen.set(false);
+      }
+    });
+  }
+
   personalBoardId(): string | undefined {
     return this.boards().find(board => board.scopeType !== 'team')?.id;
   }
@@ -306,10 +414,7 @@ export class KanbanBoardComponent implements OnInit {
 
   removeTeam(): void {
     const team = this.currentTeam();
-    if (team && confirm(`Excluir o time “${team.name}” e todo o Kanban compartilhado?`)) {
-      this.service.deleteTeam(team.id);
-      this.teamModalOpen.set(false);
-    }
+    if (team?.myRole === 'admin') this.requestTeamDeletion(team);
   }
 
   memberName(userId: string): string {

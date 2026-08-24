@@ -18,7 +18,8 @@ function getWsUrl(): string {
 }
 
 function getHttpUrl(): string {
-  return '';
+  if (typeof document === 'undefined') return '';
+  return new URL(document.baseURI).pathname.replace(/\/$/, '');
 }
 
 @Injectable({ providedIn: 'root' })
@@ -35,19 +36,20 @@ export class SyncService implements OnDestroy {
   clientsOnline = signal<number>(0);
 
   private ws: WebSocket | null = null;
+  private eventSource: EventSource | null = null;
+  private recentMessageIds = new Set<string>();
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private healthInterval: ReturnType<typeof setInterval> | null = null;
   private healthOnline = false;
+  private shouldReconnect = false;
 
-  constructor() {
-    // Monitora a saúde do backend periodicamente e tenta reconectar caso desconectado
-    this.healthInterval = setInterval(() => {
-      this.checkHealthAndConnect();
-    }, 4000);
-  }
+  constructor() {}
 
   /** Inicia a conexão WebSocket com o backend */
   connect(): void {
+    this.shouldReconnect = true;
+    this.startHealthMonitor();
+    this.connectEventSource();
     if (this.ws && (this.ws.readyState === WebSocket.CONNECTING || this.ws.readyState === WebSocket.OPEN)) {
       return;
     }
@@ -90,18 +92,18 @@ export class SyncService implements OnDestroy {
 
       this.ws.onclose = () => {
         this.ngZone.run(() => {
-          this.status.set(this.healthOnline ? 'connected' : 'disconnected');
+          this.status.set(this.isRealtimeConnected() ? 'connected' : (this.healthOnline ? 'connecting' : 'disconnected'));
           this.scheduleReconnect();
         });
       };
 
       this.ws.onerror = (err) => {
         this.ngZone.run(() => {
-          this.status.set(this.healthOnline ? 'connected' : 'disconnected');
+          this.status.set(this.isRealtimeConnected() ? 'connected' : (this.healthOnline ? 'connecting' : 'disconnected'));
         });
       };
     } catch {
-      this.status.set(this.healthOnline ? 'connected' : 'disconnected');
+      this.status.set(this.healthOnline ? 'connecting' : 'disconnected');
       this.scheduleReconnect();
     }
   }
@@ -112,8 +114,7 @@ export class SyncService implements OnDestroy {
       next: (res) => {
         if (res?.status === 'ok') {
           this.healthOnline = true;
-          this.status.set('connected');
-          this.lastSyncAt.set(new Date());
+          this.status.set(this.isRealtimeConnected() ? 'connected' : 'connecting');
           this.clientsOnline.set(res.clients ?? 0);
 
           if (!this.ws || this.ws.readyState === WebSocket.CLOSED) {
@@ -123,18 +124,24 @@ export class SyncService implements OnDestroy {
       },
       error: () => {
         this.healthOnline = false;
-        this.status.set('disconnected');
+        this.status.set(this.isRealtimeConnected() ? 'connected' : 'disconnected');
       }
     });
   }
 
   disconnect(): void {
+    this.shouldReconnect = false;
     this.healthOnline = false;
-    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
-    if (this.healthInterval) clearInterval(this.healthInterval);
+    if (this.reconnectTimer) { clearTimeout(this.reconnectTimer); this.reconnectTimer = null; }
+    if (this.healthInterval) { clearInterval(this.healthInterval); this.healthInterval = null; }
     if (this.ws) {
+      this.ws.onclose = null;
       try { this.ws.close(); } catch {}
       this.ws = null;
+    }
+    if (this.eventSource) {
+      this.eventSource.close();
+      this.eventSource = null;
     }
     this.status.set('disconnected');
   }
@@ -143,7 +150,43 @@ export class SyncService implements OnDestroy {
     this.disconnect();
   }
 
-  private handleMessage(msg: { type: string; calendarId?: string; eventId?: string; userId?: string; boardId?: string; taskId?: string; teamId?: string }): void {
+  private connectEventSource(): void {
+    if (typeof EventSource === 'undefined' || this.eventSource) return;
+    this.eventSource = new EventSource(`${getHttpUrl()}/api/realtime`);
+    this.eventSource.onopen = () => this.ngZone.run(() => {
+      this.status.set('connected');
+      this.lastSyncAt.set(new Date());
+    });
+    this.eventSource.onmessage = event => {
+      try {
+        const msg = JSON.parse(event.data);
+        this.ngZone.run(() => this.handleMessage(msg));
+      } catch {}
+    };
+    this.eventSource.onerror = () => {
+      // O EventSource se reconecta automaticamente; o WebSocket segue em paralelo.
+      this.ngZone.run(() => {
+        if (!this.isRealtimeConnected()) this.status.set(this.healthOnline ? 'connecting' : 'disconnected');
+      });
+    };
+  }
+
+  private startHealthMonitor(): void {
+    if (this.healthInterval) return;
+    this.checkHealthAndConnect();
+    this.healthInterval = setInterval(() => this.checkHealthAndConnect(), 4000);
+  }
+
+  private isRealtimeConnected(): boolean {
+    return this.ws?.readyState === 1 || this.eventSource?.readyState === 1;
+  }
+
+  private handleMessage(msg: { type: string; messageId?: string; calendarId?: string; eventId?: string; userId?: string; boardId?: string; taskId?: string; teamId?: string }): void {
+    if (msg.messageId) {
+      if (this.recentMessageIds.has(msg.messageId)) return;
+      this.recentMessageIds.add(msg.messageId);
+      setTimeout(() => this.recentMessageIds.delete(msg.messageId!), 10000);
+    }
     this.lastSyncAt.set(new Date());
 
     switch (msg.type) {
@@ -161,7 +204,14 @@ export class SyncService implements OnDestroy {
       case 'member_added':
       case 'member_updated':
       case 'member_removed':
-        this.calendarsService.loadAll();
+        if (msg.type === 'calendar_deleted' && msg.calendarId) {
+          this.eventsService.unloadCalendar(msg.calendarId);
+        }
+        this.calendarsService.loadAll(calendars => {
+          this.eventsService.retainCalendars(calendars.map(calendar => calendar.id));
+          const visibleIds = [...this.calendarsService.visibleCalendarIds()];
+          if (visibleIds.length) this.eventsService.loadFromCalendars(visibleIds);
+        });
         break;
       case 'calendar_invited':
         this.invitationsService.load();
@@ -172,7 +222,6 @@ export class SyncService implements OnDestroy {
         this.invitationsService.load();
         break;
       case 'kanban_updated':
-        if (this.kanbanService.shouldIgnoreRealtime()) break;
         if (msg.boardId && this.kanbanService.activeBoard()?.id === msg.boardId) {
           this.kanbanService.loadBoard(msg.boardId);
         } else {
@@ -193,6 +242,7 @@ export class SyncService implements OnDestroy {
   }
 
   private scheduleReconnect(): void {
+    if (!this.shouldReconnect) return;
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     this.reconnectTimer = setTimeout(() => {
       this.connect();

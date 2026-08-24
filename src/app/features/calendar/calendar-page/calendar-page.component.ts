@@ -52,6 +52,19 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
   public kanbanService = inject(KanbanService);
   private router = inject(Router);
   readonly themeService = inject(ThemeService);
+  private initializedUserId = '';
+  private readonly authInitialization = effect(() => {
+    const user = this.authService.currentUser();
+    if (!user?.id || user.id === this.initializedUserId) return;
+    this.initializedUserId = user.id;
+    this.eventsService.currentUserId.set(user.id);
+    this.calendarsService.loadAll(() => {
+      const id = [...this.calendarsService.visibleCalendarIds()][0];
+      if (id) this.selectOnlyCalendar(id);
+    });
+    this.invitationsService.load();
+    this.kanbanService.loadTeamInvitations();
+  });
 
   readonly defaultAvatar = DEFAULT_AVATAR;
 
@@ -67,6 +80,12 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
   showCalendarManager = false;
   editingCalendar: Calendar | null = null;
   calendarDeleteTarget: Calendar | null = null;
+  calendarDeleteLoading = false;
+  readonly calendarContextMenu = signal<{ calendar: Calendar; x: number; y: number } | null>(null);
+  readonly eventContextMenu = signal<{ event: CalendarEvent; x: number; y: number } | null>(null);
+  readonly dayContextMenu = signal<{ date: string; x: number; y: number } | null>(null);
+  readonly eventDeleteTarget = signal<CalendarEvent | null>(null);
+  readonly eventDeleteLoading = signal(false);
 
   readonly events = this.eventsService.events;
   /** Eventos exibidos, incluindo os pagamentos padrão da Minha Agenda. */
@@ -125,29 +144,6 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.loadHolidays(this.selectedDate.getFullYear());
     this.syncService.connect();
-
-    // Sincroniza dados do usuário assim que disponível
-    const checkUser = () => {
-      const user = this.currentUser();
-      if (user?.id) {
-        this.eventsService.currentUserId.set(user.id);
-        this.calendarsService.loadAll();
-        this.invitationsService.load();
-        this.kanbanService.loadTeamInvitations();
-        setTimeout(() => {
-          const id = [...this.calendarsService.visibleCalendarIds()][0];
-          if (id) this.selectOnlyCalendar(id);
-        }, 500);
-      }
-    };
-
-    checkUser();
-    const interval = setInterval(() => {
-      if (this.currentUser()?.id) {
-        clearInterval(interval);
-        checkUser();
-      }
-    }, 400);
   }
 
   ngOnDestroy(): void {
@@ -171,11 +167,8 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
   }
 
   onCalendarSaved(): void {
-    // Recarrega eventos após criar/editar agenda
-    setTimeout(() => {
-      const id = [...this.calendarsService.visibleCalendarIds()][0];
-      if (id) this.selectOnlyCalendar(id);
-    }, 600);
+    const id = [...this.calendarsService.visibleCalendarIds()][0];
+    if (id) this.selectOnlyCalendar(id);
   }
 
   toggleCalendarVisibility(calendarId: string): void {
@@ -201,23 +194,120 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
   }
 
   removeCalendar(cal: Calendar): void {
+    if (cal.isDefault) return;
     this.calendarDeleteTarget = cal;
   }
 
   cancelCalendarDelete(): void {
+    if (this.calendarDeleteLoading) return;
     this.calendarDeleteTarget = null;
   }
 
   confirmCalendarDelete(): void {
     const calendar = this.calendarDeleteTarget;
     if (!calendar) return;
-    this.calendarDeleteTarget = null;
-    this.eventsService.unloadCalendar(calendar.id);
-    this.calendarsService.remove(calendar.id);
-    setTimeout(() => {
+    this.calendarDeleteLoading = true;
+    this.calendarsService.remove(calendar.id, success => {
+      this.calendarDeleteLoading = false;
+      if (!success) return;
+      this.calendarDeleteTarget = null;
+      this.eventsService.unloadCalendar(calendar.id);
       const nextId = [...this.calendarsService.visibleCalendarIds()][0];
       if (nextId) this.selectOnlyCalendar(nextId);
-    }, 150);
+    });
+  }
+
+  openCalendarContextMenu(mouseEvent: MouseEvent, calendar: Calendar): void {
+    mouseEvent.preventDefault();
+    mouseEvent.stopPropagation();
+    this.eventContextMenu.set(null);
+    this.dayContextMenu.set(null);
+    this.calendarContextMenu.set({
+      calendar,
+      x: Math.max(8, Math.min(mouseEvent.clientX, window.innerWidth - 206)),
+      y: Math.max(8, Math.min(mouseEvent.clientY, window.innerHeight - 150)),
+    });
+  }
+
+  openEventContextMenu(payload: { event: CalendarEvent; mouseEvent: MouseEvent }): void {
+    const { event, mouseEvent } = payload;
+    mouseEvent.preventDefault();
+    mouseEvent.stopPropagation();
+    this.calendarContextMenu.set(null);
+    this.dayContextMenu.set(null);
+    this.eventContextMenu.set({
+      event,
+      x: Math.max(8, Math.min(mouseEvent.clientX, window.innerWidth - 218)),
+      y: Math.max(8, Math.min(mouseEvent.clientY, window.innerHeight - 112)),
+    });
+  }
+
+  closeCalendarContextMenus(): void {
+    this.calendarContextMenu.set(null);
+    this.eventContextMenu.set(null);
+    this.dayContextMenu.set(null);
+  }
+
+  openDayContextMenu(payload: { date: string; mouseEvent: MouseEvent }): void {
+    const { date, mouseEvent } = payload;
+    mouseEvent.preventDefault();
+    mouseEvent.stopPropagation();
+    this.calendarContextMenu.set(null);
+    this.eventContextMenu.set(null);
+    this.dayContextMenu.set({
+      date,
+      x: Math.max(8, Math.min(mouseEvent.clientX, window.innerWidth - 190)),
+      y: Math.max(8, Math.min(mouseEvent.clientY, window.innerHeight - 52)),
+    });
+  }
+
+  createEventFromContext(date: string): void {
+    this.closeCalendarContextMenus();
+    this.openCreateModal(date);
+  }
+
+  selectCalendarFromContext(calendar: Calendar): void {
+    this.closeCalendarContextMenus();
+    this.selectOnlyCalendar(calendar.id);
+  }
+
+  editCalendarFromContext(calendar: Calendar): void {
+    this.closeCalendarContextMenus();
+    if (this.calendarsService.canEdit(calendar.id)) this.openEditCalendar(calendar);
+  }
+
+  deleteCalendarFromContext(calendar: Calendar): void {
+    this.closeCalendarContextMenus();
+    if (this.calendarsService.isOwner(calendar.id) && !calendar.isDefault) this.removeCalendar(calendar);
+  }
+
+  editEventFromContext(event: CalendarEvent): void {
+    this.closeCalendarContextMenus();
+    if (this.canManageEvent(event)) this.openEditModal(event);
+  }
+
+  requestEventDeletion(event: CalendarEvent): void {
+    this.closeCalendarContextMenus();
+    if (this.canManageEvent(event)) this.eventDeleteTarget.set(event);
+  }
+
+  cancelEventDeletion(): void {
+    if (this.eventDeleteLoading()) return;
+    this.eventDeleteTarget.set(null);
+  }
+
+  confirmEventDeletion(): void {
+    const event = this.eventDeleteTarget();
+    if (!event || !this.canManageEvent(event)) return;
+    this.eventDeleteLoading.set(true);
+    this.eventsService.remove(event.id, success => {
+      this.eventDeleteLoading.set(false);
+      if (success) this.eventDeleteTarget.set(null);
+    });
+  }
+
+  canManageEvent(event: CalendarEvent): boolean {
+    return !event.isSystem && !event.isTaskDeadline && this.calendarsService.canEdit(event.calendarId);
   }
 
   myCalendars(): Calendar[] {
@@ -273,7 +363,7 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
     if (event.isSystem) return;
     this.dialog.open(EventModalComponent, {
       width: '600px', maxWidth: '98vw',
-      data: { event } satisfies EventModalData,
+      data: { event, readOnly: !this.calendarsService.canEdit(event.calendarId) } satisfies EventModalData,
       panelClass: 'agenda-dialog',
       disableClose: true,
     });
@@ -282,8 +372,8 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
   onEventDrop(payload: { eventId: string; oldDate: string; oldEndDate?: string; newDate: string; newStartTime?: string; newEndTime?: string }): void {
     if (payload.eventId.startsWith('system-payment-') || this.events().find(event => event.id === payload.eventId)?.isSystem) return;
     // Calcula o delta em dias entre a data original e a nova data
-    const oldMs = new Date(payload.oldDate + 'T00:00:00').getTime();
-    const newMs = new Date(payload.newDate + 'T00:00:00').getTime();
+    const oldMs = new Date(payload.oldDate + 'T00:00:00Z').getTime();
+    const newMs = new Date(payload.newDate + 'T00:00:00Z').getTime();
     const deltaDays = Math.round((newMs - oldMs) / (1000 * 60 * 60 * 24));
 
     // Aplica o mesmo deslocamento ao endDate para preservar a duração do evento
@@ -322,7 +412,7 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
   private getPaymentEvents(): CalendarEvent[] {
     const currentUserId = this.currentUser()?.id;
     const defaultCalendar = this.calendars().find(calendar =>
-      calendar.owner_id === currentUserId && calendar.name === 'Minha Agenda' &&
+      calendar.owner_id === currentUserId && calendar.isDefault &&
       this.calendarsService.visibleCalendarIds().has(calendar.id)
     );
     if (!defaultCalendar) return [];
@@ -335,7 +425,7 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
       let businessDays = 0;
       for (let day = 1; ; day++) {
         const date = new Date(year, month, day);
-        if (date.getDay() !== 0 && !isHoliday(date) && ++businessDays === 5) return date;
+        if (date.getDay() !== 0 && date.getDay() !== 6 && !isHoliday(date) && ++businessDays === 5) return date;
       }
     };
     const salaryAdvanceDay = (month: number) => {

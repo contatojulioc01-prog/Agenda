@@ -46,7 +46,9 @@ export class MonthViewComponent implements OnInit, OnChanges {
   @Input() events: CalendarEvent[] = [];
   @Input() holidays: Holiday[] = [];
   @Output() dayClick = new EventEmitter<string>();
+  @Output() dayContextMenu = new EventEmitter<{ date: string; mouseEvent: MouseEvent }>();
   @Output() eventClick = new EventEmitter<CalendarEvent>();
+  @Output() eventContextMenu = new EventEmitter<{ event: CalendarEvent; mouseEvent: MouseEvent }>();
   @Output() eventDrop = new EventEmitter<EventDropPayload>();
 
   readonly DOW = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];

@@ -12,8 +12,8 @@
         <mat-icon>{{ isEdit ? 'edit_calendar' : 'event' }}</mat-icon>
       </div>
       <div class="header-title-box">
-        <h2>{{ isEdit ? 'Editar Evento' : 'Novo Evento' }}</h2>
-        <p>{{ isEdit ? 'Atualize os dados do evento selecionado.' : 'Preencha os dados para criar um novo evento.' }}</p>
+        <h2>{{ isReadOnly ? 'Detalhes do Evento' : isEdit ? 'Editar Evento' : 'Novo Evento' }}</h2>
+        <p>{{ isReadOnly ? 'Você possui acesso somente para visualização.' : isEdit ? 'Atualize os dados do evento selecionado.' : 'Preencha os dados para criar um novo evento.' }}</p>
       </div>
     </div>
     <button type="button" class="close-btn" (click)="dialogRef.close()" title="Fechar" id="btn-close-modal">
@@ -21,9 +21,12 @@
     </button>
   </div>
 
+  <div class="event-error" *ngIf="eventsService.error()"><mat-icon>error_outline</mat-icon><span>{{ eventsService.error() }}</span></div>
+  <div class="event-error" *ngIf="!hasValidSchedule"><mat-icon>schedule</mat-icon><span>O horário final deve ser posterior ao horário inicial.</span></div>
+
   <!-- ── Body rolável ── -->
   <div class="modal-body">
-    <form class="form-container" #eventForm="ngForm">
+    <form class="form-container" [class.read-only-form]="isReadOnly" #eventForm="ngForm">
 
       <p class="no-calendar-warning" *ngIf="!isEdit && !hasTargetCalendars">Selecione ao menos uma agenda na lateral antes de criar o evento.</p>
 
@@ -211,7 +214,7 @@
   <div class="modal-footer">
     <!-- Botão excluir (apenas no edit) -->
     <button
-      *ngIf="isEdit"
+      *ngIf="isEdit && !isReadOnly"
       type="button"
       class="btn-delete"
       (click)="excluir()"
@@ -222,7 +225,7 @@
     </button>
 
     <button
-      *ngIf="isEdit && duplicateCalendars().length > 0"
+      *ngIf="isEdit && !isReadOnly && duplicateCalendars().length > 0"
       type="button"
       class="btn-duplicate-toggle"
       (click)="showDuplicateOptions = !showDuplicateOptions"
@@ -235,10 +238,11 @@
 
     <!-- SKILL: Angular Button HTTP Loading -->
     <button
+      *ngIf="!isReadOnly"
       type="button"
       class="btn-save"
       (click)="salvar()"
-      [disabled]="loadingSalvar || !formData.title.trim() || !formData.date || !hasTargetCalendars"
+      [disabled]="loadingSalvar || !formData.title.trim() || !formData.date || !hasTargetCalendars || !hasValidSchedule"
       id="btn-salvar-evento"
     >
       <mat-progress-spinner
@@ -250,6 +254,16 @@
       <mat-icon *ngIf="!loadingSalvar" style="font-size:18px;width:18px;height:18px;">save</mat-icon>
       <span>{{ loadingSalvar ? 'Salvando...' : 'Salvar' }}</span>
     </button>
+    <button *ngIf="isReadOnly" type="button" class="btn-save" (click)="dialogRef.close()"><mat-icon>close</mat-icon>Fechar</button>
+  </div>
+
+  <div class="event-delete-backdrop" *ngIf="showDeleteConfirmation" (mousedown)="showDeleteConfirmation = false">
+    <section class="event-delete-confirmation" role="alertdialog" aria-modal="true" aria-labelledby="event-delete-title" (mousedown)="$event.stopPropagation()">
+      <mat-icon>event_busy</mat-icon>
+      <h3 id="event-delete-title">Excluir evento</h3>
+      <p>Deseja excluir permanentemente <strong>{{ data.event?.title }}</strong>?</p>
+      <div><button type="button" (click)="showDeleteConfirmation = false">Cancelar</button><button type="button" class="danger" [disabled]="loadingSalvar" (click)="confirmDelete()">Excluir evento</button></div>
+    </section>
   </div>
 
 </div>

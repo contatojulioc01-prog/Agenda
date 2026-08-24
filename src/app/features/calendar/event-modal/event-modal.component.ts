@@ -5,8 +5,6 @@ import { MatDialogRef, MAT_DIALOG_DATA, MatDialogModule } from '@angular/materia
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { finalize } from 'rxjs/operators';
-import { of, delay } from 'rxjs';
 
 import { EventsService } from '../../../core/services/events.service';
 import { HolidaysService } from '../../../core/services/holidays.service';
@@ -18,6 +16,7 @@ export interface EventModalData {
   event?: CalendarEvent;
   defaultDate?: string;
   targetCalendarIds?: string[];
+  readOnly?: boolean;
 }
 
 @Component({
@@ -37,9 +36,11 @@ export interface EventModalData {
 export class EventModalComponent implements OnInit {
   private calendarsService = inject(CalendarsService);
   isEdit = false;
+  get isReadOnly(): boolean { return !!this.data.readOnly; }
 
   // ── Skill: Button HTTP Loading ──
   loadingSalvar = false;
+  showDeleteConfirmation = false;
   // A seção legada de participantes permanece desativada no template.
   readonly allUsers = signal<any[]>([]);
   readonly defaultAvatar = '';
@@ -60,6 +61,7 @@ export class EventModalComponent implements OnInit {
 
   holidayWarning: string | null = null;
   holidays: Holiday[] = [];
+  private holidayYear: number | null = null;
 
   readonly colorMap = EVENT_COLOR_MAP;
   readonly colorLabels = EVENT_COLOR_LABELS;
@@ -88,7 +90,7 @@ export class EventModalComponent implements OnInit {
   constructor(
     public dialogRef: MatDialogRef<EventModalComponent>,
     @Inject(MAT_DIALOG_DATA) public data: EventModalData,
-    private eventsService: EventsService,
+    public eventsService: EventsService,
     private holidaysService: HolidaysService,
   ) {}
 
@@ -132,11 +134,14 @@ export class EventModalComponent implements OnInit {
     if (!this.formData.endDate || this.formData.endDate < this.formData.date) {
       this.formData.endDate = this.formData.date;
     }
-    this.checkHoliday();
+    const year = Number(this.formData.date.slice(0, 4));
+    if (year && year !== this.holidayYear) this.loadHolidays();
+    else this.checkHoliday();
   }
 
   loadHolidays(): void {
     const year = this.formData.date ? parseInt(this.formData.date.slice(0, 4), 10) : new Date().getFullYear();
+    this.holidayYear = year;
     this.holidaysService.getHolidays(year).subscribe(h => {
       this.holidays = h;
       this.checkHoliday();
@@ -152,8 +157,15 @@ export class EventModalComponent implements OnInit {
     this.holidayWarning = found ? `🎌 Atenção: ${found.name} (${found.type})` : null;
   }
 
+  get hasValidSchedule(): boolean {
+    if (this.formData.allDay || !this.formData.date) return true;
+    const effectiveEndDate = this.formData.endDate || this.formData.date;
+    return effectiveEndDate > this.formData.date || this.formData.endTime > this.formData.startTime;
+  }
+
   // ── Skill: Button HTTP Loading — finalize() garante reset do loading ──
   salvar(): void {
+    if (this.isReadOnly) return;
     if (!this.formData.title.trim() || !this.formData.date || !this.hasTargetCalendars) return;
 
     this.loadingSalvar = true;
@@ -169,26 +181,24 @@ export class EventModalComponent implements OnInit {
       title: this.formData.title.trim(),
     };
 
-    of(null).pipe(
-      delay(300),
-      finalize(() => {
-        this.loadingSalvar = false;
-      })
-    ).subscribe(() => {
-      if (this.isEdit && this.data.event) {
-        this.eventsService.update(this.data.event.id, payload);
-      } else {
-        const targets = this.data.targetCalendarIds || [];
-        this.eventsService.createInCalendars(payload, targets);
-      }
-      this.dialogRef.close(true);
-    });
+    const completed = (success: boolean) => {
+      this.loadingSalvar = false;
+      if (success) this.dialogRef.close(true);
+    };
+    if (this.isEdit && this.data.event) this.eventsService.update(this.data.event.id, payload, completed);
+    else this.eventsService.createInCalendars(payload, this.data.targetCalendarIds || [], completed);
   }
 
   excluir(): void {
-    if (this.isEdit && this.data.event) {
-      this.eventsService.remove(this.data.event.id);
-      this.dialogRef.close(true);
-    }
+    if (!this.isReadOnly && this.isEdit && this.data.event) this.showDeleteConfirmation = true;
+  }
+
+  confirmDelete(): void {
+    if (!this.data.event) return;
+    this.loadingSalvar = true;
+    this.eventsService.remove(this.data.event.id, success => {
+      this.loadingSalvar = false;
+      if (success) this.dialogRef.close(true);
+    });
   }
 }

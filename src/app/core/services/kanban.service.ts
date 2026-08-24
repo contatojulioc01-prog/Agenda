@@ -16,20 +16,26 @@ export class KanbanService {
   readonly teamMembers = signal<KanbanTeamMember[]>([]);
   readonly loading = signal(false);
   readonly error = signal('');
-  private ignoreRealtimeUntil = 0;
+  private boardLoadVersion = new Map<string, number>();
+  private boardsLoadVersion = 0;
 
   private get headers() { return { 'x-user-id': this.auth.currentUser()?.id || 'anonymous' }; }
 
   loadBoards(selectId?: string): void {
     if (this.headers['x-user-id'] === 'anonymous') return;
+    const version = ++this.boardsLoadVersion;
     this.loading.set(true);
     this.http.get<KanbanBoardSummary[]>('/api/kanban/boards', { headers: this.headers }).pipe(
-      catchError(err => { this.error.set(err.error?.error || 'Não foi possível carregar os quadros.'); return of([]); }),
+      catchError(err => { this.error.set(err.error?.error || 'Não foi possível carregar os quadros.'); return of(null); }),
       finalize(() => this.loading.set(false))
     ).subscribe(boards => {
+      if (version !== this.boardsLoadVersion) return;
+      if (boards === null) return;
       this.boards.set(boards);
-      const target = selectId || this.activeBoard()?.id || boards[0]?.id;
+      const requested = selectId || this.activeBoard()?.id;
+      const target = boards.some(board => board.id === requested) ? requested : boards[0]?.id;
       if (target) this.loadBoard(target);
+      else this.activeBoard.set(null);
     });
   }
 
@@ -51,7 +57,9 @@ export class KanbanService {
       .pipe(catchError(err => { this.error.set(err.error?.error || 'Erro ao criar time.'); return of(null); }))
       .subscribe(team => {
         if (!team) return;
-        this.teams.update(items => [...items, team]);
+        this.teams.update(items => items.some(item => item.id === team.id)
+          ? items.map(item => item.id === team.id ? team : item)
+          : [...items, team]);
         this.loadBoards(team.boardId);
       });
   }
@@ -62,10 +70,18 @@ export class KanbanService {
       .subscribe(team => { if (team) this.loadTeams(); });
   }
 
-  deleteTeam(id: string): void {
+  deleteTeam(id: string, onComplete?: (success: boolean) => void): void {
     this.http.delete(`/api/kanban/teams/${id}`, { headers: this.headers })
       .pipe(catchError(err => { this.error.set(err.error?.error || 'Erro ao excluir time.'); return of(null); }))
-      .subscribe(result => { if (result) { this.activeBoard.set(null); this.loadWorkspace(); } });
+      .subscribe(result => {
+        if (result) {
+          if (this.activeBoard()?.teamId === id) this.activeBoard.set(null);
+          this.teams.update(items => items.filter(team => team.id !== id));
+          this.boards.update(items => items.filter(board => board.teamId !== id));
+          this.loadWorkspace();
+        }
+        onComplete?.(!!result);
+      });
   }
 
   loadTeamMembers(teamId: string): void {
@@ -104,12 +120,28 @@ export class KanbanService {
   }
 
   loadBoard(id: string): void {
+    const version = (this.boardLoadVersion.get(id) || 0) + 1;
+    this.boardLoadVersion.set(id, version);
     this.loading.set(true);
     this.error.set('');
     this.http.get<KanbanBoard>(`/api/kanban/boards/${id}`, { headers: this.headers }).pipe(
-      catchError(err => { this.error.set(err.error?.error || 'Não foi possível carregar o quadro.'); return of(null); }),
+      catchError(err => {
+        this.error.set(err.error?.error || 'Não foi possível carregar o quadro.');
+        if (err.status === 404 && this.activeBoard()?.id === id) {
+          this.activeBoard.set(null);
+          this.loadBoards();
+        }
+        return of(null);
+      }),
       finalize(() => this.loading.set(false))
-    ).subscribe(board => { if (board) this.activeBoard.set(board); });
+    ).subscribe(board => {
+      if (board && this.boardLoadVersion.get(id) === version) {
+        this.activeBoard.set(board);
+        this.boards.update(items => items.map(item => item.id === id
+          ? { ...item, taskCount: board.tasks.filter(task => !task.archived).length }
+          : item));
+      }
+    });
   }
 
   createBoard(name: string): void {
@@ -138,7 +170,13 @@ export class KanbanService {
     this.http.post<KanbanColumn>(`/api/kanban/boards/${boardId}/columns`, { title }, { headers: this.headers })
       .pipe(catchError(err => { this.error.set(err.error?.error || 'Erro ao criar lista.'); return of(null); }))
       .subscribe(column => {
-        if (column) this.activeBoard.update(board => board ? { ...board, columns: [...board.columns, column] } : board);
+        if (column) this.activeBoard.update(board => {
+          if (!board) return board;
+          const exists = board.columns.some(item => item.id === column.id);
+          return { ...board, columns: exists
+            ? board.columns.map(item => item.id === column.id ? column : item)
+            : [...board.columns, column] };
+        });
       });
   }
 
@@ -151,41 +189,56 @@ export class KanbanService {
   }
 
   deleteColumn(id: string): void {
+    const boardBeforeDelete = this.activeBoard();
+    const directIds = new Set((boardBeforeDelete?.tasks || []).filter(task => task.columnId === id).map(task => task.id));
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const task of boardBeforeDelete?.tasks || []) {
+        if (task.parentTaskId && directIds.has(task.parentTaskId) && !directIds.has(task.id)) { directIds.add(task.id); changed = true; }
+      }
+    }
     this.http.delete(`/api/kanban/columns/${id}`, { headers: this.headers })
       .pipe(catchError(err => { this.error.set(err.error?.error || 'Erro ao excluir lista.'); return of(null); }))
       .subscribe(result => {
-        if (result) this.activeBoard.update(board => board ? { ...board, columns: board.columns.filter(column => column.id !== id) } : board);
+        if (result) this.activeBoard.update(board => board ? { ...board, columns: board.columns.filter(column => column.id !== id), tasks: board.tasks.filter(task => !directIds.has(task.id)) } : board);
       });
   }
 
-  createTask(boardId: string, input: KanbanTaskInput): void {
+  createTask(boardId: string, input: KanbanTaskInput, onComplete?: (success: boolean) => void): void {
     this.http.post<KanbanTask>(`/api/kanban/boards/${boardId}/tasks`, input, { headers: this.headers })
       .pipe(catchError(err => { this.error.set(err.error?.error || 'Erro ao criar tarefa.'); return of(null); }))
-      .subscribe(task => { if (task) this.upsertTask(task); });
+      .subscribe(task => { if (task) this.upsertTask(task); onComplete?.(!!task); });
   }
 
-  updateTask(id: string, changes: Partial<KanbanTask>): void {
+  updateTask(id: string, changes: Partial<KanbanTask>, onComplete?: (success: boolean) => void): void {
     this.http.put<KanbanTask>(`/api/kanban/tasks/${id}`, changes, { headers: this.headers })
       .pipe(catchError(err => { this.error.set(err.error?.error || 'Erro ao atualizar tarefa.'); return of(null); }))
-      .subscribe(task => { if (task) this.upsertTask(task); });
+      .subscribe(task => { if (task) this.upsertTask(task); onComplete?.(!!task); });
   }
 
-  deleteTask(id: string): void {
+  deleteTask(id: string, onComplete?: (success: boolean) => void): void {
+    const deletedIds = new Set([id]);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const task of this.activeBoard()?.tasks || []) {
+        if (task.parentTaskId && deletedIds.has(task.parentTaskId) && !deletedIds.has(task.id)) { deletedIds.add(task.id); changed = true; }
+      }
+    }
     this.http.delete(`/api/kanban/tasks/${id}`, { headers: this.headers })
       .pipe(catchError(err => { this.error.set(err.error?.error || 'Erro ao excluir tarefa.'); return of(null); }))
       .subscribe(result => {
-        if (result) this.activeBoard.update(board => board ? { ...board, tasks: board.tasks.filter(task => task.id !== id) } : board);
+        if (result) this.activeBoard.update(board => board ? { ...board, tasks: board.tasks.filter(task => !deletedIds.has(task.id)) } : board);
+        onComplete?.(!!result);
       });
   }
 
   reorder(boardId: string, columns: string[], tasks: { id: string; columnId: string; position: number }[]): void {
-    this.ignoreRealtimeUntil = Date.now() + 1200;
     this.http.post(`/api/kanban/boards/${boardId}/reorder`, { columns, tasks }, { headers: this.headers })
       .pipe(catchError(err => { this.error.set(err.error?.error || 'Erro ao reordenar.'); this.loadBoard(boardId); return of(null); }))
       .subscribe();
   }
-
-  shouldIgnoreRealtime(): boolean { return Date.now() < this.ignoreRealtimeUntil; }
 
   private upsertTask(task: KanbanTask): void {
     this.activeBoard.update(board => {

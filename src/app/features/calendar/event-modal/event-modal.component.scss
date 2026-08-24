@@ -1,5 +1,13 @@
 /* Os estilos base do modal vêm das skills (styles/modal.scss e styles/form-groups.scss) */
 :host { display: block; }
+.event-error { display:flex;align-items:center;gap:7px;margin:10px 24px 0;padding:9px 11px;border-radius:8px;background:#fee2e2;color:#b91c1c;font-size:12px; }
+.event-error mat-icon { width:17px;height:17px;font-size:17px; }
+.event-delete-backdrop { position:fixed;inset:0;z-index:1600;display:grid;place-items:center;padding:16px;background:rgba(15,23,42,.55); }
+.event-delete-confirmation { width:min(390px,100%);padding:22px;border-radius:14px;background:var(--bg-surface);color:var(--text-primary);box-shadow:var(--shadow-xl);text-align:center; }
+.event-delete-confirmation>mat-icon { width:36px;height:36px;font-size:36px;color:#ef4444; }
+.event-delete-confirmation h3 { margin:8px 0; }.event-delete-confirmation p { color:var(--text-secondary);font-size:13px; }
+.event-delete-confirmation>div { display:flex;justify-content:flex-end;gap:8px;margin-top:18px; }.event-delete-confirmation button { padding:9px 13px;border-radius:8px;background:var(--bg-hover); }.event-delete-confirmation button.danger { background:#dc2626;color:#fff; }
+.read-only-form { pointer-events:none; }
 
 /* ── Color Picker ── */
 .color-picker {

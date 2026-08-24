@@ -72,6 +72,9 @@ router.put('/:id/members/:memberId', asyncRoute(async (req, res) => {
   const isOwner = await db.get("SELECT 1 FROM calendar_members WHERE calendar_id = ? AND user_id = ? AND permission = 'owner'", [id, ownerId]);
   if (!isOwner) return res.status(403).json({ error: 'Sem permissão' });
   if (!['editor', 'viewer'].includes(permission)) return res.status(400).json({ error: 'Permissão inválida' });
+  const target = await db.get('SELECT * FROM calendar_members WHERE id = ? AND calendar_id = ?', [memberId, id]);
+  if (!target) return res.status(404).json({ error: 'Membro não encontrado' });
+  if (target.permission === 'owner') return res.status(400).json({ error: 'A permissão do dono não pode ser alterada' });
   await db.run('UPDATE calendar_members SET permission = ? WHERE id = ? AND calendar_id = ?', [permission, memberId, id]);
   req.broadcast({ type: 'member_updated', calendarId: id });
   res.json({ success: true });
@@ -82,7 +85,8 @@ router.delete('/:id/members/:memberId', asyncRoute(async (req, res) => {
   const { id, memberId } = req.params;
   const isOwner = await db.get("SELECT 1 FROM calendar_members WHERE calendar_id = ? AND user_id = ? AND permission = 'owner'", [id, ownerId]);
   if (!isOwner) return res.status(403).json({ error: 'Sem permissão' });
-  const target = await db.get('SELECT * FROM calendar_members WHERE id = ?', [memberId]);
+  const target = await db.get('SELECT * FROM calendar_members WHERE id = ? AND calendar_id = ?', [memberId, id]);
+  if (!target) return res.status(404).json({ error: 'Membro não encontrado' });
   if (target && target.permission === 'owner') return res.status(400).json({ error: 'Não pode remover o dono' });
   await db.run('DELETE FROM calendar_members WHERE id = ? AND calendar_id = ?', [memberId, id]);
   req.broadcast({ type: 'member_removed', calendarId: id });

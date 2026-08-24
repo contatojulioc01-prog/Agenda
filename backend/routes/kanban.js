@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const asyncRoute = require('../async-route');
+const { isHexColor, isNonEmptyString, isOptionalString, validateTaskInput } = require('../validation');
 
 const id = prefix => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 const userId = req => String(req.headers['x-user-id'] || '');
@@ -76,14 +77,15 @@ async function createDefaultPersonalBoard(uid) {
 }
 
 async function ensureDefaultCalendar(uid, broadcast) {
-  let calendar = await db.get('SELECT * FROM calendars WHERE owner_id = ? AND is_private = 1 ORDER BY created_at LIMIT 1', [uid]);
+  let calendar = await db.get('SELECT * FROM calendars WHERE owner_id = ? AND is_default = 1 ORDER BY created_at LIMIT 1', [uid]);
   if (calendar) return calendar;
   const calendarId = id('cal');
   const now = new Date().toISOString();
   await db.transaction(async tx => {
-    calendar = await tx.get('SELECT * FROM calendars WHERE owner_id = ? AND is_private = 1 ORDER BY created_at LIMIT 1', [uid]);
+    await tx.get('SELECT pg_advisory_xact_lock(hashtext(?))', [`default-calendar:${uid}`]);
+    calendar = await tx.get('SELECT * FROM calendars WHERE owner_id = ? AND is_default = 1 ORDER BY created_at LIMIT 1', [uid]);
     if (calendar) return;
-    await tx.run('INSERT INTO calendars (id, name, color, is_private, owner_id, created_at) VALUES (?, ?, ?, 1, ?, ?)',
+    await tx.run('INSERT INTO calendars (id, name, color, is_private, owner_id, is_default, created_at) VALUES (?, ?, ?, 1, ?, 1, ?)',
       [calendarId, 'Minha Agenda', '#4f46e5', uid, now]);
     await tx.run('INSERT INTO calendar_members (id, calendar_id, user_id, permission) VALUES (?, ?, ?, ?)',
       [id('mbr'), calendarId, uid, 'owner']);
@@ -168,7 +170,9 @@ router.get('/teams', asyncRoute(async (req, res) => {
 
 router.post('/teams', asyncRoute(async (req, res) => {
   const name = String(req.body.name || '').trim();
-  if (!name) return res.status(400).json({ error: 'Nome do time é obrigatório' });
+  if (!isNonEmptyString(name, 80)) return res.status(400).json({ error: 'Nome do time inválido (máximo de 80 caracteres)' });
+  if (!isOptionalString(req.body.description, 1000)) return res.status(400).json({ error: 'Descrição inválida' });
+  if (req.body.color !== undefined && !isHexColor(req.body.color)) return res.status(400).json({ error: 'Cor inválida' });
   const uid = userId(req);
   const teamId = id('team');
   const now = new Date().toISOString();
@@ -190,6 +194,9 @@ router.put('/teams/:teamId', asyncRoute(async (req, res) => {
   const access = await teamAccess(req.params.teamId, userId(req), true);
   if (!access) return res.status(403).json({ error: 'Somente o administrador pode editar o time' });
   const now = new Date().toISOString();
+  if (req.body.name !== undefined && !isNonEmptyString(req.body.name, 80)) return res.status(400).json({ error: 'Nome do time inválido' });
+  if (!isOptionalString(req.body.description, 1000)) return res.status(400).json({ error: 'Descrição inválida' });
+  if (req.body.color !== undefined && !isHexColor(req.body.color)) return res.status(400).json({ error: 'Cor inválida' });
   if (req.body.name !== undefined) await db.run('UPDATE kanban_teams SET name = ?, updated_at = ? WHERE id = ?', [String(req.body.name).trim(), now, access.team.id]);
   if (req.body.description !== undefined) await db.run('UPDATE kanban_teams SET description = ?, updated_at = ? WHERE id = ?', [req.body.description, now, access.team.id]);
   if (req.body.color !== undefined) await db.run('UPDATE kanban_teams SET color = ?, updated_at = ? WHERE id = ?', [req.body.color, now, access.team.id]);
@@ -294,7 +301,9 @@ router.get('/boards', asyncRoute(async (req, res) => {
 
 router.post('/boards', asyncRoute(async (req, res) => {
   const name = String(req.body.name || '').trim();
-  if (!name) return res.status(400).json({ error: 'name é obrigatório' });
+  if (!isNonEmptyString(name, 80)) return res.status(400).json({ error: 'Nome inválido (máximo de 80 caracteres)' });
+  if (!isOptionalString(req.body.description, 1000)) return res.status(400).json({ error: 'Descrição inválida' });
+  if (req.body.color !== undefined && !isHexColor(req.body.color)) return res.status(400).json({ error: 'Cor inválida' });
   const board = await db.transaction(tx => createBoard({ name, description: req.body.description, color: req.body.color, ownerId: userId(req) }, tx));
   req.broadcast({ type: 'kanban_updated', boardId: board.id });
   res.status(201).json(boardDto(board, 'admin'));
@@ -312,6 +321,9 @@ router.put('/boards/:boardId', asyncRoute(async (req, res) => {
   const access = await boardAccess(req.params.boardId, userId(req), true);
   if (!access) return res.status(403).json({ error: 'Sem permissão' });
   const now = new Date().toISOString();
+  if (req.body.name !== undefined && !isNonEmptyString(req.body.name, 80)) return res.status(400).json({ error: 'Nome inválido' });
+  if (!isOptionalString(req.body.description, 1000)) return res.status(400).json({ error: 'Descrição inválida' });
+  if (req.body.color !== undefined && !isHexColor(req.body.color)) return res.status(400).json({ error: 'Cor inválida' });
   if (req.body.name !== undefined) await db.run('UPDATE kanban_boards SET name = ?, updated_at = ? WHERE id = ?', [String(req.body.name).trim(), now, access.board.id]);
   if (req.body.description !== undefined) await db.run('UPDATE kanban_boards SET description = ?, updated_at = ? WHERE id = ?', [req.body.description, now, access.board.id]);
   if (req.body.color !== undefined) await db.run('UPDATE kanban_boards SET color = ?, updated_at = ? WHERE id = ?', [req.body.color, now, access.board.id]);
@@ -336,7 +348,8 @@ router.post('/boards/:boardId/columns', asyncRoute(async (req, res) => {
   const access = await boardAccess(req.params.boardId, userId(req), true);
   if (!access) return res.status(403).json({ error: 'Sem permissão' });
   const title = String(req.body.title || '').trim();
-  if (!title) return res.status(400).json({ error: 'title é obrigatório' });
+  if (!isNonEmptyString(title, 60)) return res.status(400).json({ error: 'Nome da lista inválido (máximo de 60 caracteres)' });
+  if (req.body.color !== undefined && !isHexColor(req.body.color)) return res.status(400).json({ error: 'Cor inválida' });
   const next = await db.get('SELECT COALESCE(MAX(position), -1) + 1 next FROM kanban_columns WHERE board_id = ?', [access.board.id]);
   const columnId = id('col');
   await db.run('INSERT INTO kanban_columns (id, board_id, title, color, position, created_at) VALUES (?, ?, ?, ?, ?, ?)',
@@ -349,6 +362,9 @@ router.put('/columns/:columnId', asyncRoute(async (req, res) => {
   const column = await db.get('SELECT * FROM kanban_columns WHERE id = ?', [req.params.columnId]);
   const access = column && await boardAccess(column.board_id, userId(req), true);
   if (!column || !access) return res.status(404).json({ error: 'Lista não encontrada' });
+  if (req.body.title !== undefined && !isNonEmptyString(req.body.title, 60)) return res.status(400).json({ error: 'Nome da lista inválido' });
+  if (req.body.color !== undefined && !isHexColor(req.body.color)) return res.status(400).json({ error: 'Cor inválida' });
+  if (req.body.position !== undefined && (!Number.isInteger(req.body.position) || req.body.position < 0)) return res.status(400).json({ error: 'Posição inválida' });
   if (req.body.title !== undefined) await db.run('UPDATE kanban_columns SET title = ? WHERE id = ?', [String(req.body.title).trim(), column.id]);
   if (req.body.color !== undefined) await db.run('UPDATE kanban_columns SET color = ? WHERE id = ?', [req.body.color, column.id]);
   if (req.body.position !== undefined) await db.run('UPDATE kanban_columns SET position = ? WHERE id = ?', [Number(req.body.position), column.id]);
@@ -360,12 +376,15 @@ router.delete('/columns/:columnId', asyncRoute(async (req, res) => {
   const column = await db.get('SELECT * FROM kanban_columns WHERE id = ?', [req.params.columnId]);
   const access = column && await boardAccess(column.board_id, userId(req), true);
   if (!column || !access) return res.status(404).json({ error: 'Lista não encontrada' });
-  const count = await db.get('SELECT COUNT(*) count FROM kanban_tasks WHERE column_id = ? AND archived = 0', [column.id]);
-  if (Number(count.count) > 0) return res.status(409).json({ error: 'Mova ou arquive os cartões antes de excluir a lista' });
-  const tasks = await db.all('SELECT id FROM kanban_tasks WHERE column_id = ?', [column.id]);
+  const tasks = await db.all(`WITH RECURSIVE tree(id, archived) AS (
+    SELECT id, archived FROM kanban_tasks WHERE column_id = ?
+    UNION ALL
+    SELECT t.id, t.archived FROM kanban_tasks t JOIN tree ON t.parent_task_id = tree.id
+  ) SELECT DISTINCT id, archived FROM tree`, [column.id]);
+  if (tasks.some(task => !task.archived)) return res.status(409).json({ error: 'Mova ou arquive os cartões e suas subtarefas antes de excluir a lista' });
   for (const task of tasks) await deleteTaskCalendarEvents(task.id, req.broadcast);
   await db.transaction(async tx => {
-    await tx.run('DELETE FROM kanban_tasks WHERE column_id = ?', [column.id]);
+    for (const task of [...tasks].reverse()) await tx.run('DELETE FROM kanban_tasks WHERE id = ?', [task.id]);
     await tx.run('DELETE FROM kanban_columns WHERE id = ?', [column.id]);
   });
   req.broadcast({ type: 'kanban_updated', boardId: column.board_id });
@@ -379,7 +398,9 @@ router.post('/boards/:boardId/tasks', asyncRoute(async (req, res) => {
   const title = String(req.body.title || '').trim();
   const parentTaskId = req.body.parentTaskId || null;
   const assigneeIds = [...new Set(Array.isArray(req.body.assigneeIds) ? req.body.assigneeIds.filter(Boolean) : (req.body.assigneeId ? [req.body.assigneeId] : []))];
-  if (!column || !title) return res.status(400).json({ error: 'title e columnId são obrigatórios' });
+  const validationError = validateTaskInput({ ...req.body, title, assigneeIds });
+  if (validationError) return res.status(400).json({ error: validationError });
+  if (!column) return res.status(400).json({ error: 'A lista informada não pertence a este quadro' });
   if (!(await validAssignees(access.board, assigneeIds))) return res.status(400).json({ error: 'Um ou mais responsáveis não pertencem a este Kanban' });
   if (parentTaskId && !(await db.get('SELECT 1 FROM kanban_tasks WHERE id = ? AND board_id = ?', [parentTaskId, access.board.id]))) return res.status(400).json({ error: 'Tarefa principal inválida' });
   const next = await db.get(`SELECT COALESCE(MAX(position), -1) + 1 next FROM kanban_tasks
@@ -400,6 +421,12 @@ router.put('/tasks/:taskId', asyncRoute(async (req, res) => {
   const task = await db.get('SELECT * FROM kanban_tasks WHERE id = ?', [req.params.taskId]);
   const access = task && await boardAccess(task.board_id, userId(req), true);
   if (!task || !access) return res.status(404).json({ error: 'Tarefa não encontrada' });
+  const validationError = validateTaskInput(req.body, true);
+  if (validationError) return res.status(400).json({ error: validationError });
+  if (req.body.columnId !== undefined && !(await db.get('SELECT 1 FROM kanban_columns WHERE id = ? AND board_id = ?', [req.body.columnId, task.board_id]))) {
+    return res.status(400).json({ error: 'A lista informada não pertence a este quadro' });
+  }
+  if (req.body.position !== undefined && (!Number.isInteger(req.body.position) || req.body.position < 0)) return res.status(400).json({ error: 'Posição inválida' });
   const nextAssigneeIds = req.body.assigneeIds !== undefined
     ? [...new Set(Array.isArray(req.body.assigneeIds) ? req.body.assigneeIds.filter(Boolean) : [])]
     : null;
@@ -421,11 +448,24 @@ router.put('/tasks/:taskId', asyncRoute(async (req, res) => {
 router.post('/boards/:boardId/reorder', asyncRoute(async (req, res) => {
   const access = await boardAccess(req.params.boardId, userId(req), true);
   if (!access) return res.status(403).json({ error: 'Sem permissão' });
+  const columns = Array.isArray(req.body.columns) ? req.body.columns : [];
+  const tasks = Array.isArray(req.body.tasks) ? req.body.tasks : [];
+  if (columns.some(columnId => typeof columnId !== 'string') || new Set(columns).size !== columns.length) return res.status(400).json({ error: 'Ordenação de listas inválida' });
+  const boardColumns = await db.all('SELECT id FROM kanban_columns WHERE board_id = ?', [access.board.id]);
+  const allowedColumns = new Set(boardColumns.map(column => column.id));
+  if (columns.some(columnId => !allowedColumns.has(columnId))) return res.status(400).json({ error: 'Uma lista não pertence a este quadro' });
+  if (tasks.some(item => !item || typeof item.id !== 'string' || !allowedColumns.has(item.columnId) || !Number.isInteger(item.position) || item.position < 0) ||
+      new Set(tasks.map(item => item.id)).size !== tasks.length) return res.status(400).json({ error: 'Ordenação de tarefas inválida' });
+  if (tasks.length) {
+    const taskRows = await db.all('SELECT id FROM kanban_tasks WHERE board_id = ?', [access.board.id]);
+    const allowedTasks = new Set(taskRows.map(item => item.id));
+    if (tasks.some(item => !allowedTasks.has(item.id))) return res.status(400).json({ error: 'Uma tarefa não pertence a este quadro' });
+  }
   await db.transaction(async tx => {
-    for (const [position, columnId] of (req.body.columns || []).entries()) {
+    for (const [position, columnId] of columns.entries()) {
       await tx.run('UPDATE kanban_columns SET position = ? WHERE id = ? AND board_id = ?', [position, columnId, access.board.id]);
     }
-    for (const item of (req.body.tasks || [])) {
+    for (const item of tasks) {
       await tx.run('UPDATE kanban_tasks SET column_id = ?, position = ?, updated_at = ? WHERE id = ? AND board_id = ?',
         [item.columnId, item.position, new Date().toISOString(), item.id, access.board.id]);
     }

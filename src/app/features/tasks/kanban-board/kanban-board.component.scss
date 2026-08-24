@@ -22,6 +22,17 @@
 .toolbar-actions { gap: 7px; }
 .quick-create { position: absolute; right: 16px; top: calc(100% + 7px); z-index: 20; gap: 6px; padding: 10px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-surface); box-shadow: var(--shadow-lg); }
 .quick-create input { width: 230px; }
+.team-context-menu,.task-context-menu { position: fixed; z-index: 1500; padding: 5px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-surface); box-shadow: var(--shadow-lg); }
+.team-context-menu { width: 190px; }
+.task-context-menu { width: 198px; }
+.team-context-menu button,.task-context-menu button { width: 100%; min-height: 36px; padding: 0 10px; display: flex; align-items: center; gap: 8px; border-radius: 7px; font-size: 12px; }
+.team-context-menu button { color: #ef4444; font-weight: 650; }
+.team-context-menu button:hover { background: rgba(239,68,68,.1); }
+.task-context-menu button { color: var(--text-secondary); font-weight: 600; text-align: left; }
+.task-context-menu button:hover { color: var(--text-primary); background: var(--bg-hover); }
+.task-context-menu button.danger { color: #ef4444; border-top: 1px solid var(--border-light); border-radius: 0 0 7px 7px; }
+.task-context-menu button.danger:hover { background: rgba(239,68,68,.1); }
+.team-context-menu mat-icon,.task-context-menu mat-icon { width: 17px; height: 17px; font-size: 17px; }
 .kanban-filters { padding: 8px 12px; flex-direction: row; gap: 8px; min-height: 52px; }
 .kanban-filters select,.archive-toggle,.search-box { height: 34px; border: 1px solid var(--border); border-radius: 9px; background: var(--bg-input); color: var(--text-secondary); font-size: 12px; }
 .search-box { flex: 1; min-width: 180px; padding: 0 10px; gap: 7px; }

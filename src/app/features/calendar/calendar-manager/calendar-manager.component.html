@@ -15,6 +15,8 @@
       </button>
     </div>
 
+    <div class="manager-error" *ngIf="calendarsService.error()"><mat-icon>error_outline</mat-icon>{{ calendarsService.error() }}</div>
+
     <!-- Body -->
     <div class="modal-body">
 
@@ -62,6 +64,7 @@
           <button
             class="privacy-btn"
             [class.active]="!isPrivate"
+            [disabled]="isEditing && (!isOwner || !!calendar?.isDefault)"
             (click)="isPrivate = false"
             type="button"
           >
@@ -71,6 +74,7 @@
           <button
             class="privacy-btn"
             [class.active]="isPrivate"
+            [disabled]="isEditing && (!isOwner || !!calendar?.isDefault)"
             (click)="isPrivate = true"
             type="button"
           >
@@ -81,7 +85,7 @@
       </div>
 
       <!-- Membros e Permissões (somente para agendas não privadas) -->
-      <div class="field-group members-section input-relative" *ngIf="!isPrivate">
+      <div class="field-group members-section input-relative" *ngIf="!isPrivate && (!isEditing || isOwner)">
         <label class="field-label">
           <mat-icon class="label-icon">people</mat-icon>
           Colaboradores Vinculados & Permissões
@@ -162,7 +166,7 @@
     <!-- Footer -->
     <div class="modal-footer">
       <button
-        *ngIf="isEditing"
+        *ngIf="isEditing && canDelete"
         class="btn-delete"
         [disabled]="isSaving"
         (click)="onDelete()"
