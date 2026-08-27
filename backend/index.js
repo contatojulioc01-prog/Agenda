@@ -235,10 +235,12 @@ initDb().then(() => {
   );
 
   if (frontendPath) {
-    app.use(express.static(frontendPath, {
+    const staticOptions = {
       index: false,
       maxAge: process.env.NODE_ENV === 'production' ? '1h' : 0,
-    }));
+    };
+    app.use('/agenda', express.static(frontendPath, staticOptions));
+    app.use(express.static(frontendPath, staticOptions));
   } else {
     console.warn('[WEB] Frontend compilado nao encontrado; somente API/WS estarao disponiveis.');
   }
