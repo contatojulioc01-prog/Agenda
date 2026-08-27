@@ -5,10 +5,7 @@ const { spawnSync } = require('child_process');
 const rootPath = __dirname;
 const backendPath = path.join(rootPath, 'backend');
 const dependencyMarker = path.join(backendPath, 'node_modules', 'express', 'package.json');
-const frontendCandidates = [
-  path.join(rootPath, 'frontend', 'index.html'),
-  path.join(rootPath, 'dist', 'agenda', 'browser', 'index.html'),
-];
+const frontendIndex = path.join(backendPath, 'public', 'index.html');
 
 function runNpm(args, cwd) {
   // Quando iniciado por `npm start`, o npm informa o caminho do seu CLI.
@@ -28,8 +25,8 @@ if (!fs.existsSync(dependencyMarker)) {
   runNpm(['ci', '--omit=dev'], backendPath);
 }
 
-if (!frontendCandidates.some(fs.existsSync)) {
-  console.error('[START] Frontend compilado nao encontrado. Gere o pacote com "npm run build".');
+if (!fs.existsSync(frontendIndex)) {
+  console.error('[START] Frontend compilado nao encontrado em backend/public. Gere-o com "npm run build" dentro de frontend.');
   process.exit(1);
 }
 

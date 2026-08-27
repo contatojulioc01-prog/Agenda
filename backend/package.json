@@ -4,6 +4,7 @@
   "description": "Backend para Agenda Corporativa Compartilhada",
   "main": "index.js",
   "scripts": {
+    "build": "npm --prefix ../frontend run build",
     "start": "node index.js",
     "dev": "npx nodemon index.js",
     "test": "node --test test/*.test.js",

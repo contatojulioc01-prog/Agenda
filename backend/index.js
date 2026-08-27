@@ -228,8 +228,7 @@ initDb().then(() => {
     process.env.FRONTEND_PATH
       ? path.resolve(__dirname, '..', process.env.FRONTEND_PATH)
       : null,
-    path.join(__dirname, '..', 'frontend'),
-    path.join(__dirname, '..', 'dist', 'agenda', 'browser'),
+    path.join(__dirname, 'public'),
   ].filter(Boolean);
   const frontendPath = frontendCandidates.find(candidate =>
     fs.existsSync(path.join(candidate, 'index.html'))
