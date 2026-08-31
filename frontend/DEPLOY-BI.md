@@ -83,5 +83,5 @@ http://docebrinquedo.local/agenda/
 
 O servidor IIS precisa ter URL Rewrite e ARR Proxy instalados e habilitados. Para
 a sincronizacao em tempo real, habilite tambem o protocolo WebSocket no IIS. O
-proxy encaminha todo o subcaminho para `docebrinquedo.local:9900`, enquanto o Node
+proxy encaminha todo o subcaminho para `192.168.13.180:9900`, enquanto o Node
 continua escutando em `0.0.0.0:9900`.

@@ -16,15 +16,22 @@
     "name": "Jc"
   },
   "servers": [
-    "dev"
+    "dev",
+    "prod"
   ],
   "remoteByServer": {
     "dev": {
       "remotePath": "/home/deploys"
+    },
+    "prod": {
+      "remotePath": "c:/server"
     }
   },
   "pm2ByServer": {
     "dev": {
+      "process": 13
+    },
+    "prod": {
       "process": 9
     }
   }

@@ -12,6 +12,7 @@ async function hasAccess(calendarId, userId, requireWrite = false) {
   if (!calendarId) return true;
   const calendar = await db.get('SELECT * FROM calendars WHERE id = ?', [calendarId]);
   if (!calendar) return false;
+  if (requireWrite && (calendar.is_task_calendar || await db.get('SELECT 1 FROM kanban_teams WHERE calendar_id = ?', [calendarId]))) return false;
   if (calendar.owner_id === userId) return true;
   if (!userId) return false;
 

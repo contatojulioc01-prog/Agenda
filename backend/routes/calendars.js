@@ -27,16 +27,24 @@ router.get('/', asyncRoute(async (req, res) => {
 
   await createDefaultCalendar(userId);
   const rows = await db.all(`
-    SELECT DISTINCT c.*, cm.permission as my_permission
+    SELECT DISTINCT c.*, cm.permission as my_permission, kt.name AS task_team_name
     FROM calendars c
     LEFT JOIN calendar_members cm ON cm.calendar_id = c.id AND cm.user_id = ?
+    LEFT JOIN kanban_teams kt ON kt.calendar_id = c.id
     WHERE c.owner_id = ? OR cm.user_id = ?
     ORDER BY c.created_at ASC
   `, [userId, userId, userId]);
 
   const result = await Promise.all(rows.map(async cal => {
     const members = await db.all('SELECT * FROM calendar_members WHERE calendar_id = ?', [cal.id]);
-    return { ...cal, isPrivate: cal.is_private === 1, isDefault: cal.is_default === 1, members };
+    return {
+      ...cal,
+      isPrivate: cal.is_private === 1,
+      isDefault: cal.is_default === 1,
+      isTaskCalendar: cal.is_task_calendar === 1,
+      taskTeamName: cal.task_team_name || null,
+      members,
+    };
   }));
 
   res.json(result);
@@ -94,6 +102,9 @@ router.put('/:id', asyncRoute(async (req, res) => {
   const { name, color, isPrivate } = req.body;
   if (isPrivate !== undefined && member.permission !== 'owner') return res.status(403).json({ error: 'Somente o dono pode alterar a privacidade' });
   const existingCalendar = await db.get('SELECT * FROM calendars WHERE id = ?', [id]);
+  if (existingCalendar?.is_task_calendar || await db.get('SELECT 1 FROM kanban_teams WHERE calendar_id = ?', [id])) {
+    return res.status(409).json({ error: 'A agenda Tarefas é gerenciada automaticamente pelo time' });
+  }
   if (existingCalendar?.is_default && isPrivate === false) return res.status(409).json({ error: 'A agenda padrão deve permanecer privada' });
   if (name !== undefined && !isNonEmptyString(name, 80)) return res.status(400).json({ error: 'Nome inválido (máximo de 80 caracteres)' });
   if (color !== undefined && !isHexColor(color)) return res.status(400).json({ error: 'Cor inválida' });
@@ -103,7 +114,7 @@ router.put('/:id', asyncRoute(async (req, res) => {
   if (isPrivate !== undefined) await db.run('UPDATE calendars SET is_private = ? WHERE id = ?', [isPrivate ? 1 : 0, id]);
   const calendar = await db.get('SELECT * FROM calendars WHERE id = ?', [id]);
   req.broadcast({ type: 'calendar_updated', calendarId: id });
-  res.json({ ...calendar, isPrivate: calendar.is_private === 1, isDefault: calendar.is_default === 1 });
+  res.json({ ...calendar, isPrivate: calendar.is_private === 1, isDefault: calendar.is_default === 1, isTaskCalendar: false });
 }));
 
 router.delete('/:id', asyncRoute(async (req, res) => {
@@ -112,6 +123,9 @@ router.delete('/:id', asyncRoute(async (req, res) => {
   const calendar = await db.get('SELECT * FROM calendars WHERE id = ? AND owner_id = ?', [id, userId]);
   if (!calendar) return res.status(403).json({ error: 'Sem permissão' });
   if (calendar.is_default) return res.status(409).json({ error: 'A agenda padrão não pode ser excluída' });
+  if (calendar.is_task_calendar || await db.get('SELECT 1 FROM kanban_teams WHERE calendar_id = ?', [id])) {
+    return res.status(409).json({ error: 'A agenda Tarefas só pode ser excluída junto com o time' });
+  }
 
   await db.transaction(async tx => {
     await tx.run('DELETE FROM kanban_task_events WHERE calendar_id = ?', [id]);

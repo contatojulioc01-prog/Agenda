@@ -158,6 +158,42 @@
           </div>
         </div>
       </div>
+
+      <!-- Agendas automaticas dos times de tarefas -->
+      <div class="sidebar-section task-calendars-section" *ngIf="taskCalendars().length > 0">
+        <div class="sidebar-section-header">
+          <span class="sidebar-section-title">Tarefas</span>
+        </div>
+        <div class="calendar-list">
+          <div
+            *ngFor="let cal of taskCalendars()"
+            class="calendar-item task-calendar-item"
+            [class.is-active]="calendarsService.visibleCalendarIds().has(cal.id)"
+            [class.is-solo]="calendarsService.isOnlySelected(cal.id)"
+            (click)="toggleCalendarVisibility(cal.id)"
+          >
+            <label class="calendar-checkbox-label" (click)="$event.stopPropagation()">
+              <input
+                type="radio"
+                name="active-calendar"
+                class="calendar-checkbox"
+                [checked]="calendarsService.visibleCalendarIds().has(cal.id)"
+                (change)="toggleCalendarVisibility(cal.id)"
+              />
+              <span class="calendar-dot" [style.background]="cal.color"></span>
+              <span class="calendar-name" [matTooltip]="cal.taskTeamName ? 'Agenda automática do time ' + cal.taskTeamName : 'Agenda automática de tarefas'">Tarefas</span>
+              <span class="task-calendar-badge" [matTooltip]="cal.taskTeamName || 'Gerenciada automaticamente'">
+                <mat-icon>task_alt</mat-icon>
+              </span>
+            </label>
+            <div class="calendar-actions" (click)="$event.stopPropagation()">
+              <button class="btn-cal-menu solo-btn" (click)="selectOnlyCalendar(cal.id, $event)" matTooltip="Ver apenas esta agenda">
+                <mat-icon>filter_center_focus</mat-icon>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="sidebar-content tasks-sidebar" [hidden]="activeSection !== 'tasks'">

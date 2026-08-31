@@ -69,6 +69,16 @@ wss.on('connection', (ws, req) => {
 
 // ── Middlewares ──────────────────────────────────────────────────────────────
 app.use(cors({ origin: '*', methods: ['GET','POST','PUT','DELETE','OPTIONS'], allowedHeaders: ['Content-Type','Authorization','x-user-id'] }));
+// Aceita tanto o acesso direto http://servidor:9900/agenda quanto o proxy IIS,
+// que remove /agenda antes de encaminhar a requisicao para o Node.
+app.use((req, _res, next) => {
+  const prefix = '/agenda';
+  if (req.url === prefix || req.url.startsWith(`${prefix}/`) || req.url.startsWith(`${prefix}?`)) {
+    const strippedUrl = req.url.slice(prefix.length);
+    req.url = !strippedUrl ? '/' : (strippedUrl.startsWith('?') ? `/${strippedUrl}` : strippedUrl);
+  }
+  next();
+});
 app.use(express.json());
 app.use((req, _res, next) => { req.broadcast = broadcast; next(); });
 
@@ -238,7 +248,9 @@ initDb().then(() => {
     const staticOptions = {
       maxAge: process.env.NODE_ENV === 'production' ? '1h' : 0,
     };
-    app.use('/agenda', express.static(frontendPath, staticOptions));
+    // O IIS remove o prefixo publico /agenda antes de encaminhar a requisicao.
+    // Portanto, os assets precisam estar disponiveis na raiz interna do Express.
+    app.use(express.static(frontendPath, staticOptions));
   }
 
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Rota nao encontrada' }));

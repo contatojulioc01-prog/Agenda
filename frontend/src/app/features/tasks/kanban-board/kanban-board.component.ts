@@ -54,6 +54,7 @@ export class KanbanBoardComponent {
   readonly teamContextMenu = signal<{ team: KanbanTeam; x: number; y: number } | null>(null);
   readonly taskContextMenu = signal<{ task: KanbanTask; x: number; y: number } | null>(null);
   readonly teamDeleteTarget = signal<KanbanTeam | null>(null);
+  readonly expandedChecklistIds = signal<Set<string>>(new Set());
   readonly savingTask = signal(false);
   readonly teamDeleteLoading = signal(false);
 
@@ -524,6 +525,27 @@ export class KanbanBoardComponent {
   checklistProgress(task: KanbanTask): number {
     if (!task.checklist.length) return 0;
     return Math.round(task.checklist.filter(item => item.done).length / task.checklist.length * 100);
+  }
+
+  isChecklistExpanded(taskId: string): boolean {
+    return this.expandedChecklistIds().has(taskId);
+  }
+
+  toggleCardChecklist(taskId: string, event: Event): void {
+    event.stopPropagation();
+    this.expandedChecklistIds.update(current => {
+      const next = new Set(current);
+      if (next.has(taskId)) next.delete(taskId);
+      else next.add(taskId);
+      return next;
+    });
+  }
+
+  toggleCardChecklistItem(task: KanbanTask, itemId: string, event: Event): void {
+    event.stopPropagation();
+    const done = (event.target as HTMLInputElement).checked;
+    const checklist = task.checklist.map(item => item.id === itemId ? { ...item, done } : { ...item });
+    this.service.updateTask(task.id, { checklist });
   }
 
   isOverdue(task: KanbanTask): boolean {

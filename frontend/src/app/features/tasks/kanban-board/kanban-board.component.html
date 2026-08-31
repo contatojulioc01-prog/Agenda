@@ -81,11 +81,21 @@
           <div class="card-title-row"><h3>{{ task.title }}</h3><button class="child-board-btn" (click)="openChildBoard(task, $event)" [matTooltip]="branchHasContent(task) ? childCount(task) + ' subtarefas ativas' : 'Criar ramificação de subtarefas'"><mat-icon>account_tree</mat-icon><small *ngIf="childCount(task)">{{ childCount(task) }}</small></button><mat-icon class="edit-hint">edit</mat-icon></div>
           <p class="card-description" *ngIf="task.description">{{ task.description }}</p>
           <div class="check-progress" *ngIf="task.checklist.length"><span [style.width.%]="checklistProgress(task)"></span></div>
+          <button class="card-checklist-toggle" *ngIf="task.checklist.length" type="button" (mousedown)="$event.stopPropagation()" (click)="toggleCardChecklist(task.id, $event)" [attr.aria-expanded]="isChecklistExpanded(task.id)">
+            <mat-icon>{{ isChecklistExpanded(task.id) ? 'keyboard_arrow_up' : 'keyboard_arrow_down' }}</mat-icon>
+            <span>Checklist</span>
+            <strong>{{ task.checklist.filter(item => item.done).length }}/{{ task.checklist.length }}</strong>
+          </button>
+          <div class="card-checklist-items" *ngIf="task.checklist.length && isChecklistExpanded(task.id)" (mousedown)="$event.stopPropagation()" (click)="$event.stopPropagation()">
+            <label *ngFor="let item of task.checklist; trackBy: trackById">
+              <input type="checkbox" [checked]="item.done" (change)="toggleCardChecklistItem(task, item.id, $event)">
+              <span [class.done]="item.done">{{ item.text }}</span>
+            </label>
+          </div>
           <footer class="card-footer">
             <div class="card-badges">
               <span class="priority" [class]="task.priority">{{ task.priority === 'urgent' ? 'Urgente' : task.priority === 'high' ? 'Alta' : task.priority === 'low' ? 'Baixa' : 'Média' }}</span>
               <span class="date-badge" *ngIf="task.dueDate" [class.overdue]="isOverdue(task)" [class.soon]="isDueSoon(task)"><mat-icon>schedule</mat-icon>{{ formatDate(task.dueDate) }}</span>
-              <span *ngIf="task.checklist.length"><mat-icon>check_box</mat-icon>{{ task.checklist.filter(item => item.done).length }}/{{ task.checklist.length }}</span>
             </div>
             <div class="assignee-stack" *ngIf="task.assigneeIds.length"><img *ngFor="let assigneeId of task.assigneeIds | slice:0:3" class="assignee-avatar" [src]="assigneeAvatar(assigneeId)" [alt]="assigneeName(assigneeId)" [matTooltip]="assigneeName(assigneeId)" (error)="$any($event.target).src = defaultAvatar"><span *ngIf="task.assigneeIds.length > 3">+{{ task.assigneeIds.length - 3 }}</span></div>
           </footer>

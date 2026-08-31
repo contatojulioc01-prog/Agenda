@@ -62,6 +62,7 @@ async function initDb() {
       is_private INTEGER NOT NULL DEFAULT 0,
       owner_id TEXT NOT NULL,
       is_default INTEGER NOT NULL DEFAULT 0,
+      is_task_calendar INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP::text)
     );
 
@@ -187,12 +188,19 @@ async function initDb() {
 
     ALTER TABLE events ADD COLUMN IF NOT EXISTS end_date TEXT;
     ALTER TABLE calendars ADD COLUMN IF NOT EXISTS is_default INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE calendars ADD COLUMN IF NOT EXISTS is_task_calendar INTEGER NOT NULL DEFAULT 0;
     ALTER TABLE events ADD COLUMN IF NOT EXISTS day_times TEXT DEFAULT '{}';
     ALTER TABLE events ADD COLUMN IF NOT EXISTS copy_group_id TEXT;
     ALTER TABLE kanban_boards ADD COLUMN IF NOT EXISTS scope_type TEXT NOT NULL DEFAULT 'personal';
     ALTER TABLE kanban_boards ADD COLUMN IF NOT EXISTS team_id TEXT;
+    ALTER TABLE kanban_teams ADD COLUMN IF NOT EXISTS calendar_id TEXT;
     ALTER TABLE kanban_tasks ADD COLUMN IF NOT EXISTS parent_task_id TEXT;
     ALTER TABLE kanban_tasks ADD COLUMN IF NOT EXISTS assignee_ids TEXT NOT NULL DEFAULT '[]';
+
+    UPDATE calendars
+    SET name = 'Tarefas', color = kanban_teams.color, is_private = 0, is_task_calendar = 1
+    FROM kanban_teams
+    WHERE kanban_teams.calendar_id = calendars.id;
 
     WITH defaults AS (
       SELECT id, ROW_NUMBER() OVER (PARTITION BY owner_id ORDER BY created_at, id) row_number

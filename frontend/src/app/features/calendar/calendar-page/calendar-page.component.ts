@@ -157,6 +157,7 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
   }
 
   openEditCalendar(cal: Calendar): void {
+    if (cal.isTaskCalendar) return;
     this.editingCalendar = cal;
     this.showCalendarManager = true;
   }
@@ -194,7 +195,7 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
   }
 
   removeCalendar(cal: Calendar): void {
-    if (cal.isDefault) return;
+    if (cal.isDefault || cal.isTaskCalendar) return;
     this.calendarDeleteTarget = cal;
   }
 
@@ -312,12 +313,16 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
 
   myCalendars(): Calendar[] {
     const uid = this.currentUser()?.id;
-    return this.calendars().filter(c => c.owner_id === uid);
+    return this.calendars().filter(c => c.owner_id === uid && !c.isTaskCalendar);
   }
 
   sharedCalendars(): Calendar[] {
     const uid = this.currentUser()?.id;
-    return this.calendars().filter(c => c.owner_id !== uid);
+    return this.calendars().filter(c => c.owner_id !== uid && !c.isTaskCalendar);
+  }
+
+  taskCalendars(): Calendar[] {
+    return this.calendars().filter(calendar => calendar.isTaskCalendar);
   }
 
   // ── Navegação ──

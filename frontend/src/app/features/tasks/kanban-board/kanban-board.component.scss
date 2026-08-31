@@ -66,6 +66,17 @@
 .card-description { color: var(--text-muted); font-size: 10.5px; margin-top: 5px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .check-progress { height: 3px; border-radius: 3px; background: var(--bg-hover); overflow: hidden; margin: 9px 0 3px; }
 .check-progress span { display: block; height: 100%; background: #10b981; border-radius: inherit; }
+.card-checklist-toggle { width:100%; min-height:27px; margin-top:3px; padding:2px 4px; display:flex; align-items:center; gap:4px; border-radius:7px; color:var(--text-muted); font-size:10px; text-align:left; }
+.card-checklist-toggle:hover { color:var(--text-primary); background:var(--bg-hover); }
+.card-checklist-toggle mat-icon { width:17px; height:17px; font-size:17px; color:var(--text-secondary); }
+.card-checklist-toggle span { flex:1; font-weight:650; }
+.card-checklist-toggle strong { font-size:9.5px; }
+.card-checklist-items { margin-top:4px; padding:4px 6px; border:1px solid var(--border-light); border-radius:8px; background:var(--bg-surface-alt); cursor:default; }
+.card-checklist-items label { min-height:28px; display:flex; align-items:center; gap:7px; border-bottom:1px solid var(--border-light); color:var(--text-secondary); font-size:10.5px; line-height:1.3; cursor:pointer; }
+.card-checklist-items label:last-child { border-bottom:0; }
+.card-checklist-items input { width:14px; height:14px; padding:0; flex:0 0 auto; accent-color:var(--brand-500); }
+.card-checklist-items span { min-width:0; overflow-wrap:anywhere; }
+.card-checklist-items span.done { color:var(--text-muted); text-decoration:line-through; }
 .card-footer { justify-content: space-between; margin-top: 9px; min-height: 22px; }
 .card-badges { flex-wrap: wrap; gap: 5px; }
 .card-badges > span { display: inline-flex; align-items: center; gap: 2px; color: var(--text-muted); font-size: 9.5px; }

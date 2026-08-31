@@ -7,6 +7,11 @@ function genId() {
   return 'mbr-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
 }
 
+async function isTaskCalendar(calendarId) {
+  const calendar = await db.get('SELECT is_task_calendar FROM calendars WHERE id = ?', [calendarId]);
+  return calendar?.is_task_calendar === 1 || !!(await db.get('SELECT 1 FROM kanban_teams WHERE calendar_id = ?', [calendarId]));
+}
+
 router.get('/invitations', asyncRoute(async (req, res) => {
   const userId = req.headers['x-user-id'];
   if (!userId) return res.status(400).json({ error: 'User header required' });
@@ -47,6 +52,7 @@ router.post('/:id/members', asyncRoute(async (req, res) => {
   const ownerId = req.headers['x-user-id'];
   const { id } = req.params;
   const { userId, permission = 'viewer' } = req.body;
+  if (await isTaskCalendar(id)) return res.status(409).json({ error: 'Os membros da agenda Tarefas são gerenciados pelo time' });
   if (!userId) return res.status(400).json({ error: 'userId é obrigatório' });
 
   const isOwner = await db.get("SELECT 1 FROM calendar_members WHERE calendar_id = ? AND user_id = ? AND permission = 'owner'", [id, ownerId]);
@@ -69,6 +75,7 @@ router.put('/:id/members/:memberId', asyncRoute(async (req, res) => {
   const ownerId = req.headers['x-user-id'];
   const { id, memberId } = req.params;
   const { permission } = req.body;
+  if (await isTaskCalendar(id)) return res.status(409).json({ error: 'Os membros da agenda Tarefas são gerenciados pelo time' });
   const isOwner = await db.get("SELECT 1 FROM calendar_members WHERE calendar_id = ? AND user_id = ? AND permission = 'owner'", [id, ownerId]);
   if (!isOwner) return res.status(403).json({ error: 'Sem permissão' });
   if (!['editor', 'viewer'].includes(permission)) return res.status(400).json({ error: 'Permissão inválida' });
@@ -83,6 +90,7 @@ router.put('/:id/members/:memberId', asyncRoute(async (req, res) => {
 router.delete('/:id/members/:memberId', asyncRoute(async (req, res) => {
   const ownerId = req.headers['x-user-id'];
   const { id, memberId } = req.params;
+  if (await isTaskCalendar(id)) return res.status(409).json({ error: 'Os membros da agenda Tarefas são gerenciados pelo time' });
   const isOwner = await db.get("SELECT 1 FROM calendar_members WHERE calendar_id = ? AND user_id = ? AND permission = 'owner'", [id, ownerId]);
   if (!isOwner) return res.status(403).json({ error: 'Sem permissão' });
   const target = await db.get('SELECT * FROM calendar_members WHERE id = ? AND calendar_id = ?', [memberId, id]);

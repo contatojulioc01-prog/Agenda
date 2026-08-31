@@ -17,6 +17,8 @@ export interface Calendar {
   color: string;
   isPrivate: boolean;
   isDefault?: boolean;
+  isTaskCalendar?: boolean;
+  taskTeamName?: string | null;
   owner_id: string;
   created_at: string;
   members: CalendarMember[];

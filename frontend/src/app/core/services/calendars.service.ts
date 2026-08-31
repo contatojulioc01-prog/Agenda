@@ -99,6 +99,11 @@ export class CalendarsService {
 
   /** Atualiza agenda existente */
   update(id: string, changes: Partial<Pick<Calendar, 'name' | 'color' | 'isPrivate'>>, onComplete?: (success: boolean) => void): void {
+    if (this.calendars().find(calendar => calendar.id === id)?.isTaskCalendar) {
+      this.error.set('A agenda Tarefas é gerenciada automaticamente pelo time.');
+      onComplete?.(false);
+      return;
+    }
     this.error.set('');
     this.http.put<Calendar>(`${getBackendUrl()}/api/calendars/${id}`, changes, { headers: this.headers })
       .pipe(catchError(err => { this.error.set(err.error?.error || 'Não foi possível atualizar a agenda no PostgreSQL.'); return of(null); }))
@@ -112,8 +117,11 @@ export class CalendarsService {
 
   /** Remove agenda */
   remove(id: string, onComplete?: (success: boolean) => void): void {
-    if (this.calendars().find(calendar => calendar.id === id)?.isDefault) {
-      this.error.set('A agenda padrão não pode ser excluída.');
+    const calendar = this.calendars().find(item => item.id === id);
+    if (calendar?.isDefault || calendar?.isTaskCalendar) {
+      this.error.set(calendar?.isTaskCalendar
+        ? 'A agenda Tarefas só pode ser excluída junto com o time.'
+        : 'A agenda padrão não pode ser excluída.');
       onComplete?.(false);
       return;
     }
@@ -231,14 +239,14 @@ export class CalendarsService {
   /** Verifica se o usuário pode editar (owner/editor) */
   canEdit(calendarId: string): boolean {
     const cal = this.calendars().find(c => c.id === calendarId);
-    if (!cal) return false;
+    if (!cal || cal.isTaskCalendar) return false;
     return ['owner', 'editor'].includes(cal.my_permission ?? 'viewer');
   }
 
   /** Verifica se o usuário é dono */
   isOwner(calendarId: string): boolean {
     const cal = this.calendars().find(c => c.id === calendarId);
-    return cal?.my_permission === 'owner';
+    return !cal?.isTaskCalendar && cal?.my_permission === 'owner';
   }
 
   /** Enriquece membros com dados dos usuários da API corporativa */

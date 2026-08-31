@@ -57,3 +57,114 @@ test('rejeita reordenação para coluna de outro quadro', async () => {
     assert.equal(transactions, 0);
   });
 });
+
+test('cria agenda compartilhada junto com o time', async () => {
+  const statements = [];
+  await withRouter('../routes/kanban', fakeDb => {
+    const tx = {
+      run: async (sql, params = []) => {
+        statements.push({ sql, params });
+        return { rowCount: 1 };
+      },
+      all: async sql => sql.includes('kanban_team_members')
+        ? [{ user_id: 'user-1', role: 'admin' }]
+        : [],
+      get: async sql => {
+        if (sql.includes('FROM calendars')) return { id: 'calendar-team-1' };
+        if (sql.includes('FROM kanban_boards')) return { id: 'board-team-1' };
+        return null;
+      },
+    };
+    fakeDb.transaction = callback => callback(tx);
+    fakeDb.get = async sql => sql.includes('FROM kanban_teams')
+      ? { id: 'team-1', name: 'Produto', color: '#4f46e5', owner_id: 'user-1' }
+      : null;
+  }, async baseUrl => {
+    const response = await fetch(`${baseUrl}/teams`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-user-id': 'user-1' },
+      body: JSON.stringify({ name: 'Produto', color: '#4f46e5' }),
+    });
+    assert.equal(response.status, 201);
+    assert.ok(statements.some(item => item.sql.includes('INSERT INTO calendars')));
+    assert.ok(statements.some(item => item.sql.includes('UPDATE kanban_teams SET calendar_id')));
+    assert.ok(statements.some(item => item.sql.includes('INSERT INTO calendar_members') && item.params.includes('user-1')));
+  });
+});
+
+test('sincroniza prazo da tarefa na agenda compartilhada do time', async () => {
+  const statements = [];
+  const task = {
+    id: 'task-1', board_id: 'board-team-1', column_id: 'column-1', title: 'Publicar', description: '',
+    position: 0, priority: 'medium', due_date: '2026-09-10', labels: '[]', assignee_ids: '[]',
+    checklist: '[]', archived: 0, created_by: 'user-1', created_at: '2026-09-01', updated_at: '2026-09-01',
+    scope_type: 'team', team_id: 'team-1',
+  };
+  await withRouter('../routes/kanban', fakeDb => {
+    fakeDb.get = async sql => {
+      if (sql.includes('FROM kanban_boards')) return { id: 'board-team-1', owner_id: 'user-1', scope_type: 'team', team_id: 'team-1' };
+      if (sql.includes('FROM kanban_team_members')) return { role: 'member' };
+      if (sql.includes('FROM kanban_columns')) return { id: 'column-1', board_id: 'board-team-1' };
+      if (sql.includes('COALESCE(MAX(position)')) return { next: 0 };
+      if (sql.includes('SELECT kt.*, kb.scope_type')) return task;
+      if (sql.includes('FROM kanban_tasks WHERE id')) return task;
+      return null;
+    };
+    fakeDb.all = async sql => sql.includes('kanban_task_events') ? [] : [];
+    fakeDb.run = async (sql, params = []) => {
+      statements.push({ sql, params });
+      return { rowCount: 1 };
+    };
+    fakeDb.transaction = callback => callback({
+      get: async sql => {
+        if (sql.includes('FROM kanban_teams')) return { id: 'team-1', name: 'Produto', color: '#4f46e5', owner_id: 'user-1', calendar_id: 'calendar-team-1' };
+        if (sql.includes('FROM calendars')) return { id: 'calendar-team-1' };
+        return null;
+      },
+      all: async sql => sql.includes('kanban_team_members') ? [{ user_id: 'user-1' }] : [],
+      run: async (sql, params = []) => {
+        statements.push({ sql, params });
+        return { rowCount: 0 };
+      },
+    });
+  }, async baseUrl => {
+    const response = await fetch(`${baseUrl}/boards/board-team-1/tasks`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-user-id': 'user-1' },
+      body: JSON.stringify({ title: 'Publicar', columnId: 'column-1', dueDate: '2026-09-10', assigneeIds: [], checklist: [], labels: [] }),
+    });
+    assert.equal(response.status, 201);
+    assert.ok(statements.some(item => item.sql.includes('INSERT INTO events') && item.params.includes('calendar-team-1')));
+    assert.ok(statements.some(item => item.sql.includes('INSERT INTO kanban_task_events') && item.params.includes('team:team-1')));
+  });
+});
+
+test('impede editar ou excluir a agenda automatica de tarefas', async () => {
+  let writes = 0;
+  let transactions = 0;
+  await withRouter('../routes/calendars', fakeDb => {
+    fakeDb.get = async sql => {
+      if (sql.includes('calendar_members')) return { permission: 'owner' };
+      if (sql.includes('FROM calendars')) return { id: 'calendar-team-1', owner_id: 'user-1', is_task_calendar: 1, is_default: 0 };
+      if (sql.includes('FROM kanban_teams')) return { id: 'team-1' };
+      return null;
+    };
+    fakeDb.run = async () => { writes++; };
+    fakeDb.transaction = async () => { transactions++; };
+  }, async baseUrl => {
+    const updateResponse = await fetch(`${baseUrl}/calendar-team-1`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json', 'x-user-id': 'user-1' },
+      body: JSON.stringify({ name: 'Outro nome' }),
+    });
+    assert.equal(updateResponse.status, 409);
+
+    const deleteResponse = await fetch(`${baseUrl}/calendar-team-1`, {
+      method: 'DELETE',
+      headers: { 'x-user-id': 'user-1' },
+    });
+    assert.equal(deleteResponse.status, 409);
+    assert.equal(writes, 0);
+    assert.equal(transactions, 0);
+  });
+});

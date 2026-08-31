@@ -114,6 +114,7 @@ router.delete('/:id', asyncRoute(async (req, res) => {
   if (calendar.is_default) return res.status(409).json({ error: 'A agenda padrão não pode ser excluída' });
 
   await db.transaction(async tx => {
+    await tx.run('UPDATE kanban_teams SET calendar_id = NULL WHERE calendar_id = ?', [id]);
     await tx.run('DELETE FROM kanban_task_events WHERE calendar_id = ?', [id]);
     await tx.run('DELETE FROM calendar_invitations WHERE calendar_id = ?', [id]);
     await tx.run('DELETE FROM calendar_members WHERE calendar_id = ?', [id]);

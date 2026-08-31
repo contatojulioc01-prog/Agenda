@@ -95,13 +95,73 @@ async function ensureDefaultCalendar(uid, broadcast) {
   return calendar;
 }
 
+async function createTeamCalendar(team, store = db) {
+  const calendarId = id('cal');
+  const now = new Date().toISOString();
+  await store.run(`INSERT INTO calendars
+    (id, name, color, is_private, owner_id, is_default, created_at)
+    VALUES (?, ?, ?, 0, ?, 0, ?)`,
+    [calendarId, `Agenda · ${team.name}`, team.color || '#4f46e5', team.owner_id, now]);
+  await store.run('UPDATE kanban_teams SET calendar_id = ? WHERE id = ?', [calendarId, team.id]);
+  const members = await store.all('SELECT user_id, role FROM kanban_team_members WHERE team_id = ?', [team.id]);
+  for (const member of members) {
+    const permission = member.user_id === team.owner_id ? 'owner' : 'editor';
+    await store.run(`INSERT INTO calendar_members (id, calendar_id, user_id, permission)
+      VALUES (?, ?, ?, ?) ON CONFLICT (calendar_id, user_id) DO UPDATE SET permission = excluded.permission`,
+      [id('mbr'), calendarId, member.user_id, permission]);
+  }
+  return store.get('SELECT * FROM calendars WHERE id = ?', [calendarId]);
+}
+
+async function ensureTeamCalendar(teamId, broadcast) {
+  let calendar;
+  let created = false;
+  let membersAdded = 0;
+  await db.transaction(async tx => {
+    await tx.get('SELECT pg_advisory_xact_lock(hashtext(?))', [`team-calendar:${teamId}`]);
+    const team = await tx.get('SELECT * FROM kanban_teams WHERE id = ?', [teamId]);
+    if (!team) return;
+    calendar = team.calendar_id
+      ? await tx.get('SELECT * FROM calendars WHERE id = ?', [team.calendar_id])
+      : null;
+    if (!calendar) {
+      calendar = await createTeamCalendar(team, tx);
+      created = true;
+      return;
+    }
+
+    const members = await tx.all('SELECT user_id FROM kanban_team_members WHERE team_id = ?', [team.id]);
+    for (const member of members) {
+      const permission = member.user_id === team.owner_id ? 'owner' : 'editor';
+      const result = await tx.run(`INSERT INTO calendar_members (id, calendar_id, user_id, permission)
+        VALUES (?, ?, ?, ?) ON CONFLICT (calendar_id, user_id) DO NOTHING`,
+        [id('mbr'), calendar.id, member.user_id, permission]);
+      membersAdded += result.rowCount || 0;
+    }
+  });
+  if (calendar && created) broadcast({ type: 'calendar_created', calendarId: calendar.id });
+  else if (calendar && membersAdded) broadcast({ type: 'calendar_updated', calendarId: calendar.id });
+  return calendar;
+}
+
 async function syncTaskCalendarEvents(taskId, broadcast) {
-  const task = await db.get('SELECT * FROM kanban_tasks WHERE id = ?', [taskId]);
+  const task = await db.get(`SELECT kt.*, kb.scope_type, kb.team_id
+    FROM kanban_tasks kt JOIN kanban_boards kb ON kb.id = kt.board_id
+    WHERE kt.id = ?`, [taskId]);
   if (!task) return;
-  let responsibleIds = parseJson(task.assignee_ids || '[]', []);
-  if (!responsibleIds.length && task.assignee_id) responsibleIds = [task.assignee_id];
-  if (!responsibleIds.length && task.created_by) responsibleIds = [task.created_by];
-  const desired = new Set(task.archived || !task.due_date ? [] : responsibleIds.filter(Boolean));
+  const targets = new Map();
+  if (!task.archived && task.due_date && task.scope_type === 'team' && task.team_id) {
+    const calendar = await ensureTeamCalendar(task.team_id, broadcast);
+    if (calendar) targets.set(`team:${task.team_id}`, calendar);
+  } else if (!task.archived && task.due_date) {
+    let responsibleIds = parseJson(task.assignee_ids || '[]', []);
+    if (!responsibleIds.length && task.assignee_id) responsibleIds = [task.assignee_id];
+    if (!responsibleIds.length && task.created_by) responsibleIds = [task.created_by];
+    for (const uid of responsibleIds.filter(Boolean)) {
+      targets.set(uid, await ensureDefaultCalendar(uid, broadcast));
+    }
+  }
+  const desired = new Set(targets.keys());
   const links = await db.all('SELECT * FROM kanban_task_events WHERE task_id = ?', [task.id]);
 
   for (const link of links) {
@@ -113,8 +173,8 @@ async function syncTaskCalendarEvents(taskId, broadcast) {
     broadcast({ type: 'event_deleted', calendarId: link.calendar_id, eventId: link.event_id });
   }
 
-  for (const uid of desired) {
-    const existing = links.find(link => link.user_id === uid);
+  for (const targetKey of desired) {
+    const existing = links.find(link => link.user_id === targetKey);
     const description = task.description ? `Prazo da tarefa Kanban.\n\n${task.description}` : 'Prazo da tarefa Kanban.';
     if (existing) {
       await db.run(`UPDATE events SET title = ?, description = ?, date = ?, end_date = ?, all_day = 1,
@@ -123,16 +183,17 @@ async function syncTaskCalendarEvents(taskId, broadcast) {
       continue;
     }
 
-    const calendar = await ensureDefaultCalendar(uid, broadcast);
+    const calendar = targets.get(targetKey);
+    if (!calendar) continue;
     const eventId = id('evt');
     const now = new Date().toISOString();
     await db.transaction(async tx => {
       await tx.run(`INSERT INTO events (id, calendar_id, title, description, date, end_date, start_time, end_time,
         day_times, color, category, all_day, created_by, copy_group_id, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, '00:00', '23:59', '{}', 'indigo', 'Tarefas', 1, ?, ?, ?)`,
-        [eventId, calendar.id, `📋 ${task.title}`, description, task.due_date, task.due_date, uid, `kanban-${task.id}`, now]);
+        [eventId, calendar.id, `📋 ${task.title}`, description, task.due_date, task.due_date, task.created_by, `kanban-${task.id}`, now]);
       await tx.run('INSERT INTO kanban_task_events (id, task_id, event_id, user_id, calendar_id) VALUES (?, ?, ?, ?, ?)',
-        [id('kte'), task.id, eventId, uid, calendar.id]);
+        [id('kte'), task.id, eventId, targetKey, calendar.id]);
     });
     broadcast({ type: 'event_created', calendarId: calendar.id, eventId });
   }
@@ -160,11 +221,21 @@ router.use((req, res, next) => {
 });
 
 router.get('/teams', asyncRoute(async (req, res) => {
-  const teams = await db.all(`SELECT t.*, tm.role AS my_role,
+  let teams = await db.all(`SELECT t.*, tm.role AS my_role,
     (SELECT COUNT(*) FROM kanban_team_members x WHERE x.team_id = t.id) member_count,
     (SELECT id FROM kanban_boards b WHERE b.team_id = t.id LIMIT 1) board_id
     FROM kanban_teams t JOIN kanban_team_members tm ON tm.team_id = t.id
     WHERE tm.user_id = ? ORDER BY t.created_at`, [userId(req)]);
+  for (const team of teams) {
+    if (!team.calendar_id) await ensureTeamCalendar(team.id, req.broadcast);
+  }
+  if (teams.some(team => !team.calendar_id)) {
+    teams = await db.all(`SELECT t.*, tm.role AS my_role,
+      (SELECT COUNT(*) FROM kanban_team_members x WHERE x.team_id = t.id) member_count,
+      (SELECT id FROM kanban_boards b WHERE b.team_id = t.id LIMIT 1) board_id
+      FROM kanban_teams t JOIN kanban_team_members tm ON tm.team_id = t.id
+      WHERE tm.user_id = ? ORDER BY t.created_at`, [userId(req)]);
+  }
   res.json(teams.map(team => ({ ...team, myRole: team.my_role, memberCount: Number(team.member_count), boardId: team.board_id })));
 }));
 
@@ -178,14 +249,17 @@ router.post('/teams', asyncRoute(async (req, res) => {
   const now = new Date().toISOString();
   const color = req.body.color || '#4f46e5';
   let board;
+  let calendar;
   await db.transaction(async tx => {
     await tx.run('INSERT INTO kanban_teams (id, name, description, color, owner_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [teamId, name, req.body.description || '', color, uid, now, now]);
     await tx.run('INSERT INTO kanban_team_members (id, team_id, user_id, role, joined_at) VALUES (?, ?, ?, ?, ?)',
       [id('tm'), teamId, uid, 'admin', now]);
+    calendar = await createTeamCalendar({ id: teamId, name, color, owner_id: uid }, tx);
     board = await createBoard({ name: `Kanban · ${name}`, description: `Quadro compartilhado do time ${name}`, color, ownerId: uid, scopeType: 'team', teamId }, tx);
   });
   req.broadcast({ type: 'kanban_team_updated', teamId, userId: uid });
+  req.broadcast({ type: 'calendar_created', calendarId: calendar.id, userId: uid });
   const team = await db.get('SELECT * FROM kanban_teams WHERE id = ?', [teamId]);
   res.status(201).json({ ...team, myRole: 'admin', memberCount: 1, boardId: board.id });
 }));
@@ -200,6 +274,12 @@ router.put('/teams/:teamId', asyncRoute(async (req, res) => {
   if (req.body.name !== undefined) await db.run('UPDATE kanban_teams SET name = ?, updated_at = ? WHERE id = ?', [String(req.body.name).trim(), now, access.team.id]);
   if (req.body.description !== undefined) await db.run('UPDATE kanban_teams SET description = ?, updated_at = ? WHERE id = ?', [req.body.description, now, access.team.id]);
   if (req.body.color !== undefined) await db.run('UPDATE kanban_teams SET color = ?, updated_at = ? WHERE id = ?', [req.body.color, now, access.team.id]);
+  const calendar = await ensureTeamCalendar(access.team.id, req.broadcast);
+  if (calendar) {
+    if (req.body.name !== undefined) await db.run('UPDATE calendars SET name = ? WHERE id = ?', [`Agenda · ${String(req.body.name).trim()}`, calendar.id]);
+    if (req.body.color !== undefined) await db.run('UPDATE calendars SET color = ? WHERE id = ?', [req.body.color, calendar.id]);
+    if (req.body.name !== undefined || req.body.color !== undefined) req.broadcast({ type: 'calendar_updated', calendarId: calendar.id });
+  }
   req.broadcast({ type: 'kanban_team_updated', teamId: access.team.id });
   res.json(await db.get('SELECT * FROM kanban_teams WHERE id = ?', [access.team.id]));
 }));
@@ -208,6 +288,7 @@ router.delete('/teams/:teamId', asyncRoute(async (req, res) => {
   const access = await teamAccess(req.params.teamId, userId(req), true);
   if (!access) return res.status(403).json({ error: 'Somente o administrador pode excluir o time' });
   const boards = await db.all('SELECT id FROM kanban_boards WHERE team_id = ?', [access.team.id]);
+  const calendar = access.team.calendar_id ? await db.get('SELECT * FROM calendars WHERE id = ?', [access.team.calendar_id]) : null;
   for (const board of boards) await deleteBoardCalendarEvents(board.id, req.broadcast);
   await db.transaction(async tx => {
     for (const board of boards) {
@@ -217,9 +298,16 @@ router.delete('/teams/:teamId', asyncRoute(async (req, res) => {
     await tx.run('DELETE FROM kanban_boards WHERE team_id = ?', [access.team.id]);
     await tx.run('DELETE FROM kanban_team_invitations WHERE team_id = ?', [access.team.id]);
     await tx.run('DELETE FROM kanban_team_members WHERE team_id = ?', [access.team.id]);
+    if (calendar) {
+      await tx.run('DELETE FROM calendar_invitations WHERE calendar_id = ?', [calendar.id]);
+      await tx.run('DELETE FROM calendar_members WHERE calendar_id = ?', [calendar.id]);
+      await tx.run('DELETE FROM events WHERE calendar_id = ?', [calendar.id]);
+      await tx.run('DELETE FROM calendars WHERE id = ?', [calendar.id]);
+    }
     await tx.run('DELETE FROM kanban_teams WHERE id = ?', [access.team.id]);
   });
   req.broadcast({ type: 'kanban_team_updated', teamId: access.team.id });
+  if (calendar) req.broadcast({ type: 'calendar_deleted', calendarId: calendar.id });
   res.json({ success: true });
 }));
 
@@ -250,7 +338,11 @@ router.delete('/teams/:teamId/members/:memberId', asyncRoute(async (req, res) =>
   if (!access) return res.status(403).json({ error: 'Somente o administrador pode remover pessoas' });
   const member = await db.get('SELECT * FROM kanban_team_members WHERE id = ? AND team_id = ?', [req.params.memberId, access.team.id]);
   if (!member || member.role === 'admin') return res.status(400).json({ error: 'Administrador não pode ser removido' });
-  await db.run('DELETE FROM kanban_team_members WHERE id = ?', [member.id]);
+  const calendar = await ensureTeamCalendar(access.team.id, req.broadcast);
+  await db.transaction(async tx => {
+    await tx.run('DELETE FROM kanban_team_members WHERE id = ?', [member.id]);
+    if (calendar) await tx.run('DELETE FROM calendar_members WHERE calendar_id = ? AND user_id = ?', [calendar.id, member.user_id]);
+  });
   const tasks = await db.all('SELECT kt.* FROM kanban_tasks kt JOIN kanban_boards kb ON kb.id = kt.board_id WHERE kb.team_id = ?', [access.team.id]);
   for (const task of tasks) {
     const assignees = parseJson(task.assignee_ids || '[]', []).filter(uid => uid !== member.user_id);
@@ -259,6 +351,7 @@ router.delete('/teams/:teamId/members/:memberId', asyncRoute(async (req, res) =>
     await syncTaskCalendarEvents(task.id, req.broadcast);
   }
   req.broadcast({ type: 'kanban_team_updated', teamId: access.team.id, userId: member.user_id });
+  if (calendar) req.broadcast({ type: 'member_removed', calendarId: calendar.id, userId: member.user_id });
   res.json({ success: true });
 }));
 
@@ -273,14 +366,19 @@ router.put('/team-invitations/:invitationId', asyncRoute(async (req, res) => {
     [req.params.invitationId, userId(req)]);
   if (!invitation) return res.status(404).json({ error: 'Convite não encontrado' });
   const accepted = req.body.accept === true;
+  const calendar = accepted ? await ensureTeamCalendar(invitation.team_id, req.broadcast) : null;
   await db.transaction(async tx => {
     if (accepted) {
       await tx.run('INSERT INTO kanban_team_members (id, team_id, user_id, role, joined_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT (team_id, user_id) DO NOTHING',
         [id('tm'), invitation.team_id, userId(req), 'member', new Date().toISOString()]);
+      if (calendar) await tx.run(`INSERT INTO calendar_members (id, calendar_id, user_id, permission)
+        VALUES (?, ?, ?, 'editor') ON CONFLICT (calendar_id, user_id) DO UPDATE SET permission = 'editor'`,
+        [id('mbr'), calendar.id, userId(req)]);
     }
     await tx.run('UPDATE kanban_team_invitations SET status = ? WHERE id = ?', [accepted ? 'accepted' : 'declined', invitation.id]);
   });
   req.broadcast({ type: accepted ? 'kanban_team_joined' : 'kanban_team_declined', teamId: invitation.team_id, userId: userId(req) });
+  if (accepted && calendar) req.broadcast({ type: 'member_added', calendarId: calendar.id, userId: userId(req) });
   res.json({ success: true, accepted });
 }));
 

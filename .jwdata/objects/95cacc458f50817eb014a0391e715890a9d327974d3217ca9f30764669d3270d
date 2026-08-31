@@ -236,13 +236,11 @@ initDb().then(() => {
 
   if (frontendPath) {
     const staticOptions = {
-      index: false,
       maxAge: process.env.NODE_ENV === 'production' ? '1h' : 0,
     };
-    app.use('/agenda', express.static(frontendPath, staticOptions));
+    // O IIS remove o prefixo publico /agenda antes de encaminhar a requisicao.
+    // Portanto, os assets precisam estar disponiveis na raiz interna do Express.
     app.use(express.static(frontendPath, staticOptions));
-  } else {
-    console.warn('[WEB] Frontend compilado nao encontrado; somente API/WS estarao disponiveis.');
   }
 
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Rota nao encontrada' }));
