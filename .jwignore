@@ -1,0 +1,5 @@
+node_modules/
+.jw
+.jwdata/
+.env
+*.log

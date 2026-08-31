@@ -1,0 +1,28 @@
+{
+  "services": [
+    {
+      "name": "Agenda",
+      "workingDirectory": "./backend",
+      "startCommand": "npm start",
+      "buildCommand": "npm run build"
+    },
+    {
+      "name": "frontend",
+      "workingDirectory": "./frontend",
+      "startCommand": "npm start",
+      "buildCommand": "npm run build"
+    },
+    {
+      "name": "Deploy",
+      "workingDirectory": "./", 
+      "CommitCommand": "jw commit -m {random}",
+      "pushDEVCommand": "jw push --server dev",
+      "pushPRODCommand": "jw push --server prod",
+      "diffCommand": "jw diff",
+      "logCommand": "jw log",
+      "statusCommand": "jw status",
+      "DryR unDevCommand": "jw push --server dev --dry-run"
+
+    }
+  ]
+}

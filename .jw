@@ -1,0 +1,31 @@
+{
+  "deployPath": [
+    "backend"
+  ],
+  "deployFolder": "DC-Agenda",
+  "postDeployCommands": [
+    "npm i"
+  ],
+  "backup": {
+    "enabled": true,
+    "folder": "BKP-Agenda",
+    "format": "tar.gz"
+  },
+  "manifestFile": "jw-deploys.json",
+  "identity": {
+    "name": "Jc"
+  },
+  "servers": [
+    "dev"
+  ],
+  "remoteByServer": {
+    "dev": {
+      "remotePath": "/home/deploys"
+    }
+  },
+  "pm2ByServer": {
+    "dev": {
+      "process": 9
+    }
+  }
+}
