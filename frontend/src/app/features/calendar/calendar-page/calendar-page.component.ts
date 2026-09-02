@@ -86,6 +86,8 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
   readonly dayContextMenu = signal<{ date: string; x: number; y: number } | null>(null);
   readonly eventDeleteTarget = signal<CalendarEvent | null>(null);
   readonly eventDeleteLoading = signal(false);
+  readonly collapsedSidebarSections = signal<Set<string>>(new Set());
+  readonly agendaPillsExpanded = signal(true);
 
   readonly events = this.eventsService.events;
   /** Eventos exibidos, incluindo os pagamentos padrão da Minha Agenda. */
@@ -323,6 +325,28 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
 
   taskCalendars(): Calendar[] {
     return this.calendars().filter(calendar => calendar.isTaskCalendar);
+  }
+
+  calendarDisplayName(calendar: Calendar): string {
+    return calendar.isTaskCalendar && calendar.taskTeamName
+      ? `${calendar.taskTeamName} · Tarefas`
+      : calendar.name;
+  }
+
+  isSidebarSectionCollapsed(sectionId: string): boolean {
+    return this.collapsedSidebarSections().has(sectionId);
+  }
+
+  toggleSidebarSection(sectionId: string): void {
+    this.collapsedSidebarSections.update(current => {
+      const next = new Set(current);
+      next.has(sectionId) ? next.delete(sectionId) : next.add(sectionId);
+      return next;
+    });
+  }
+
+  toggleAgendaPills(): void {
+    this.agendaPillsExpanded.update(expanded => !expanded);
   }
 
   // ── Navegação ──
