@@ -57,7 +57,10 @@ export class CalendarsService {
         tap(cals => {
           if (version !== this.loadVersion) return;
           if (cals === null) { this.isLoading.set(false); return; }
-          const finalList = Array.isArray(cals) ? cals : [];
+          const finalList = (Array.isArray(cals) ? cals : []).map(calendar => ({
+            ...calendar,
+            members: this.enrichMembersWithUserData(calendar.members || [], this.authService.allUsers()),
+          }));
           this.calendars.set(finalList);
 
           // Tornar todas visíveis por padrão
@@ -255,9 +258,9 @@ export class CalendarsService {
       const user = allUsers.find(u => u.id === m.user_id);
       return {
         ...m,
-        userName: user?.name ?? m.user_id,
-        userEmail: user?.email,
-        userAvatar: user?.avatar,
+        userName: user?.name ?? m.userName ?? m.user_id,
+        userEmail: user?.email ?? m.userEmail,
+        userAvatar: user?.avatar ?? m.userAvatar,
       };
     });
   }
@@ -267,7 +270,10 @@ export class CalendarsService {
     this.http.get<Calendar[]>(`${getBackendUrl()}/api/calendars`, { headers: this.headers })
       .pipe(catchError(() => of(null)))
       .subscribe(cals => {
-        if (cals) this.calendars.set(cals);
+        if (cals) this.calendars.set(cals.map(calendar => ({
+          ...calendar,
+          members: this.enrichMembersWithUserData(calendar.members || [], this.authService.allUsers()),
+        })));
       });
   }
 

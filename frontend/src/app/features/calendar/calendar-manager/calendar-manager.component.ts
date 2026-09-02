@@ -44,7 +44,7 @@ export class CalendarManagerComponent implements OnInit {
   showDeleteConfirmation = false;
 
   // Membros adicionados
-  members = signal<(CalendarMember & { userName?: string; userEmail?: string })[]>([]);
+  members = signal<CalendarMember[]>([]);
 
   get isEditing(): boolean { return !!this.calendar; }
   get isOwner(): boolean { return !!this.calendar && this.calendarsService.isOwner(this.calendar.id); }
@@ -84,7 +84,12 @@ export class CalendarManagerComponent implements OnInit {
           .filter(m => m.permission !== 'owner')
           .map(m => {
             const user = allU.find(u => u.id === m.user_id);
-            return { ...m, userName: user?.name, userEmail: user?.email };
+            return {
+              ...m,
+              userName: user?.name ?? m.userName,
+              userEmail: user?.email ?? m.userEmail,
+              userAvatar: user?.avatar ?? m.userAvatar,
+            };
           })
       );
     }
@@ -113,6 +118,7 @@ export class CalendarManagerComponent implements OnInit {
       permission: 'editor',
       userName: user.name,
       userEmail: user.email,
+      userAvatar: user.avatar,
     }]);
     this.userSearch.set('');
   }
@@ -194,6 +200,12 @@ export class CalendarManagerComponent implements OnInit {
 
   permissionLabel(p: CalendarPermission): string {
     return p === 'editor' ? 'Leitura e Gravação' : 'Somente Leitura';
+  }
+
+  memberAvatar(member: CalendarMember): string {
+    return member.userAvatar
+      || this.allUsers().find(user => user.id === member.user_id)?.avatar
+      || this.defaultAvatar;
   }
 
   private finishSave(success: boolean): void {

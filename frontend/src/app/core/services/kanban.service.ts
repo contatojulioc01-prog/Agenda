@@ -18,6 +18,7 @@ export class KanbanService {
   readonly error = signal('');
   private boardLoadVersion = new Map<string, number>();
   private boardsLoadVersion = 0;
+  private teamMembersLoadVersion = 0;
 
   private get headers() { return { 'x-user-id': this.auth.currentUser()?.id || 'anonymous' }; }
 
@@ -39,10 +40,10 @@ export class KanbanService {
     });
   }
 
-  loadWorkspace(): void {
+  loadWorkspace(selectId?: string): void {
     this.loadTeams();
     this.loadTeamInvitations();
-    this.loadBoards();
+    this.loadBoards(selectId);
   }
 
   loadTeams(): void {
@@ -85,9 +86,18 @@ export class KanbanService {
   }
 
   loadTeamMembers(teamId: string): void {
+    const version = ++this.teamMembersLoadVersion;
+    this.teamMembers.set([]);
     this.http.get<KanbanTeamMember[]>(`/api/kanban/teams/${teamId}/members`, { headers: this.headers })
       .pipe(catchError(() => of([])))
-      .subscribe(members => this.teamMembers.set(members));
+      .subscribe(members => {
+        if (version === this.teamMembersLoadVersion) this.teamMembers.set(members);
+      });
+  }
+
+  clearTeamMembers(): void {
+    this.teamMembersLoadVersion++;
+    this.teamMembers.set([]);
   }
 
   inviteToTeam(teamId: string, invitedUserId: string): void {

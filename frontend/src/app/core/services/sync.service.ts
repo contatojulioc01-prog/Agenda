@@ -22,6 +22,15 @@ function getHttpUrl(): string {
   return new URL(document.baseURI).pathname.replace(/\/$/, '');
 }
 
+/**
+ * Sob um subcaminho do IIS, o EventSource é o transporte mais compatível e
+ * entrega as mesmas notificações em tempo real sem depender de WebSocket
+ * Protocol/Upgrade no servidor. No acesso direto e no dev-server, usamos WS.
+ */
+function shouldUseWebSocket(): boolean {
+  return getHttpUrl() === '';
+}
+
 @Injectable({ providedIn: 'root' })
 export class SyncService implements OnDestroy {
   private calendarsService = inject(CalendarsService);
@@ -50,6 +59,10 @@ export class SyncService implements OnDestroy {
     this.shouldReconnect = true;
     this.startHealthMonitor();
     this.connectEventSource();
+    if (!shouldUseWebSocket()) {
+      if (!this.isRealtimeConnected()) this.status.set('connecting');
+      return;
+    }
     if (this.ws && (this.ws.readyState === WebSocket.CONNECTING || this.ws.readyState === WebSocket.OPEN)) {
       return;
     }
@@ -117,7 +130,7 @@ export class SyncService implements OnDestroy {
           this.status.set(this.isRealtimeConnected() ? 'connected' : 'connecting');
           this.clientsOnline.set(res.clients ?? 0);
 
-          if (!this.ws || this.ws.readyState === WebSocket.CLOSED) {
+          if (shouldUseWebSocket() && (!this.ws || this.ws.readyState === WebSocket.CLOSED)) {
             this.connect();
           }
         }

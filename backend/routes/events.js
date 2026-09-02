@@ -39,6 +39,9 @@ function eventDto(event) {
     allDay: event.all_day === 1,
     isSystem: event.is_task_deadline === 1,
     isTaskDeadline: event.is_task_deadline === 1,
+    taskId: event.task_id || undefined,
+    taskBoardId: event.task_board_id || undefined,
+    taskParentId: event.task_parent_id || undefined,
   };
 }
 
@@ -47,9 +50,11 @@ router.get('/:calendarId/events', asyncRoute(async (req, res) => {
   const { calendarId } = req.params;
   if (!(await hasAccess(calendarId, userId))) return res.status(403).json({ error: 'Sem acesso' });
   const events = await db.all(`SELECT e.*,
-    CASE WHEN kte.event_id IS NOT NULL THEN 1 ELSE 0 END AS is_task_deadline
+    CASE WHEN kte.event_id IS NOT NULL THEN 1 ELSE 0 END AS is_task_deadline,
+    kte.task_id, kt.board_id AS task_board_id, kt.parent_task_id AS task_parent_id
     FROM events e
     LEFT JOIN kanban_task_events kte ON kte.event_id = e.id
+    LEFT JOIN kanban_tasks kt ON kt.id = kte.task_id
     WHERE e.calendar_id = ?
     ORDER BY e.date ASC, e.start_time ASC`, [calendarId]);
   res.json(events.map(eventDto));

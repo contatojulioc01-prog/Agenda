@@ -1,5 +1,5 @@
 {
-  "lastCommit": "bd406aed-613e-431e-adee-ef917f8a90ca",
+  "lastCommit": "84eb29f4-cc96-40a4-b565-8a20296ac94a",
   "commits": [
     {
       "id": "029104f7-7ab2-4d57-b90c-cb17445d7fb0",
@@ -469,13 +469,734 @@
       "pushedTo": [
         "prod"
       ]
+    },
+    {
+      "id": "5298f061-7043-4f94-9c85-75dc7de2eba7",
+      "date": "2026-09-02T12:44:54.706Z",
+      "message": "ui ux",
+      "changes": {
+        "added": [
+          "backend/public/main-OXM2DZY5.js"
+        ],
+        "modified": [
+          "backend/public/index.html"
+        ],
+        "deleted": [
+          "backend/public/main-SAKJOMQ7.js"
+        ]
+      },
+      "snapshot": {
+        "backend/.env": "1e3dc635b084cf1a6a17ad5a584e5e1f7f9be0da7517ded27104ee38998cd9f2",
+        "backend/.env.example": "42af06ac4fbd7b40ff1570f84884eefe2680909fb3e7d3d0e448b9613375f9be",
+        "backend/agenda.db": "17cde3325884d62298688b843141d9acd1af3b913f282c95d88e72dba61da8fd",
+        "backend/async-route.js": "6e55ff707ce96a5b15f2f01c306e20054035dbb1ba7b6d5f4281309c815c0eda",
+        "backend/db.js": "f4a0bc289026b96a3ece10fa2ad271f7e579898f27f3c6159b3c5f69d7f64ae5",
+        "backend/ecosystem.config.cjs": "c27396c1a1a1cafa554dfa0fb895349caba70593c28723a1a585a45d534a9d00",
+        "backend/index.js": "9619972f142c05b01f848ef64073f6f733ace1b870fb63d6bac243e57ca097d4",
+        "backend/package-lock.json": "baee13c344cad4594bf5ea8a322f7fbf7e26d65942fb59f7eab5054613f50ef3",
+        "backend/package.json": "152484486297d094b6c0739d1cde3176a67d8856257181982271c8d7338ce001",
+        "backend/public/3rdpartylicenses.txt": "3b0be8bc0928cddbb7fd50b16f1c6974ab823acbe1aacf1400b06179bbefd99e",
+        "backend/public/chunk-M3QR3OQ6.js": "c44687f92fc61113e38616f7bb48a2a9b093c4bf0a3f46f9ef37cccc94962d2c",
+        "backend/public/chunk-ORJCMO7Y.js": "11071384eb6c0717793268fa2d10d07e0b01b1a2276646ac1ee89ef7e54dfafb",
+        "backend/public/favicon-doce.png": "58d60b5dbc87a7f612a0ab6ae5ca624d616819d068b450e4162ebb2046dc9013",
+        "backend/public/favicon.ico": "f9102be80297c0529207607be5277b4f90bca89d65988fa1771b91c7894e815f",
+        "backend/public/header-favicon.jpg": "324252369933f4a073666db720fefefeecdd8d971e93306800c51e1b8d0fc7b6",
+        "backend/public/header.jfif": "324252369933f4a073666db720fefefeecdd8d971e93306800c51e1b8d0fc7b6",
+        "backend/public/index.html": "7b801c16e754cb4ce278c5e382d4e69fb1708c7d486602d0a0eedde25d3a9337",
+        "backend/public/main-OXM2DZY5.js": "6411b1aff35989d5f5b77326736e861c4a4611a49e8aff10f78390b1f2b955e9",
+        "backend/public/polyfills-JOTRX7ND.js": "ada6406bce793942b50bd47a7b63d72f69c8964fbc785e25043eedb19da4a32d",
+        "backend/public/prerendered-routes.json": "a79ddcc8a115190e9c19479ed36914741a7d1db74f0a1153529efc80725505fe",
+        "backend/public/sidebar-icon.png": "58d60b5dbc87a7f612a0ab6ae5ca624d616819d068b450e4162ebb2046dc9013",
+        "backend/public/sidebar.jpg": "fcecfcfa1f50a19c041215329e7c48d8c8cd88e56edd654b6e228dbaf3279653",
+        "backend/public/sidebar.png": "3638c4ce6f84f64b97426858ea40ac2d1b8d4e334d61d7ada9b6d37e77e546b6",
+        "backend/public/styles-EI74MXS6.css": "b43a15bee490324579b2db7ed85623d2cb093c107e7ac54a7caf688cab3ea4d0",
+        "backend/routes/calendars.js": "2c4f3cbd8613d054b28fa8353816e02649f7391aedc355b10db61be936f94f03",
+        "backend/routes/events.js": "31f805d5c03cf6d41aad6136ae524fe1c63cbc6a0e86325dd0f2066240b24ea3",
+        "backend/routes/kanban.js": "cbd2ff7bef1e62248a90ca167bea04aaf9f600e1235c5e4b4f5133ccad697413",
+        "backend/routes/members.js": "816d6f235d87da25d963779bf65a359eef915d0c562a1b004fc88997d41f0f75",
+        "backend/scripts/migrate-sqlite-to-postgres.js": "55722ab4c04ad37900e9d3d4c849d9897157fc05e77a70469ad0e2aa605bdc5b",
+        "backend/scripts/setup-postgres.js": "bd1beff479fb265ef902a5f4a34188daa8c2fc6da4c5161749297f3795dedff1",
+        "backend/test/routes.test.js": "d2feb4b905f5b327a033e84ec238dc50cf31c2e7ba1c18138705f4e2957181c4",
+        "backend/test/validation.test.js": "d85c4fc6fb444e8a37b192645b7e9ebb7af7049e02da24fc030d795e239d8fc8",
+        "backend/validation.js": "5b667b8dc8f9491df3e9726e4a96a5a352ef4fba3b9538e6ad885eb8a794186a"
+      },
+      "pushed": false,
+      "pushedTo": [
+        "prod"
+      ]
+    },
+    {
+      "id": "cded9223-efb8-4be1-8ecd-8a47952199d4",
+      "date": "2026-09-02T12:51:23.189Z",
+      "message": "UP",
+      "changes": {
+        "added": [
+          "backend/public/main-J77HNS7P.js"
+        ],
+        "modified": [
+          "backend/public/index.html"
+        ],
+        "deleted": [
+          "backend/public/main-OXM2DZY5.js"
+        ]
+      },
+      "snapshot": {
+        "backend/.env": "1e3dc635b084cf1a6a17ad5a584e5e1f7f9be0da7517ded27104ee38998cd9f2",
+        "backend/.env.example": "42af06ac4fbd7b40ff1570f84884eefe2680909fb3e7d3d0e448b9613375f9be",
+        "backend/agenda.db": "17cde3325884d62298688b843141d9acd1af3b913f282c95d88e72dba61da8fd",
+        "backend/async-route.js": "6e55ff707ce96a5b15f2f01c306e20054035dbb1ba7b6d5f4281309c815c0eda",
+        "backend/db.js": "f4a0bc289026b96a3ece10fa2ad271f7e579898f27f3c6159b3c5f69d7f64ae5",
+        "backend/ecosystem.config.cjs": "c27396c1a1a1cafa554dfa0fb895349caba70593c28723a1a585a45d534a9d00",
+        "backend/index.js": "9619972f142c05b01f848ef64073f6f733ace1b870fb63d6bac243e57ca097d4",
+        "backend/package-lock.json": "baee13c344cad4594bf5ea8a322f7fbf7e26d65942fb59f7eab5054613f50ef3",
+        "backend/package.json": "152484486297d094b6c0739d1cde3176a67d8856257181982271c8d7338ce001",
+        "backend/public/3rdpartylicenses.txt": "3b0be8bc0928cddbb7fd50b16f1c6974ab823acbe1aacf1400b06179bbefd99e",
+        "backend/public/chunk-M3QR3OQ6.js": "c44687f92fc61113e38616f7bb48a2a9b093c4bf0a3f46f9ef37cccc94962d2c",
+        "backend/public/chunk-ORJCMO7Y.js": "11071384eb6c0717793268fa2d10d07e0b01b1a2276646ac1ee89ef7e54dfafb",
+        "backend/public/favicon-doce.png": "58d60b5dbc87a7f612a0ab6ae5ca624d616819d068b450e4162ebb2046dc9013",
+        "backend/public/favicon.ico": "f9102be80297c0529207607be5277b4f90bca89d65988fa1771b91c7894e815f",
+        "backend/public/header-favicon.jpg": "324252369933f4a073666db720fefefeecdd8d971e93306800c51e1b8d0fc7b6",
+        "backend/public/header.jfif": "324252369933f4a073666db720fefefeecdd8d971e93306800c51e1b8d0fc7b6",
+        "backend/public/index.html": "7adceb37feb34982f9722e3ba60a754d136b2a01b848b8106ca641219c6ffc6d",
+        "backend/public/main-J77HNS7P.js": "9a4f8853dfa9070b201a92e4821565520f9952cfee444ea7e19edb1da6b019e8",
+        "backend/public/polyfills-JOTRX7ND.js": "ada6406bce793942b50bd47a7b63d72f69c8964fbc785e25043eedb19da4a32d",
+        "backend/public/prerendered-routes.json": "a79ddcc8a115190e9c19479ed36914741a7d1db74f0a1153529efc80725505fe",
+        "backend/public/sidebar-icon.png": "58d60b5dbc87a7f612a0ab6ae5ca624d616819d068b450e4162ebb2046dc9013",
+        "backend/public/sidebar.jpg": "fcecfcfa1f50a19c041215329e7c48d8c8cd88e56edd654b6e228dbaf3279653",
+        "backend/public/sidebar.png": "3638c4ce6f84f64b97426858ea40ac2d1b8d4e334d61d7ada9b6d37e77e546b6",
+        "backend/public/styles-EI74MXS6.css": "b43a15bee490324579b2db7ed85623d2cb093c107e7ac54a7caf688cab3ea4d0",
+        "backend/routes/calendars.js": "2c4f3cbd8613d054b28fa8353816e02649f7391aedc355b10db61be936f94f03",
+        "backend/routes/events.js": "31f805d5c03cf6d41aad6136ae524fe1c63cbc6a0e86325dd0f2066240b24ea3",
+        "backend/routes/kanban.js": "cbd2ff7bef1e62248a90ca167bea04aaf9f600e1235c5e4b4f5133ccad697413",
+        "backend/routes/members.js": "816d6f235d87da25d963779bf65a359eef915d0c562a1b004fc88997d41f0f75",
+        "backend/scripts/migrate-sqlite-to-postgres.js": "55722ab4c04ad37900e9d3d4c849d9897157fc05e77a70469ad0e2aa605bdc5b",
+        "backend/scripts/setup-postgres.js": "bd1beff479fb265ef902a5f4a34188daa8c2fc6da4c5161749297f3795dedff1",
+        "backend/test/routes.test.js": "d2feb4b905f5b327a033e84ec238dc50cf31c2e7ba1c18138705f4e2957181c4",
+        "backend/test/validation.test.js": "d85c4fc6fb444e8a37b192645b7e9ebb7af7049e02da24fc030d795e239d8fc8",
+        "backend/validation.js": "5b667b8dc8f9491df3e9726e4a96a5a352ef4fba3b9538e6ad885eb8a794186a"
+      },
+      "pushed": false,
+      "pushedTo": [
+        "prod"
+      ]
+    },
+    {
+      "id": "722e2e3e-f295-4971-a764-3fd8cabf4d98",
+      "date": "2026-09-02T12:55:06.091Z",
+      "message": "fix",
+      "changes": {
+        "added": [
+          "backend/public/main-H7S4YY4E.js"
+        ],
+        "modified": [
+          "backend/public/index.html"
+        ],
+        "deleted": [
+          "backend/public/main-J77HNS7P.js"
+        ]
+      },
+      "snapshot": {
+        "backend/.env": "1e3dc635b084cf1a6a17ad5a584e5e1f7f9be0da7517ded27104ee38998cd9f2",
+        "backend/.env.example": "42af06ac4fbd7b40ff1570f84884eefe2680909fb3e7d3d0e448b9613375f9be",
+        "backend/agenda.db": "17cde3325884d62298688b843141d9acd1af3b913f282c95d88e72dba61da8fd",
+        "backend/async-route.js": "6e55ff707ce96a5b15f2f01c306e20054035dbb1ba7b6d5f4281309c815c0eda",
+        "backend/db.js": "f4a0bc289026b96a3ece10fa2ad271f7e579898f27f3c6159b3c5f69d7f64ae5",
+        "backend/ecosystem.config.cjs": "c27396c1a1a1cafa554dfa0fb895349caba70593c28723a1a585a45d534a9d00",
+        "backend/index.js": "9619972f142c05b01f848ef64073f6f733ace1b870fb63d6bac243e57ca097d4",
+        "backend/package-lock.json": "baee13c344cad4594bf5ea8a322f7fbf7e26d65942fb59f7eab5054613f50ef3",
+        "backend/package.json": "152484486297d094b6c0739d1cde3176a67d8856257181982271c8d7338ce001",
+        "backend/public/3rdpartylicenses.txt": "3b0be8bc0928cddbb7fd50b16f1c6974ab823acbe1aacf1400b06179bbefd99e",
+        "backend/public/chunk-M3QR3OQ6.js": "c44687f92fc61113e38616f7bb48a2a9b093c4bf0a3f46f9ef37cccc94962d2c",
+        "backend/public/chunk-ORJCMO7Y.js": "11071384eb6c0717793268fa2d10d07e0b01b1a2276646ac1ee89ef7e54dfafb",
+        "backend/public/favicon-doce.png": "58d60b5dbc87a7f612a0ab6ae5ca624d616819d068b450e4162ebb2046dc9013",
+        "backend/public/favicon.ico": "f9102be80297c0529207607be5277b4f90bca89d65988fa1771b91c7894e815f",
+        "backend/public/header-favicon.jpg": "324252369933f4a073666db720fefefeecdd8d971e93306800c51e1b8d0fc7b6",
+        "backend/public/header.jfif": "324252369933f4a073666db720fefefeecdd8d971e93306800c51e1b8d0fc7b6",
+        "backend/public/index.html": "7e4fc1fd2325e0e17db1a6a2d37f863b04a6f7f6d5e25d1b065d0a03798b97d7",
+        "backend/public/main-H7S4YY4E.js": "b0424f829af7ca9c1d4972bc85559e0962dd0ccdebef8e35776844f2ccd4f6ce",
+        "backend/public/polyfills-JOTRX7ND.js": "ada6406bce793942b50bd47a7b63d72f69c8964fbc785e25043eedb19da4a32d",
+        "backend/public/prerendered-routes.json": "a79ddcc8a115190e9c19479ed36914741a7d1db74f0a1153529efc80725505fe",
+        "backend/public/sidebar-icon.png": "58d60b5dbc87a7f612a0ab6ae5ca624d616819d068b450e4162ebb2046dc9013",
+        "backend/public/sidebar.jpg": "fcecfcfa1f50a19c041215329e7c48d8c8cd88e56edd654b6e228dbaf3279653",
+        "backend/public/sidebar.png": "3638c4ce6f84f64b97426858ea40ac2d1b8d4e334d61d7ada9b6d37e77e546b6",
+        "backend/public/styles-EI74MXS6.css": "b43a15bee490324579b2db7ed85623d2cb093c107e7ac54a7caf688cab3ea4d0",
+        "backend/routes/calendars.js": "2c4f3cbd8613d054b28fa8353816e02649f7391aedc355b10db61be936f94f03",
+        "backend/routes/events.js": "31f805d5c03cf6d41aad6136ae524fe1c63cbc6a0e86325dd0f2066240b24ea3",
+        "backend/routes/kanban.js": "cbd2ff7bef1e62248a90ca167bea04aaf9f600e1235c5e4b4f5133ccad697413",
+        "backend/routes/members.js": "816d6f235d87da25d963779bf65a359eef915d0c562a1b004fc88997d41f0f75",
+        "backend/scripts/migrate-sqlite-to-postgres.js": "55722ab4c04ad37900e9d3d4c849d9897157fc05e77a70469ad0e2aa605bdc5b",
+        "backend/scripts/setup-postgres.js": "bd1beff479fb265ef902a5f4a34188daa8c2fc6da4c5161749297f3795dedff1",
+        "backend/test/routes.test.js": "d2feb4b905f5b327a033e84ec238dc50cf31c2e7ba1c18138705f4e2957181c4",
+        "backend/test/validation.test.js": "d85c4fc6fb444e8a37b192645b7e9ebb7af7049e02da24fc030d795e239d8fc8",
+        "backend/validation.js": "5b667b8dc8f9491df3e9726e4a96a5a352ef4fba3b9538e6ad885eb8a794186a"
+      },
+      "pushed": false,
+      "pushedTo": [
+        "prod"
+      ]
+    },
+    {
+      "id": "afdfb137-b208-40a4-9822-7fd0608a78c5",
+      "date": "2026-09-02T13:05:08.744Z",
+      "message": "fix",
+      "changes": {
+        "added": [
+          "backend/public/main-UD6NJKJT.js"
+        ],
+        "modified": [
+          "backend/public/index.html"
+        ],
+        "deleted": [
+          "backend/public/main-H7S4YY4E.js"
+        ]
+      },
+      "snapshot": {
+        "backend/.env": "1e3dc635b084cf1a6a17ad5a584e5e1f7f9be0da7517ded27104ee38998cd9f2",
+        "backend/.env.example": "42af06ac4fbd7b40ff1570f84884eefe2680909fb3e7d3d0e448b9613375f9be",
+        "backend/agenda.db": "17cde3325884d62298688b843141d9acd1af3b913f282c95d88e72dba61da8fd",
+        "backend/async-route.js": "6e55ff707ce96a5b15f2f01c306e20054035dbb1ba7b6d5f4281309c815c0eda",
+        "backend/db.js": "f4a0bc289026b96a3ece10fa2ad271f7e579898f27f3c6159b3c5f69d7f64ae5",
+        "backend/ecosystem.config.cjs": "c27396c1a1a1cafa554dfa0fb895349caba70593c28723a1a585a45d534a9d00",
+        "backend/index.js": "9619972f142c05b01f848ef64073f6f733ace1b870fb63d6bac243e57ca097d4",
+        "backend/package-lock.json": "baee13c344cad4594bf5ea8a322f7fbf7e26d65942fb59f7eab5054613f50ef3",
+        "backend/package.json": "152484486297d094b6c0739d1cde3176a67d8856257181982271c8d7338ce001",
+        "backend/public/3rdpartylicenses.txt": "3b0be8bc0928cddbb7fd50b16f1c6974ab823acbe1aacf1400b06179bbefd99e",
+        "backend/public/chunk-M3QR3OQ6.js": "c44687f92fc61113e38616f7bb48a2a9b093c4bf0a3f46f9ef37cccc94962d2c",
+        "backend/public/chunk-ORJCMO7Y.js": "11071384eb6c0717793268fa2d10d07e0b01b1a2276646ac1ee89ef7e54dfafb",
+        "backend/public/favicon-doce.png": "58d60b5dbc87a7f612a0ab6ae5ca624d616819d068b450e4162ebb2046dc9013",
+        "backend/public/favicon.ico": "f9102be80297c0529207607be5277b4f90bca89d65988fa1771b91c7894e815f",
+        "backend/public/header-favicon.jpg": "324252369933f4a073666db720fefefeecdd8d971e93306800c51e1b8d0fc7b6",
+        "backend/public/header.jfif": "324252369933f4a073666db720fefefeecdd8d971e93306800c51e1b8d0fc7b6",
+        "backend/public/index.html": "6314d6562d7864c33d2b6d87cd55f30e069983d2774e593227a373c9ba2803b1",
+        "backend/public/main-UD6NJKJT.js": "8fa767fa3c70fb4e7099260be15ad6a1a3b0161691d8d07cbe82cc49aef76762",
+        "backend/public/polyfills-JOTRX7ND.js": "ada6406bce793942b50bd47a7b63d72f69c8964fbc785e25043eedb19da4a32d",
+        "backend/public/prerendered-routes.json": "a79ddcc8a115190e9c19479ed36914741a7d1db74f0a1153529efc80725505fe",
+        "backend/public/sidebar-icon.png": "58d60b5dbc87a7f612a0ab6ae5ca624d616819d068b450e4162ebb2046dc9013",
+        "backend/public/sidebar.jpg": "fcecfcfa1f50a19c041215329e7c48d8c8cd88e56edd654b6e228dbaf3279653",
+        "backend/public/sidebar.png": "3638c4ce6f84f64b97426858ea40ac2d1b8d4e334d61d7ada9b6d37e77e546b6",
+        "backend/public/styles-EI74MXS6.css": "b43a15bee490324579b2db7ed85623d2cb093c107e7ac54a7caf688cab3ea4d0",
+        "backend/routes/calendars.js": "2c4f3cbd8613d054b28fa8353816e02649f7391aedc355b10db61be936f94f03",
+        "backend/routes/events.js": "31f805d5c03cf6d41aad6136ae524fe1c63cbc6a0e86325dd0f2066240b24ea3",
+        "backend/routes/kanban.js": "cbd2ff7bef1e62248a90ca167bea04aaf9f600e1235c5e4b4f5133ccad697413",
+        "backend/routes/members.js": "816d6f235d87da25d963779bf65a359eef915d0c562a1b004fc88997d41f0f75",
+        "backend/scripts/migrate-sqlite-to-postgres.js": "55722ab4c04ad37900e9d3d4c849d9897157fc05e77a70469ad0e2aa605bdc5b",
+        "backend/scripts/setup-postgres.js": "bd1beff479fb265ef902a5f4a34188daa8c2fc6da4c5161749297f3795dedff1",
+        "backend/test/routes.test.js": "d2feb4b905f5b327a033e84ec238dc50cf31c2e7ba1c18138705f4e2957181c4",
+        "backend/test/validation.test.js": "d85c4fc6fb444e8a37b192645b7e9ebb7af7049e02da24fc030d795e239d8fc8",
+        "backend/validation.js": "5b667b8dc8f9491df3e9726e4a96a5a352ef4fba3b9538e6ad885eb8a794186a"
+      },
+      "pushed": false,
+      "pushedTo": [
+        "prod"
+      ]
+    },
+    {
+      "id": "cc0a049d-28df-4400-bea6-c1a3b750a32a",
+      "date": "2026-09-02T13:09:19.236Z",
+      "message": "fix",
+      "changes": {
+        "added": [
+          "backend/public/main-2LPKFVCC.js"
+        ],
+        "modified": [
+          "backend/public/index.html"
+        ],
+        "deleted": [
+          "backend/public/main-UD6NJKJT.js"
+        ]
+      },
+      "snapshot": {
+        "backend/.env": "1e3dc635b084cf1a6a17ad5a584e5e1f7f9be0da7517ded27104ee38998cd9f2",
+        "backend/.env.example": "42af06ac4fbd7b40ff1570f84884eefe2680909fb3e7d3d0e448b9613375f9be",
+        "backend/agenda.db": "17cde3325884d62298688b843141d9acd1af3b913f282c95d88e72dba61da8fd",
+        "backend/async-route.js": "6e55ff707ce96a5b15f2f01c306e20054035dbb1ba7b6d5f4281309c815c0eda",
+        "backend/db.js": "f4a0bc289026b96a3ece10fa2ad271f7e579898f27f3c6159b3c5f69d7f64ae5",
+        "backend/ecosystem.config.cjs": "c27396c1a1a1cafa554dfa0fb895349caba70593c28723a1a585a45d534a9d00",
+        "backend/index.js": "9619972f142c05b01f848ef64073f6f733ace1b870fb63d6bac243e57ca097d4",
+        "backend/package-lock.json": "baee13c344cad4594bf5ea8a322f7fbf7e26d65942fb59f7eab5054613f50ef3",
+        "backend/package.json": "152484486297d094b6c0739d1cde3176a67d8856257181982271c8d7338ce001",
+        "backend/public/3rdpartylicenses.txt": "3b0be8bc0928cddbb7fd50b16f1c6974ab823acbe1aacf1400b06179bbefd99e",
+        "backend/public/chunk-M3QR3OQ6.js": "c44687f92fc61113e38616f7bb48a2a9b093c4bf0a3f46f9ef37cccc94962d2c",
+        "backend/public/chunk-ORJCMO7Y.js": "11071384eb6c0717793268fa2d10d07e0b01b1a2276646ac1ee89ef7e54dfafb",
+        "backend/public/favicon-doce.png": "58d60b5dbc87a7f612a0ab6ae5ca624d616819d068b450e4162ebb2046dc9013",
+        "backend/public/favicon.ico": "f9102be80297c0529207607be5277b4f90bca89d65988fa1771b91c7894e815f",
+        "backend/public/header-favicon.jpg": "324252369933f4a073666db720fefefeecdd8d971e93306800c51e1b8d0fc7b6",
+        "backend/public/header.jfif": "324252369933f4a073666db720fefefeecdd8d971e93306800c51e1b8d0fc7b6",
+        "backend/public/index.html": "9b86e936059d590912809e8117949e919d6c9ceefc6c4cf0dd285985f90ffad1",
+        "backend/public/main-2LPKFVCC.js": "c154bf20e1b6df1a532f3f2993d67d3786176ffe09640b5ff5c02fd60fade6b6",
+        "backend/public/polyfills-JOTRX7ND.js": "ada6406bce793942b50bd47a7b63d72f69c8964fbc785e25043eedb19da4a32d",
+        "backend/public/prerendered-routes.json": "a79ddcc8a115190e9c19479ed36914741a7d1db74f0a1153529efc80725505fe",
+        "backend/public/sidebar-icon.png": "58d60b5dbc87a7f612a0ab6ae5ca624d616819d068b450e4162ebb2046dc9013",
+        "backend/public/sidebar.jpg": "fcecfcfa1f50a19c041215329e7c48d8c8cd88e56edd654b6e228dbaf3279653",
+        "backend/public/sidebar.png": "3638c4ce6f84f64b97426858ea40ac2d1b8d4e334d61d7ada9b6d37e77e546b6",
+        "backend/public/styles-EI74MXS6.css": "b43a15bee490324579b2db7ed85623d2cb093c107e7ac54a7caf688cab3ea4d0",
+        "backend/routes/calendars.js": "2c4f3cbd8613d054b28fa8353816e02649f7391aedc355b10db61be936f94f03",
+        "backend/routes/events.js": "31f805d5c03cf6d41aad6136ae524fe1c63cbc6a0e86325dd0f2066240b24ea3",
+        "backend/routes/kanban.js": "cbd2ff7bef1e62248a90ca167bea04aaf9f600e1235c5e4b4f5133ccad697413",
+        "backend/routes/members.js": "816d6f235d87da25d963779bf65a359eef915d0c562a1b004fc88997d41f0f75",
+        "backend/scripts/migrate-sqlite-to-postgres.js": "55722ab4c04ad37900e9d3d4c849d9897157fc05e77a70469ad0e2aa605bdc5b",
+        "backend/scripts/setup-postgres.js": "bd1beff479fb265ef902a5f4a34188daa8c2fc6da4c5161749297f3795dedff1",
+        "backend/test/routes.test.js": "d2feb4b905f5b327a033e84ec238dc50cf31c2e7ba1c18138705f4e2957181c4",
+        "backend/test/validation.test.js": "d85c4fc6fb444e8a37b192645b7e9ebb7af7049e02da24fc030d795e239d8fc8",
+        "backend/validation.js": "5b667b8dc8f9491df3e9726e4a96a5a352ef4fba3b9538e6ad885eb8a794186a"
+      },
+      "pushed": false,
+      "pushedTo": [
+        "prod"
+      ]
+    },
+    {
+      "id": "8ec747d6-d7d7-4d41-929b-aa950c13562b",
+      "date": "2026-09-02T13:10:57.346Z",
+      "message": "fix",
+      "changes": {
+        "added": [
+          "backend/public/main-NZQYCVZP.js"
+        ],
+        "modified": [
+          "backend/public/index.html"
+        ],
+        "deleted": [
+          "backend/public/main-2LPKFVCC.js"
+        ]
+      },
+      "snapshot": {
+        "backend/.env": "1e3dc635b084cf1a6a17ad5a584e5e1f7f9be0da7517ded27104ee38998cd9f2",
+        "backend/.env.example": "42af06ac4fbd7b40ff1570f84884eefe2680909fb3e7d3d0e448b9613375f9be",
+        "backend/agenda.db": "17cde3325884d62298688b843141d9acd1af3b913f282c95d88e72dba61da8fd",
+        "backend/async-route.js": "6e55ff707ce96a5b15f2f01c306e20054035dbb1ba7b6d5f4281309c815c0eda",
+        "backend/db.js": "f4a0bc289026b96a3ece10fa2ad271f7e579898f27f3c6159b3c5f69d7f64ae5",
+        "backend/ecosystem.config.cjs": "c27396c1a1a1cafa554dfa0fb895349caba70593c28723a1a585a45d534a9d00",
+        "backend/index.js": "9619972f142c05b01f848ef64073f6f733ace1b870fb63d6bac243e57ca097d4",
+        "backend/package-lock.json": "baee13c344cad4594bf5ea8a322f7fbf7e26d65942fb59f7eab5054613f50ef3",
+        "backend/package.json": "152484486297d094b6c0739d1cde3176a67d8856257181982271c8d7338ce001",
+        "backend/public/3rdpartylicenses.txt": "3b0be8bc0928cddbb7fd50b16f1c6974ab823acbe1aacf1400b06179bbefd99e",
+        "backend/public/chunk-M3QR3OQ6.js": "c44687f92fc61113e38616f7bb48a2a9b093c4bf0a3f46f9ef37cccc94962d2c",
+        "backend/public/chunk-ORJCMO7Y.js": "11071384eb6c0717793268fa2d10d07e0b01b1a2276646ac1ee89ef7e54dfafb",
+        "backend/public/favicon-doce.png": "58d60b5dbc87a7f612a0ab6ae5ca624d616819d068b450e4162ebb2046dc9013",
+        "backend/public/favicon.ico": "f9102be80297c0529207607be5277b4f90bca89d65988fa1771b91c7894e815f",
+        "backend/public/header-favicon.jpg": "324252369933f4a073666db720fefefeecdd8d971e93306800c51e1b8d0fc7b6",
+        "backend/public/header.jfif": "324252369933f4a073666db720fefefeecdd8d971e93306800c51e1b8d0fc7b6",
+        "backend/public/index.html": "ec20bdc43dba7c49193c9d6ef253378b8597b66ce3028628e539fca4ecfb3ea0",
+        "backend/public/main-NZQYCVZP.js": "f9a52a4a9a12b6703b7b95570dc0b204904240de861641ebec4e7f5526c50eda",
+        "backend/public/polyfills-JOTRX7ND.js": "ada6406bce793942b50bd47a7b63d72f69c8964fbc785e25043eedb19da4a32d",
+        "backend/public/prerendered-routes.json": "a79ddcc8a115190e9c19479ed36914741a7d1db74f0a1153529efc80725505fe",
+        "backend/public/sidebar-icon.png": "58d60b5dbc87a7f612a0ab6ae5ca624d616819d068b450e4162ebb2046dc9013",
+        "backend/public/sidebar.jpg": "fcecfcfa1f50a19c041215329e7c48d8c8cd88e56edd654b6e228dbaf3279653",
+        "backend/public/sidebar.png": "3638c4ce6f84f64b97426858ea40ac2d1b8d4e334d61d7ada9b6d37e77e546b6",
+        "backend/public/styles-EI74MXS6.css": "b43a15bee490324579b2db7ed85623d2cb093c107e7ac54a7caf688cab3ea4d0",
+        "backend/routes/calendars.js": "2c4f3cbd8613d054b28fa8353816e02649f7391aedc355b10db61be936f94f03",
+        "backend/routes/events.js": "31f805d5c03cf6d41aad6136ae524fe1c63cbc6a0e86325dd0f2066240b24ea3",
+        "backend/routes/kanban.js": "cbd2ff7bef1e62248a90ca167bea04aaf9f600e1235c5e4b4f5133ccad697413",
+        "backend/routes/members.js": "816d6f235d87da25d963779bf65a359eef915d0c562a1b004fc88997d41f0f75",
+        "backend/scripts/migrate-sqlite-to-postgres.js": "55722ab4c04ad37900e9d3d4c849d9897157fc05e77a70469ad0e2aa605bdc5b",
+        "backend/scripts/setup-postgres.js": "bd1beff479fb265ef902a5f4a34188daa8c2fc6da4c5161749297f3795dedff1",
+        "backend/test/routes.test.js": "d2feb4b905f5b327a033e84ec238dc50cf31c2e7ba1c18138705f4e2957181c4",
+        "backend/test/validation.test.js": "d85c4fc6fb444e8a37b192645b7e9ebb7af7049e02da24fc030d795e239d8fc8",
+        "backend/validation.js": "5b667b8dc8f9491df3e9726e4a96a5a352ef4fba3b9538e6ad885eb8a794186a"
+      },
+      "pushed": false,
+      "pushedTo": [
+        "prod"
+      ]
+    },
+    {
+      "id": "7cacd3f0-6de5-414b-9753-6cdde6aaec29",
+      "date": "2026-09-02T13:12:02.788Z",
+      "message": "fix",
+      "changes": {
+        "added": [
+          "backend/public/main-7NIGB3MW.js"
+        ],
+        "modified": [
+          "backend/public/index.html"
+        ],
+        "deleted": [
+          "backend/public/main-NZQYCVZP.js"
+        ]
+      },
+      "snapshot": {
+        "backend/.env": "1e3dc635b084cf1a6a17ad5a584e5e1f7f9be0da7517ded27104ee38998cd9f2",
+        "backend/.env.example": "42af06ac4fbd7b40ff1570f84884eefe2680909fb3e7d3d0e448b9613375f9be",
+        "backend/agenda.db": "17cde3325884d62298688b843141d9acd1af3b913f282c95d88e72dba61da8fd",
+        "backend/async-route.js": "6e55ff707ce96a5b15f2f01c306e20054035dbb1ba7b6d5f4281309c815c0eda",
+        "backend/db.js": "f4a0bc289026b96a3ece10fa2ad271f7e579898f27f3c6159b3c5f69d7f64ae5",
+        "backend/ecosystem.config.cjs": "c27396c1a1a1cafa554dfa0fb895349caba70593c28723a1a585a45d534a9d00",
+        "backend/index.js": "9619972f142c05b01f848ef64073f6f733ace1b870fb63d6bac243e57ca097d4",
+        "backend/package-lock.json": "baee13c344cad4594bf5ea8a322f7fbf7e26d65942fb59f7eab5054613f50ef3",
+        "backend/package.json": "152484486297d094b6c0739d1cde3176a67d8856257181982271c8d7338ce001",
+        "backend/public/3rdpartylicenses.txt": "3b0be8bc0928cddbb7fd50b16f1c6974ab823acbe1aacf1400b06179bbefd99e",
+        "backend/public/chunk-M3QR3OQ6.js": "c44687f92fc61113e38616f7bb48a2a9b093c4bf0a3f46f9ef37cccc94962d2c",
+        "backend/public/chunk-ORJCMO7Y.js": "11071384eb6c0717793268fa2d10d07e0b01b1a2276646ac1ee89ef7e54dfafb",
+        "backend/public/favicon-doce.png": "58d60b5dbc87a7f612a0ab6ae5ca624d616819d068b450e4162ebb2046dc9013",
+        "backend/public/favicon.ico": "f9102be80297c0529207607be5277b4f90bca89d65988fa1771b91c7894e815f",
+        "backend/public/header-favicon.jpg": "324252369933f4a073666db720fefefeecdd8d971e93306800c51e1b8d0fc7b6",
+        "backend/public/header.jfif": "324252369933f4a073666db720fefefeecdd8d971e93306800c51e1b8d0fc7b6",
+        "backend/public/index.html": "b34a4b189f14ce7bbca9e32ded69c56bc7249beb874ba35536cac4a02b39098d",
+        "backend/public/main-7NIGB3MW.js": "8cf0d6b9c161bf06317960b52a358720c23850fa3514e66fb6b0629654bc4ca1",
+        "backend/public/polyfills-JOTRX7ND.js": "ada6406bce793942b50bd47a7b63d72f69c8964fbc785e25043eedb19da4a32d",
+        "backend/public/prerendered-routes.json": "a79ddcc8a115190e9c19479ed36914741a7d1db74f0a1153529efc80725505fe",
+        "backend/public/sidebar-icon.png": "58d60b5dbc87a7f612a0ab6ae5ca624d616819d068b450e4162ebb2046dc9013",
+        "backend/public/sidebar.jpg": "fcecfcfa1f50a19c041215329e7c48d8c8cd88e56edd654b6e228dbaf3279653",
+        "backend/public/sidebar.png": "3638c4ce6f84f64b97426858ea40ac2d1b8d4e334d61d7ada9b6d37e77e546b6",
+        "backend/public/styles-EI74MXS6.css": "b43a15bee490324579b2db7ed85623d2cb093c107e7ac54a7caf688cab3ea4d0",
+        "backend/routes/calendars.js": "2c4f3cbd8613d054b28fa8353816e02649f7391aedc355b10db61be936f94f03",
+        "backend/routes/events.js": "31f805d5c03cf6d41aad6136ae524fe1c63cbc6a0e86325dd0f2066240b24ea3",
+        "backend/routes/kanban.js": "cbd2ff7bef1e62248a90ca167bea04aaf9f600e1235c5e4b4f5133ccad697413",
+        "backend/routes/members.js": "816d6f235d87da25d963779bf65a359eef915d0c562a1b004fc88997d41f0f75",
+        "backend/scripts/migrate-sqlite-to-postgres.js": "55722ab4c04ad37900e9d3d4c849d9897157fc05e77a70469ad0e2aa605bdc5b",
+        "backend/scripts/setup-postgres.js": "bd1beff479fb265ef902a5f4a34188daa8c2fc6da4c5161749297f3795dedff1",
+        "backend/test/routes.test.js": "d2feb4b905f5b327a033e84ec238dc50cf31c2e7ba1c18138705f4e2957181c4",
+        "backend/test/validation.test.js": "d85c4fc6fb444e8a37b192645b7e9ebb7af7049e02da24fc030d795e239d8fc8",
+        "backend/validation.js": "5b667b8dc8f9491df3e9726e4a96a5a352ef4fba3b9538e6ad885eb8a794186a"
+      },
+      "pushed": false,
+      "pushedTo": [
+        "prod"
+      ]
+    },
+    {
+      "id": "8d0400b0-9931-4d7e-8556-3f73dc876de7",
+      "date": "2026-09-02T13:14:59.532Z",
+      "message": "fix",
+      "changes": {
+        "added": [
+          "backend/public/main-4Y5BUBRE.js"
+        ],
+        "modified": [
+          "backend/public/index.html"
+        ],
+        "deleted": [
+          "backend/public/main-7NIGB3MW.js"
+        ]
+      },
+      "snapshot": {
+        "backend/.env": "1e3dc635b084cf1a6a17ad5a584e5e1f7f9be0da7517ded27104ee38998cd9f2",
+        "backend/.env.example": "42af06ac4fbd7b40ff1570f84884eefe2680909fb3e7d3d0e448b9613375f9be",
+        "backend/agenda.db": "17cde3325884d62298688b843141d9acd1af3b913f282c95d88e72dba61da8fd",
+        "backend/async-route.js": "6e55ff707ce96a5b15f2f01c306e20054035dbb1ba7b6d5f4281309c815c0eda",
+        "backend/db.js": "f4a0bc289026b96a3ece10fa2ad271f7e579898f27f3c6159b3c5f69d7f64ae5",
+        "backend/ecosystem.config.cjs": "c27396c1a1a1cafa554dfa0fb895349caba70593c28723a1a585a45d534a9d00",
+        "backend/index.js": "9619972f142c05b01f848ef64073f6f733ace1b870fb63d6bac243e57ca097d4",
+        "backend/package-lock.json": "baee13c344cad4594bf5ea8a322f7fbf7e26d65942fb59f7eab5054613f50ef3",
+        "backend/package.json": "152484486297d094b6c0739d1cde3176a67d8856257181982271c8d7338ce001",
+        "backend/public/3rdpartylicenses.txt": "3b0be8bc0928cddbb7fd50b16f1c6974ab823acbe1aacf1400b06179bbefd99e",
+        "backend/public/chunk-M3QR3OQ6.js": "c44687f92fc61113e38616f7bb48a2a9b093c4bf0a3f46f9ef37cccc94962d2c",
+        "backend/public/chunk-ORJCMO7Y.js": "11071384eb6c0717793268fa2d10d07e0b01b1a2276646ac1ee89ef7e54dfafb",
+        "backend/public/favicon-doce.png": "58d60b5dbc87a7f612a0ab6ae5ca624d616819d068b450e4162ebb2046dc9013",
+        "backend/public/favicon.ico": "f9102be80297c0529207607be5277b4f90bca89d65988fa1771b91c7894e815f",
+        "backend/public/header-favicon.jpg": "324252369933f4a073666db720fefefeecdd8d971e93306800c51e1b8d0fc7b6",
+        "backend/public/header.jfif": "324252369933f4a073666db720fefefeecdd8d971e93306800c51e1b8d0fc7b6",
+        "backend/public/index.html": "37c34729457df4e6d083ed3be436a4ed0007c4e668bf229c815512500d2fb963",
+        "backend/public/main-4Y5BUBRE.js": "37958a7d3f70c30d378bf8eb22846c1b4377ce613b73a9e77e661e8c9c722a8b",
+        "backend/public/polyfills-JOTRX7ND.js": "ada6406bce793942b50bd47a7b63d72f69c8964fbc785e25043eedb19da4a32d",
+        "backend/public/prerendered-routes.json": "a79ddcc8a115190e9c19479ed36914741a7d1db74f0a1153529efc80725505fe",
+        "backend/public/sidebar-icon.png": "58d60b5dbc87a7f612a0ab6ae5ca624d616819d068b450e4162ebb2046dc9013",
+        "backend/public/sidebar.jpg": "fcecfcfa1f50a19c041215329e7c48d8c8cd88e56edd654b6e228dbaf3279653",
+        "backend/public/sidebar.png": "3638c4ce6f84f64b97426858ea40ac2d1b8d4e334d61d7ada9b6d37e77e546b6",
+        "backend/public/styles-EI74MXS6.css": "b43a15bee490324579b2db7ed85623d2cb093c107e7ac54a7caf688cab3ea4d0",
+        "backend/routes/calendars.js": "2c4f3cbd8613d054b28fa8353816e02649f7391aedc355b10db61be936f94f03",
+        "backend/routes/events.js": "31f805d5c03cf6d41aad6136ae524fe1c63cbc6a0e86325dd0f2066240b24ea3",
+        "backend/routes/kanban.js": "cbd2ff7bef1e62248a90ca167bea04aaf9f600e1235c5e4b4f5133ccad697413",
+        "backend/routes/members.js": "816d6f235d87da25d963779bf65a359eef915d0c562a1b004fc88997d41f0f75",
+        "backend/scripts/migrate-sqlite-to-postgres.js": "55722ab4c04ad37900e9d3d4c849d9897157fc05e77a70469ad0e2aa605bdc5b",
+        "backend/scripts/setup-postgres.js": "bd1beff479fb265ef902a5f4a34188daa8c2fc6da4c5161749297f3795dedff1",
+        "backend/test/routes.test.js": "d2feb4b905f5b327a033e84ec238dc50cf31c2e7ba1c18138705f4e2957181c4",
+        "backend/test/validation.test.js": "d85c4fc6fb444e8a37b192645b7e9ebb7af7049e02da24fc030d795e239d8fc8",
+        "backend/validation.js": "5b667b8dc8f9491df3e9726e4a96a5a352ef4fba3b9538e6ad885eb8a794186a"
+      },
+      "pushed": false,
+      "pushedTo": [
+        "prod"
+      ]
+    },
+    {
+      "id": "a75ca1ea-34b3-4ef4-8653-281469cc5441",
+      "date": "2026-09-02T13:23:08.845Z",
+      "message": "fix",
+      "changes": {
+        "added": [
+          "backend/public/main-HW7HPJPP.js",
+          "backend/public/styles-U6VW676Q.css"
+        ],
+        "modified": [
+          "backend/public/index.html",
+          "backend/routes/events.js",
+          "backend/test/routes.test.js"
+        ],
+        "deleted": [
+          "backend/public/main-4Y5BUBRE.js",
+          "backend/public/styles-EI74MXS6.css"
+        ]
+      },
+      "snapshot": {
+        "backend/.env": "1e3dc635b084cf1a6a17ad5a584e5e1f7f9be0da7517ded27104ee38998cd9f2",
+        "backend/.env.example": "42af06ac4fbd7b40ff1570f84884eefe2680909fb3e7d3d0e448b9613375f9be",
+        "backend/agenda.db": "17cde3325884d62298688b843141d9acd1af3b913f282c95d88e72dba61da8fd",
+        "backend/async-route.js": "6e55ff707ce96a5b15f2f01c306e20054035dbb1ba7b6d5f4281309c815c0eda",
+        "backend/db.js": "f4a0bc289026b96a3ece10fa2ad271f7e579898f27f3c6159b3c5f69d7f64ae5",
+        "backend/ecosystem.config.cjs": "c27396c1a1a1cafa554dfa0fb895349caba70593c28723a1a585a45d534a9d00",
+        "backend/index.js": "9619972f142c05b01f848ef64073f6f733ace1b870fb63d6bac243e57ca097d4",
+        "backend/package-lock.json": "baee13c344cad4594bf5ea8a322f7fbf7e26d65942fb59f7eab5054613f50ef3",
+        "backend/package.json": "152484486297d094b6c0739d1cde3176a67d8856257181982271c8d7338ce001",
+        "backend/public/3rdpartylicenses.txt": "3b0be8bc0928cddbb7fd50b16f1c6974ab823acbe1aacf1400b06179bbefd99e",
+        "backend/public/chunk-M3QR3OQ6.js": "c44687f92fc61113e38616f7bb48a2a9b093c4bf0a3f46f9ef37cccc94962d2c",
+        "backend/public/chunk-ORJCMO7Y.js": "11071384eb6c0717793268fa2d10d07e0b01b1a2276646ac1ee89ef7e54dfafb",
+        "backend/public/favicon-doce.png": "58d60b5dbc87a7f612a0ab6ae5ca624d616819d068b450e4162ebb2046dc9013",
+        "backend/public/favicon.ico": "f9102be80297c0529207607be5277b4f90bca89d65988fa1771b91c7894e815f",
+        "backend/public/header-favicon.jpg": "324252369933f4a073666db720fefefeecdd8d971e93306800c51e1b8d0fc7b6",
+        "backend/public/header.jfif": "324252369933f4a073666db720fefefeecdd8d971e93306800c51e1b8d0fc7b6",
+        "backend/public/index.html": "725535d0d1bfe9a4b52d2fa95f53afd3241c02af870ce6c01411bdbd26b37f02",
+        "backend/public/main-HW7HPJPP.js": "c50b66f78dec43cd09e5191a806c033199a5d5e6b5a99462f602321b1aeb968a",
+        "backend/public/polyfills-JOTRX7ND.js": "ada6406bce793942b50bd47a7b63d72f69c8964fbc785e25043eedb19da4a32d",
+        "backend/public/prerendered-routes.json": "a79ddcc8a115190e9c19479ed36914741a7d1db74f0a1153529efc80725505fe",
+        "backend/public/sidebar-icon.png": "58d60b5dbc87a7f612a0ab6ae5ca624d616819d068b450e4162ebb2046dc9013",
+        "backend/public/sidebar.jpg": "fcecfcfa1f50a19c041215329e7c48d8c8cd88e56edd654b6e228dbaf3279653",
+        "backend/public/sidebar.png": "3638c4ce6f84f64b97426858ea40ac2d1b8d4e334d61d7ada9b6d37e77e546b6",
+        "backend/public/styles-U6VW676Q.css": "7c4a347a232f7979b04f8127e496b635a9b3808fef7f43fb29e69025901ca99c",
+        "backend/routes/calendars.js": "2c4f3cbd8613d054b28fa8353816e02649f7391aedc355b10db61be936f94f03",
+        "backend/routes/events.js": "501e16c459db739b905c6f6946d365649aae672d198404d1489aae473f8443ce",
+        "backend/routes/kanban.js": "cbd2ff7bef1e62248a90ca167bea04aaf9f600e1235c5e4b4f5133ccad697413",
+        "backend/routes/members.js": "816d6f235d87da25d963779bf65a359eef915d0c562a1b004fc88997d41f0f75",
+        "backend/scripts/migrate-sqlite-to-postgres.js": "55722ab4c04ad37900e9d3d4c849d9897157fc05e77a70469ad0e2aa605bdc5b",
+        "backend/scripts/setup-postgres.js": "bd1beff479fb265ef902a5f4a34188daa8c2fc6da4c5161749297f3795dedff1",
+        "backend/test/routes.test.js": "365f683599e32f480fd9c8b8d01bfac000b17fc0892890f3566cc92ec9042d57",
+        "backend/test/validation.test.js": "d85c4fc6fb444e8a37b192645b7e9ebb7af7049e02da24fc030d795e239d8fc8",
+        "backend/validation.js": "5b667b8dc8f9491df3e9726e4a96a5a352ef4fba3b9538e6ad885eb8a794186a"
+      },
+      "pushed": false,
+      "pushedTo": [
+        "prod"
+      ]
+    },
+    {
+      "id": "6a4f2a9d-7fc7-4578-bebb-20a6b412be13",
+      "date": "2026-09-02T13:49:27.889Z",
+      "message": "up",
+      "changes": {
+        "added": [
+          "backend/public/main-TLK6NPSK.js"
+        ],
+        "modified": [
+          "backend/public/index.html"
+        ],
+        "deleted": [
+          "backend/public/main-HW7HPJPP.js"
+        ]
+      },
+      "snapshot": {
+        "backend/.env": "1e3dc635b084cf1a6a17ad5a584e5e1f7f9be0da7517ded27104ee38998cd9f2",
+        "backend/.env.example": "42af06ac4fbd7b40ff1570f84884eefe2680909fb3e7d3d0e448b9613375f9be",
+        "backend/agenda.db": "17cde3325884d62298688b843141d9acd1af3b913f282c95d88e72dba61da8fd",
+        "backend/async-route.js": "6e55ff707ce96a5b15f2f01c306e20054035dbb1ba7b6d5f4281309c815c0eda",
+        "backend/db.js": "f4a0bc289026b96a3ece10fa2ad271f7e579898f27f3c6159b3c5f69d7f64ae5",
+        "backend/ecosystem.config.cjs": "c27396c1a1a1cafa554dfa0fb895349caba70593c28723a1a585a45d534a9d00",
+        "backend/index.js": "9619972f142c05b01f848ef64073f6f733ace1b870fb63d6bac243e57ca097d4",
+        "backend/package-lock.json": "baee13c344cad4594bf5ea8a322f7fbf7e26d65942fb59f7eab5054613f50ef3",
+        "backend/package.json": "152484486297d094b6c0739d1cde3176a67d8856257181982271c8d7338ce001",
+        "backend/public/3rdpartylicenses.txt": "3b0be8bc0928cddbb7fd50b16f1c6974ab823acbe1aacf1400b06179bbefd99e",
+        "backend/public/chunk-M3QR3OQ6.js": "c44687f92fc61113e38616f7bb48a2a9b093c4bf0a3f46f9ef37cccc94962d2c",
+        "backend/public/chunk-ORJCMO7Y.js": "11071384eb6c0717793268fa2d10d07e0b01b1a2276646ac1ee89ef7e54dfafb",
+        "backend/public/favicon-doce.png": "58d60b5dbc87a7f612a0ab6ae5ca624d616819d068b450e4162ebb2046dc9013",
+        "backend/public/favicon.ico": "f9102be80297c0529207607be5277b4f90bca89d65988fa1771b91c7894e815f",
+        "backend/public/header-favicon.jpg": "324252369933f4a073666db720fefefeecdd8d971e93306800c51e1b8d0fc7b6",
+        "backend/public/header.jfif": "324252369933f4a073666db720fefefeecdd8d971e93306800c51e1b8d0fc7b6",
+        "backend/public/index.html": "0054cda3d5240709dd52ae63b5ddd251f06a3338453abdbbd725db209a591905",
+        "backend/public/main-TLK6NPSK.js": "545606e5c39b148d05d90a1eae92e06c2bacf17083fc8385a9f39ea2b9d9a256",
+        "backend/public/polyfills-JOTRX7ND.js": "ada6406bce793942b50bd47a7b63d72f69c8964fbc785e25043eedb19da4a32d",
+        "backend/public/prerendered-routes.json": "a79ddcc8a115190e9c19479ed36914741a7d1db74f0a1153529efc80725505fe",
+        "backend/public/sidebar-icon.png": "58d60b5dbc87a7f612a0ab6ae5ca624d616819d068b450e4162ebb2046dc9013",
+        "backend/public/sidebar.jpg": "fcecfcfa1f50a19c041215329e7c48d8c8cd88e56edd654b6e228dbaf3279653",
+        "backend/public/sidebar.png": "3638c4ce6f84f64b97426858ea40ac2d1b8d4e334d61d7ada9b6d37e77e546b6",
+        "backend/public/styles-U6VW676Q.css": "7c4a347a232f7979b04f8127e496b635a9b3808fef7f43fb29e69025901ca99c",
+        "backend/routes/calendars.js": "2c4f3cbd8613d054b28fa8353816e02649f7391aedc355b10db61be936f94f03",
+        "backend/routes/events.js": "501e16c459db739b905c6f6946d365649aae672d198404d1489aae473f8443ce",
+        "backend/routes/kanban.js": "cbd2ff7bef1e62248a90ca167bea04aaf9f600e1235c5e4b4f5133ccad697413",
+        "backend/routes/members.js": "816d6f235d87da25d963779bf65a359eef915d0c562a1b004fc88997d41f0f75",
+        "backend/scripts/migrate-sqlite-to-postgres.js": "55722ab4c04ad37900e9d3d4c849d9897157fc05e77a70469ad0e2aa605bdc5b",
+        "backend/scripts/setup-postgres.js": "bd1beff479fb265ef902a5f4a34188daa8c2fc6da4c5161749297f3795dedff1",
+        "backend/test/routes.test.js": "365f683599e32f480fd9c8b8d01bfac000b17fc0892890f3566cc92ec9042d57",
+        "backend/test/validation.test.js": "d85c4fc6fb444e8a37b192645b7e9ebb7af7049e02da24fc030d795e239d8fc8",
+        "backend/validation.js": "5b667b8dc8f9491df3e9726e4a96a5a352ef4fba3b9538e6ad885eb8a794186a"
+      },
+      "pushed": false,
+      "pushedTo": [
+        "prod"
+      ]
+    },
+    {
+      "id": "d89e3af4-ed5d-46a0-8937-c8aa720fcf67",
+      "date": "2026-09-02T13:57:55.554Z",
+      "message": "fix",
+      "changes": {
+        "added": [
+          "backend/public/main-2OSHBIOA.js"
+        ],
+        "modified": [
+          "backend/public/index.html"
+        ],
+        "deleted": [
+          "backend/public/main-TLK6NPSK.js"
+        ]
+      },
+      "snapshot": {
+        "backend/.env": "1e3dc635b084cf1a6a17ad5a584e5e1f7f9be0da7517ded27104ee38998cd9f2",
+        "backend/.env.example": "42af06ac4fbd7b40ff1570f84884eefe2680909fb3e7d3d0e448b9613375f9be",
+        "backend/agenda.db": "17cde3325884d62298688b843141d9acd1af3b913f282c95d88e72dba61da8fd",
+        "backend/async-route.js": "6e55ff707ce96a5b15f2f01c306e20054035dbb1ba7b6d5f4281309c815c0eda",
+        "backend/db.js": "f4a0bc289026b96a3ece10fa2ad271f7e579898f27f3c6159b3c5f69d7f64ae5",
+        "backend/ecosystem.config.cjs": "c27396c1a1a1cafa554dfa0fb895349caba70593c28723a1a585a45d534a9d00",
+        "backend/index.js": "9619972f142c05b01f848ef64073f6f733ace1b870fb63d6bac243e57ca097d4",
+        "backend/package-lock.json": "baee13c344cad4594bf5ea8a322f7fbf7e26d65942fb59f7eab5054613f50ef3",
+        "backend/package.json": "152484486297d094b6c0739d1cde3176a67d8856257181982271c8d7338ce001",
+        "backend/public/3rdpartylicenses.txt": "3b0be8bc0928cddbb7fd50b16f1c6974ab823acbe1aacf1400b06179bbefd99e",
+        "backend/public/chunk-M3QR3OQ6.js": "c44687f92fc61113e38616f7bb48a2a9b093c4bf0a3f46f9ef37cccc94962d2c",
+        "backend/public/chunk-ORJCMO7Y.js": "11071384eb6c0717793268fa2d10d07e0b01b1a2276646ac1ee89ef7e54dfafb",
+        "backend/public/favicon-doce.png": "58d60b5dbc87a7f612a0ab6ae5ca624d616819d068b450e4162ebb2046dc9013",
+        "backend/public/favicon.ico": "f9102be80297c0529207607be5277b4f90bca89d65988fa1771b91c7894e815f",
+        "backend/public/header-favicon.jpg": "324252369933f4a073666db720fefefeecdd8d971e93306800c51e1b8d0fc7b6",
+        "backend/public/header.jfif": "324252369933f4a073666db720fefefeecdd8d971e93306800c51e1b8d0fc7b6",
+        "backend/public/index.html": "da0de1b3e849a831a1b740569326453aa9b1eed9f25fa63bed595a1256ec016d",
+        "backend/public/main-2OSHBIOA.js": "30f938454f2409ddce4d9734dd7d37b70560e902ae1694725ead955af66a03a7",
+        "backend/public/polyfills-JOTRX7ND.js": "ada6406bce793942b50bd47a7b63d72f69c8964fbc785e25043eedb19da4a32d",
+        "backend/public/prerendered-routes.json": "a79ddcc8a115190e9c19479ed36914741a7d1db74f0a1153529efc80725505fe",
+        "backend/public/sidebar-icon.png": "58d60b5dbc87a7f612a0ab6ae5ca624d616819d068b450e4162ebb2046dc9013",
+        "backend/public/sidebar.jpg": "fcecfcfa1f50a19c041215329e7c48d8c8cd88e56edd654b6e228dbaf3279653",
+        "backend/public/sidebar.png": "3638c4ce6f84f64b97426858ea40ac2d1b8d4e334d61d7ada9b6d37e77e546b6",
+        "backend/public/styles-U6VW676Q.css": "7c4a347a232f7979b04f8127e496b635a9b3808fef7f43fb29e69025901ca99c",
+        "backend/routes/calendars.js": "2c4f3cbd8613d054b28fa8353816e02649f7391aedc355b10db61be936f94f03",
+        "backend/routes/events.js": "501e16c459db739b905c6f6946d365649aae672d198404d1489aae473f8443ce",
+        "backend/routes/kanban.js": "cbd2ff7bef1e62248a90ca167bea04aaf9f600e1235c5e4b4f5133ccad697413",
+        "backend/routes/members.js": "816d6f235d87da25d963779bf65a359eef915d0c562a1b004fc88997d41f0f75",
+        "backend/scripts/migrate-sqlite-to-postgres.js": "55722ab4c04ad37900e9d3d4c849d9897157fc05e77a70469ad0e2aa605bdc5b",
+        "backend/scripts/setup-postgres.js": "bd1beff479fb265ef902a5f4a34188daa8c2fc6da4c5161749297f3795dedff1",
+        "backend/test/routes.test.js": "365f683599e32f480fd9c8b8d01bfac000b17fc0892890f3566cc92ec9042d57",
+        "backend/test/validation.test.js": "d85c4fc6fb444e8a37b192645b7e9ebb7af7049e02da24fc030d795e239d8fc8",
+        "backend/validation.js": "5b667b8dc8f9491df3e9726e4a96a5a352ef4fba3b9538e6ad885eb8a794186a"
+      },
+      "pushed": false,
+      "pushedTo": [
+        "prod"
+      ]
+    },
+    {
+      "id": "0d79af87-075d-43f2-a0e1-3dc51d5cd69b",
+      "date": "2026-09-02T14:13:10.954Z",
+      "message": "fix",
+      "changes": {
+        "added": [
+          "backend/public/main-2X5KBVS5.js"
+        ],
+        "modified": [
+          "backend/public/index.html"
+        ],
+        "deleted": [
+          "backend/public/main-2OSHBIOA.js"
+        ]
+      },
+      "snapshot": {
+        "backend/.env": "1e3dc635b084cf1a6a17ad5a584e5e1f7f9be0da7517ded27104ee38998cd9f2",
+        "backend/.env.example": "42af06ac4fbd7b40ff1570f84884eefe2680909fb3e7d3d0e448b9613375f9be",
+        "backend/agenda.db": "17cde3325884d62298688b843141d9acd1af3b913f282c95d88e72dba61da8fd",
+        "backend/async-route.js": "6e55ff707ce96a5b15f2f01c306e20054035dbb1ba7b6d5f4281309c815c0eda",
+        "backend/db.js": "f4a0bc289026b96a3ece10fa2ad271f7e579898f27f3c6159b3c5f69d7f64ae5",
+        "backend/ecosystem.config.cjs": "c27396c1a1a1cafa554dfa0fb895349caba70593c28723a1a585a45d534a9d00",
+        "backend/index.js": "9619972f142c05b01f848ef64073f6f733ace1b870fb63d6bac243e57ca097d4",
+        "backend/package-lock.json": "baee13c344cad4594bf5ea8a322f7fbf7e26d65942fb59f7eab5054613f50ef3",
+        "backend/package.json": "152484486297d094b6c0739d1cde3176a67d8856257181982271c8d7338ce001",
+        "backend/public/3rdpartylicenses.txt": "3b0be8bc0928cddbb7fd50b16f1c6974ab823acbe1aacf1400b06179bbefd99e",
+        "backend/public/chunk-M3QR3OQ6.js": "c44687f92fc61113e38616f7bb48a2a9b093c4bf0a3f46f9ef37cccc94962d2c",
+        "backend/public/chunk-ORJCMO7Y.js": "11071384eb6c0717793268fa2d10d07e0b01b1a2276646ac1ee89ef7e54dfafb",
+        "backend/public/favicon-doce.png": "58d60b5dbc87a7f612a0ab6ae5ca624d616819d068b450e4162ebb2046dc9013",
+        "backend/public/favicon.ico": "f9102be80297c0529207607be5277b4f90bca89d65988fa1771b91c7894e815f",
+        "backend/public/header-favicon.jpg": "324252369933f4a073666db720fefefeecdd8d971e93306800c51e1b8d0fc7b6",
+        "backend/public/header.jfif": "324252369933f4a073666db720fefefeecdd8d971e93306800c51e1b8d0fc7b6",
+        "backend/public/index.html": "786c023c853afd729bd0fb8c038bab41ba27a613afd8e22bec1b94bc97956fc8",
+        "backend/public/main-2X5KBVS5.js": "4c0091c565bd5e5bc3dcd2551435598ccb6c97ad6e9c84369aa1d639c3169a0c",
+        "backend/public/polyfills-JOTRX7ND.js": "ada6406bce793942b50bd47a7b63d72f69c8964fbc785e25043eedb19da4a32d",
+        "backend/public/prerendered-routes.json": "a79ddcc8a115190e9c19479ed36914741a7d1db74f0a1153529efc80725505fe",
+        "backend/public/sidebar-icon.png": "58d60b5dbc87a7f612a0ab6ae5ca624d616819d068b450e4162ebb2046dc9013",
+        "backend/public/sidebar.jpg": "fcecfcfa1f50a19c041215329e7c48d8c8cd88e56edd654b6e228dbaf3279653",
+        "backend/public/sidebar.png": "3638c4ce6f84f64b97426858ea40ac2d1b8d4e334d61d7ada9b6d37e77e546b6",
+        "backend/public/styles-U6VW676Q.css": "7c4a347a232f7979b04f8127e496b635a9b3808fef7f43fb29e69025901ca99c",
+        "backend/routes/calendars.js": "2c4f3cbd8613d054b28fa8353816e02649f7391aedc355b10db61be936f94f03",
+        "backend/routes/events.js": "501e16c459db739b905c6f6946d365649aae672d198404d1489aae473f8443ce",
+        "backend/routes/kanban.js": "cbd2ff7bef1e62248a90ca167bea04aaf9f600e1235c5e4b4f5133ccad697413",
+        "backend/routes/members.js": "816d6f235d87da25d963779bf65a359eef915d0c562a1b004fc88997d41f0f75",
+        "backend/scripts/migrate-sqlite-to-postgres.js": "55722ab4c04ad37900e9d3d4c849d9897157fc05e77a70469ad0e2aa605bdc5b",
+        "backend/scripts/setup-postgres.js": "bd1beff479fb265ef902a5f4a34188daa8c2fc6da4c5161749297f3795dedff1",
+        "backend/test/routes.test.js": "365f683599e32f480fd9c8b8d01bfac000b17fc0892890f3566cc92ec9042d57",
+        "backend/test/validation.test.js": "d85c4fc6fb444e8a37b192645b7e9ebb7af7049e02da24fc030d795e239d8fc8",
+        "backend/validation.js": "5b667b8dc8f9491df3e9726e4a96a5a352ef4fba3b9538e6ad885eb8a794186a"
+      },
+      "pushed": false,
+      "pushedTo": [
+        "prod"
+      ]
+    },
+    {
+      "id": "84eb29f4-cc96-40a4-b565-8a20296ac94a",
+      "date": "2026-09-02T14:33:40.378Z",
+      "message": "fix",
+      "changes": {
+        "added": [
+          "backend/public/main-2Z7OQCWO.js"
+        ],
+        "modified": [
+          "backend/public/index.html",
+          "backend/routes/kanban.js",
+          "backend/test/routes.test.js"
+        ],
+        "deleted": [
+          "backend/public/main-2X5KBVS5.js"
+        ]
+      },
+      "snapshot": {
+        "backend/.env": "1e3dc635b084cf1a6a17ad5a584e5e1f7f9be0da7517ded27104ee38998cd9f2",
+        "backend/.env.example": "42af06ac4fbd7b40ff1570f84884eefe2680909fb3e7d3d0e448b9613375f9be",
+        "backend/agenda.db": "17cde3325884d62298688b843141d9acd1af3b913f282c95d88e72dba61da8fd",
+        "backend/async-route.js": "6e55ff707ce96a5b15f2f01c306e20054035dbb1ba7b6d5f4281309c815c0eda",
+        "backend/db.js": "f4a0bc289026b96a3ece10fa2ad271f7e579898f27f3c6159b3c5f69d7f64ae5",
+        "backend/ecosystem.config.cjs": "c27396c1a1a1cafa554dfa0fb895349caba70593c28723a1a585a45d534a9d00",
+        "backend/index.js": "9619972f142c05b01f848ef64073f6f733ace1b870fb63d6bac243e57ca097d4",
+        "backend/package-lock.json": "baee13c344cad4594bf5ea8a322f7fbf7e26d65942fb59f7eab5054613f50ef3",
+        "backend/package.json": "152484486297d094b6c0739d1cde3176a67d8856257181982271c8d7338ce001",
+        "backend/public/3rdpartylicenses.txt": "3b0be8bc0928cddbb7fd50b16f1c6974ab823acbe1aacf1400b06179bbefd99e",
+        "backend/public/chunk-M3QR3OQ6.js": "c44687f92fc61113e38616f7bb48a2a9b093c4bf0a3f46f9ef37cccc94962d2c",
+        "backend/public/chunk-ORJCMO7Y.js": "11071384eb6c0717793268fa2d10d07e0b01b1a2276646ac1ee89ef7e54dfafb",
+        "backend/public/favicon-doce.png": "58d60b5dbc87a7f612a0ab6ae5ca624d616819d068b450e4162ebb2046dc9013",
+        "backend/public/favicon.ico": "f9102be80297c0529207607be5277b4f90bca89d65988fa1771b91c7894e815f",
+        "backend/public/header-favicon.jpg": "324252369933f4a073666db720fefefeecdd8d971e93306800c51e1b8d0fc7b6",
+        "backend/public/header.jfif": "324252369933f4a073666db720fefefeecdd8d971e93306800c51e1b8d0fc7b6",
+        "backend/public/index.html": "8f8e78561dc9e67f9c53eb0de663dbefaec75f4bc43239a9f81f46b6dd36b248",
+        "backend/public/main-2Z7OQCWO.js": "69c0c23aa0dad9f32a0a5a6fb5bde5bec88942f5f4a7a9826be72af93e16b78b",
+        "backend/public/polyfills-JOTRX7ND.js": "ada6406bce793942b50bd47a7b63d72f69c8964fbc785e25043eedb19da4a32d",
+        "backend/public/prerendered-routes.json": "a79ddcc8a115190e9c19479ed36914741a7d1db74f0a1153529efc80725505fe",
+        "backend/public/sidebar-icon.png": "58d60b5dbc87a7f612a0ab6ae5ca624d616819d068b450e4162ebb2046dc9013",
+        "backend/public/sidebar.jpg": "fcecfcfa1f50a19c041215329e7c48d8c8cd88e56edd654b6e228dbaf3279653",
+        "backend/public/sidebar.png": "3638c4ce6f84f64b97426858ea40ac2d1b8d4e334d61d7ada9b6d37e77e546b6",
+        "backend/public/styles-U6VW676Q.css": "7c4a347a232f7979b04f8127e496b635a9b3808fef7f43fb29e69025901ca99c",
+        "backend/routes/calendars.js": "2c4f3cbd8613d054b28fa8353816e02649f7391aedc355b10db61be936f94f03",
+        "backend/routes/events.js": "501e16c459db739b905c6f6946d365649aae672d198404d1489aae473f8443ce",
+        "backend/routes/kanban.js": "12dd8e051c429c08d8aaf4f631921018ce5c07793a78af5f45dd58fad1ad5511",
+        "backend/routes/members.js": "816d6f235d87da25d963779bf65a359eef915d0c562a1b004fc88997d41f0f75",
+        "backend/scripts/migrate-sqlite-to-postgres.js": "55722ab4c04ad37900e9d3d4c849d9897157fc05e77a70469ad0e2aa605bdc5b",
+        "backend/scripts/setup-postgres.js": "bd1beff479fb265ef902a5f4a34188daa8c2fc6da4c5161749297f3795dedff1",
+        "backend/test/routes.test.js": "ff562ffa6becebb86b49c0f07747f17c5c70b200a0813359a928d44140c76c68",
+        "backend/test/validation.test.js": "d85c4fc6fb444e8a37b192645b7e9ebb7af7049e02da24fc030d795e239d8fc8",
+        "backend/validation.js": "5b667b8dc8f9491df3e9726e4a96a5a352ef4fba3b9538e6ad885eb8a794186a"
+      },
+      "pushed": false,
+      "pushedTo": [
+        "prod"
+      ]
     }
   ],
   "lastPush": {
-    "date": "2026-09-01T13:41:36.502Z",
-    "backupFile": "c:/server/BKP-Agenda/backup_20260901_104132.tar.gz",
+    "date": "2026-09-02T14:33:53.382Z",
+    "backupFile": "c:/server/BKS/BKP-Agenda/backup_20260902_113349.tar.gz",
     "commitIds": [
-      "bd406aed-613e-431e-adee-ef917f8a90ca"
+      "84eb29f4-cc96-40a4-b565-8a20296ac94a"
     ]
   },
   "lastPushes": {
@@ -487,10 +1208,10 @@
       ]
     },
     "prod": {
-      "date": "2026-09-01T13:41:36.502Z",
-      "backupFile": "c:/server/BKP-Agenda/backup_20260901_104132.tar.gz",
+      "date": "2026-09-02T14:33:53.382Z",
+      "backupFile": "c:/server/BKS/BKP-Agenda/backup_20260902_113349.tar.gz",
       "commitIds": [
-        "bd406aed-613e-431e-adee-ef917f8a90ca"
+        "84eb29f4-cc96-40a4-b565-8a20296ac94a"
       ]
     }
   }

@@ -16,6 +16,10 @@ export interface CalendarEvent {
   isSystem?: boolean;
   /** Prazo sincronizado de uma tarefa; editável somente pelo card no Kanban. */
   isTaskDeadline?: boolean;
+  /** Referências usadas para abrir o card de origem a partir da agenda. */
+  taskId?: string;
+  taskBoardId?: string;
+  taskParentId?: string;
 }
 
 export type EventColor =

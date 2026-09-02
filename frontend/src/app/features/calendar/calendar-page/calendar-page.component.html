@@ -36,9 +36,9 @@
       </nav>
 
       <!-- Botão criar evento -->
-      <button *ngIf="activeSection === 'calendar'" class="btn-create" (click)="openCreateModal()" id="btn-create-event" matTooltip="Criar novo evento">
+      <button *ngIf="activeSection === 'calendar'" class="btn-create" [disabled]="isTaskCalendarSelected()" (click)="openCreateModal()" id="btn-create-event" [matTooltip]="isTaskCalendarSelected() ? 'Os eventos desta agenda são gerenciados pelos cards de tarefas' : 'Criar novo evento'">
         <span class="btn-create-icon">＋</span>
-        <span>Criar evento</span>
+        <span>{{ isTaskCalendarSelected() ? 'Gerenciada por Tarefas' : 'Criar evento' }}</span>
       </button>
       <button *ngIf="activeSection === 'tasks'" class="btn-create" (click)="openTaskCreate()" id="btn-create-task" matTooltip="Criar nova tarefa">
         <span class="btn-create-icon">＋</span>
@@ -372,7 +372,6 @@
         (dayClick)="openCreateModal($event)"
         (dayContextMenu)="openDayContextMenu($event)"
         (eventClick)="openEditModal($event)"
-        (dayContextMenu)="openDayContextMenu($event)"
         (eventContextMenu)="openEventContextMenu($event)"
         (eventDrop)="onEventDrop($event)"
       ></app-week-view>
@@ -381,6 +380,7 @@
         *ngIf="currentView === 'day'"
         [selectedDate]="selectedDate"
         [events]="displayedEvents()" [holidays]="holidays"
+        (dayContextMenu)="openDayContextMenu($event)"
         (eventClick)="openEditModal($event)"
         (eventContextMenu)="openEventContextMenu($event)"
         (eventDrop)="onEventDrop($event)"

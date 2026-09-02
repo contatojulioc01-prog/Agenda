@@ -137,7 +137,11 @@
         <div class="members-list" *ngIf="members().length > 0">
           <div *ngFor="let m of members()" class="member-row">
             <div class="user-avatar-sm">
-              <span>{{ (m.userName ?? m.user_id).slice(0,2).toUpperCase() }}</span>
+              <img
+                [src]="memberAvatar(m)"
+                [alt]="m.userName ?? m.user_id"
+                (error)="$any($event.target).src = defaultAvatar"
+              />
             </div>
             <div class="member-info">
               <span class="member-name">{{ m.userName ?? m.user_id }}</span>

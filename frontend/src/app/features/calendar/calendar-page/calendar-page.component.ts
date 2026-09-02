@@ -1,6 +1,6 @@
 import { Component, OnInit, OnDestroy, ViewChild, inject, computed, signal, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -51,6 +51,7 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
   public invitationsService = inject(InvitationsService);
   public kanbanService = inject(KanbanService);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
   readonly themeService = inject(ThemeService);
   private initializedUserId = '';
   private readonly authInitialization = effect(() => {
@@ -59,7 +60,10 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
     this.initializedUserId = user.id;
     this.eventsService.currentUserId.set(user.id);
     this.calendarsService.loadAll(() => {
-      const id = [...this.calendarsService.visibleCalendarIds()][0];
+      const requestedId = this.route.snapshot.queryParamMap.get('agenda');
+      const id = requestedId && this.calendars().some(calendar => calendar.id === requestedId)
+        ? requestedId
+        : [...this.calendarsService.visibleCalendarIds()][0];
       if (id) this.selectOnlyCalendar(id);
     });
     this.invitationsService.load();
@@ -112,6 +116,10 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
   });
   readonly currentUser = this.authService.currentUser;
   readonly calendars = this.calendarsService.calendars;
+  readonly isTaskCalendarSelected = computed(() => {
+    const visibleIds = this.calendarsService.visibleCalendarIds();
+    return this.calendars().some(calendar => visibleIds.has(calendar.id) && calendar.isTaskCalendar);
+  });
   readonly syncStatus = this.syncService.status;
   readonly lastSyncAt = this.syncService.lastSyncAt;
 
@@ -144,7 +152,10 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    this.loadHolidays(this.selectedDate.getFullYear());
+    this.route.paramMap.subscribe(() => {
+      this.applyRouteState();
+      this.loadHolidays(this.selectedDate.getFullYear());
+    });
     this.syncService.connect();
   }
 
@@ -184,6 +195,13 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
     // Descarrega as demais e carrega apenas a selecionada
     this.eventsService.events.update(list => list.filter(e => e.calendarId === calendarId));
     this.eventsService.loadFromCalendar(calendarId);
+    if (this.activeSection === 'calendar') {
+      void this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { agenda: calendarId },
+        queryParamsHandling: 'merge',
+      });
+    }
   }
 
   selectAllCalendars(): void {
@@ -255,6 +273,10 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
     const { date, mouseEvent } = payload;
     mouseEvent.preventDefault();
     mouseEvent.stopPropagation();
+    if (this.isTaskCalendarSelected()) {
+      this.closeCalendarContextMenus();
+      return;
+    }
     this.calendarContextMenu.set(null);
     this.eventContextMenu.set(null);
     this.dayContextMenu.set({
@@ -354,6 +376,7 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
     this.selectedDate = new Date();
     this.selectedDateVersion.update(value => value + 1);
     this.loadHolidays(this.selectedDate.getFullYear());
+    this.navigateToCalendar();
   }
 
   navigate(dir: -1 | 1): void {
@@ -364,37 +387,76 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
     this.selectedDate = d;
     this.selectedDateVersion.update(value => value + 1);
     this.loadHolidays(d.getFullYear());
+    this.navigateToCalendar();
   }
 
-  setView(view: CalendarView): void { this.currentView = view; }
-  setSection(section: 'calendar' | 'tasks'): void { this.activeSection = section; }
+  setView(view: CalendarView): void {
+    this.currentView = view;
+    this.navigateToCalendar();
+  }
+  setSection(section: 'calendar' | 'tasks'): void {
+    if (section === 'tasks') {
+      const boardId = this.kanbanService.activeBoard()?.id;
+      void this.router.navigate(boardId ? ['/tarefas', boardId] : ['/tarefas']);
+      return;
+    }
+    this.navigateToCalendar();
+  }
   openTaskCreate(): void {
-    this.activeSection = 'tasks';
+    const boardId = this.kanbanService.activeBoard()?.id;
+    void this.router.navigate(boardId ? ['/tarefas', boardId] : ['/tarefas'], { queryParams: { acao: 'nova-tarefa' } });
     setTimeout(() => this.kanbanBoard?.openCreate());
   }
-  onMiniCalDateSelected(date: Date): void { this.selectedDate = date; this.selectedDateVersion.update(value => value + 1); this.loadHolidays(date.getFullYear()); }
+  onMiniCalDateSelected(date: Date): void { this.selectedDate = date; this.selectedDateVersion.update(value => value + 1); this.loadHolidays(date.getFullYear()); this.navigateToCalendar(); }
   onMiniCalMonthChanged(date: Date): void { this.loadHolidays(date.getFullYear()); }
 
   // ── Modal de eventos ──
   openCreateModal(defaultDate?: string): void {
+    if (this.isTaskCalendarSelected()) return;
     const targetCalendarIds = this.calendarsService.calendars()
       .filter(cal => this.calendarsService.visibleCalendarIds().has(cal.id) && this.calendarsService.canEdit(cal.id))
       .map(cal => cal.id);
-    this.dialog.open(EventModalComponent, {
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { acao: 'novo-evento', data: defaultDate || this.toDatePath(this.selectedDate), evento: null },
+      queryParamsHandling: 'merge',
+    });
+    const dialogRef = this.dialog.open(EventModalComponent, {
       width: '600px', maxWidth: '98vw',
       data: { defaultDate, targetCalendarIds } satisfies EventModalData,
       panelClass: 'agenda-dialog',
       disableClose: true,
     });
+    dialogRef.afterClosed().subscribe(() => this.clearUrlAction());
   }
 
   openEditModal(event: CalendarEvent): void {
+    if (event.isTaskDeadline) {
+      this.openTaskFromCalendar(event);
+      return;
+    }
     if (event.isSystem) return;
-    this.dialog.open(EventModalComponent, {
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { evento: event.id, acao: null, data: null },
+      queryParamsHandling: 'merge',
+    });
+    const dialogRef = this.dialog.open(EventModalComponent, {
       width: '600px', maxWidth: '98vw',
       data: { event, readOnly: !this.calendarsService.canEdit(event.calendarId) } satisfies EventModalData,
       panelClass: 'agenda-dialog',
       disableClose: true,
+    });
+    dialogRef.afterClosed().subscribe(() => this.clearUrlAction());
+  }
+
+  private openTaskFromCalendar(event: CalendarEvent): void {
+    if (!event.taskId || !event.taskBoardId) return;
+    void this.router.navigate(['/tarefas', event.taskBoardId], {
+      queryParams: {
+        tarefa: event.taskId,
+        ramificacao: event.taskParentId || null,
+      },
     });
   }
 
@@ -436,6 +498,55 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
       next: h => { this.holidays = h; this.holidaysVersion.update(value => value + 1); },
       error: () => { this.holidays = []; this.holidaysVersion.update(value => value + 1); },
     });
+  }
+
+  private applyRouteState(): void {
+    const path = this.router.url.split('?')[0];
+    if (path.startsWith('/tarefas')) {
+      this.activeSection = 'tasks';
+      return;
+    }
+
+    this.activeSection = 'calendar';
+    const viewParam = this.route.snapshot.paramMap.get('view');
+    const views: Record<string, CalendarView> = { mes: 'month', semana: 'week', dia: 'day' };
+    if (viewParam && views[viewParam]) this.currentView = views[viewParam];
+
+    const dateParam = this.route.snapshot.paramMap.get('date');
+    if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+      const [year, month, day] = dateParam.split('-').map(Number);
+      const parsed = new Date(year, month - 1, day);
+      if (!Number.isNaN(parsed.getTime()) && this.toDatePath(parsed) !== this.toDatePath(this.selectedDate)) {
+        this.selectedDate = parsed;
+        this.selectedDateVersion.update(value => value + 1);
+      }
+    }
+
+    if (!viewParam || !dateParam) this.navigateToCalendar(true);
+  }
+
+  private navigateToCalendar(replaceUrl = false): void {
+    this.activeSection = 'calendar';
+    const viewSlug: Record<CalendarView, string> = { month: 'mes', week: 'semana', day: 'dia' };
+    const agendaId = this.route.snapshot.queryParamMap.get('agenda')
+      || [...this.calendarsService.visibleCalendarIds()][0];
+    void this.router.navigate(['/calendario', viewSlug[this.currentView], this.toDatePath(this.selectedDate)], {
+      replaceUrl,
+      queryParams: agendaId ? { agenda: agendaId } : undefined,
+    });
+  }
+
+  private clearUrlAction(): void {
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      replaceUrl: true,
+      queryParams: { acao: null, data: null, evento: null },
+      queryParamsHandling: 'merge',
+    });
+  }
+
+  private toDatePath(date: Date): string {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   }
 
   private getPaymentEvents(): CalendarEvent[] {

@@ -5,13 +5,33 @@ import { authGuard } from './core/guards/auth.guard';
 
 export const routes: Routes = [
   {
-    path: '',
+    path: 'calendario/:view/:date',
     component: CalendarPageComponent,
     canActivate: [authGuard],
+  },
+  {
+    path: 'calendario',
+    component: CalendarPageComponent,
+    canActivate: [authGuard],
+  },
+  {
+    path: 'tarefas/:boardId',
+    component: CalendarPageComponent,
+    canActivate: [authGuard],
+  },
+  {
+    path: 'tarefas',
+    component: CalendarPageComponent,
+    canActivate: [authGuard],
+  },
+  {
+    path: '',
+    redirectTo: 'calendario',
+    pathMatch: 'full',
   },
   {
     path: 'unauthorized',
     component: UnauthorizedPageComponent,
   },
-  { path: '**', redirectTo: '' },
+  { path: '**', redirectTo: 'calendario' },
 ];

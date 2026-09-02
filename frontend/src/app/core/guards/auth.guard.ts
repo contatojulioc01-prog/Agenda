@@ -9,9 +9,16 @@ export const authGuard: CanActivateFn = (route, state) => {
   // Verifica se o token veio como query param nesta navegação
   const queryToken = route.queryParamMap.get('token');
   if (queryToken && queryToken.trim().length > 0) {
-    return authService.setToken(queryToken.trim())
-      ? true
-      : router.createUrlTree(['/unauthorized']);
+    if (!authService.setToken(queryToken.trim())) {
+      return router.createUrlTree(['/unauthorized']);
+    }
+
+    // O AuthService já retirou o token da barra de endereço. Retornamos também
+    // uma UrlTree limpa para que o Router não mantenha o segredo no estado da
+    // navegação nem o recoloque na URL ao avançar/voltar.
+    const cleanUrl = router.parseUrl(state.url);
+    delete cleanUrl.queryParams['token'];
+    return cleanUrl;
   }
 
   // Verifica se já temos um token armazenado

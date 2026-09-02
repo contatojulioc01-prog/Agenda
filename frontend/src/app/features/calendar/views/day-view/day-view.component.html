@@ -16,7 +16,7 @@
         [class.system-event]="ev.isSystem"
         [class.task-deadline]="ev.isTaskDeadline"
         [style.background]="colorMap[ev.color]"
-        [matTooltip]="ev.isTaskDeadline ? 'Prazo fixo — edite pelo card em Tarefas' : ev.title"
+        [matTooltip]="ev.isTaskDeadline ? 'Clique para abrir o card em Tarefas' : ev.title"
         (click)="eventClick.emit(ev)"
         (contextmenu)="$event.preventDefault(); $event.stopPropagation(); eventContextMenu.emit({ event: ev, mouseEvent: $event })"
       >
@@ -67,7 +67,7 @@
         (dragend)="onDragEnd($event)"
         (click)="$event.stopPropagation(); onCardClick($event, ev)"
         (contextmenu)="$event.preventDefault(); $event.stopPropagation(); eventContextMenu.emit({ event: ev, mouseEvent: $event })"
-        [matTooltip]="ev.title + ' · ' + ev.startTime + ' - ' + ev.endTime + (ev.isTaskDeadline ? ' · Prazo fixo — edite pelo card em Tarefas' : '')"
+        [matTooltip]="ev.title + ' · ' + ev.startTime + ' - ' + ev.endTime + (ev.isTaskDeadline ? ' · Clique para abrir o card em Tarefas' : '')"
       >
         <!-- Alça de Redimensionamento Superior (Início) -->
         <div

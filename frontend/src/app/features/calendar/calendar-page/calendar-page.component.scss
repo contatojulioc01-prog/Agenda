@@ -122,6 +122,13 @@
     box-shadow: var(--shadow-md);
     transform: translateY(-1px);
   }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: .62;
+    box-shadow: none;
+    transform: none;
+  }
 }
 
 .btn-create-icon {
@@ -143,6 +150,11 @@
 
 .btn-create:hover .btn-create-icon {
   transform: rotate(90deg);
+}
+
+.btn-create:disabled .btn-create-icon {
+  filter: grayscale(.65);
+  transform: none;
 }
 
 /* Divisor sidebar */
@@ -527,6 +539,7 @@
   padding: 16px;
   gap: 12px;
   box-sizing: border-box;
+  background-color: var(--bg-app);
 }
 
 .tasks-main { position: relative; }

@@ -1989,7 +1989,7 @@ body.resizing-x-active * {
 .week-event.task-deadline,
 .day-event.task-deadline,
 .event-pill.task-deadline {
-  cursor: default !important;
+  cursor: pointer !important;
   outline: 1px solid rgba(255, 255, 255, 0.38);
   outline-offset: -2px;
 }

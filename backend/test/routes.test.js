@@ -39,6 +39,30 @@ test('não cria evento órfão quando a agenda não existe', async () => {
   });
 });
 
+test('retorna a tarefa de origem nos eventos de prazo do Kanban', async () => {
+  await withRouter('../routes/events', fakeDb => {
+    fakeDb.get = async sql => sql.includes('FROM calendars')
+      ? { id: 'calendar-team-1', owner_id: 'user-1' }
+      : null;
+    fakeDb.all = async () => [{
+      id: 'event-1', calendar_id: 'calendar-team-1', title: 'Publicar', description: '',
+      date: '2026-09-10', end_date: '2026-09-10', start_time: '00:00', end_time: '23:59',
+      day_times: '{}', color: 'indigo', category: 'Tarefas', all_day: 1,
+      is_task_deadline: 1, task_id: 'task-1', task_board_id: 'board-team-1', task_parent_id: 'task-parent-1',
+    }];
+  }, async baseUrl => {
+    const response = await fetch(`${baseUrl}/calendar-team-1/events`, {
+      headers: { 'x-user-id': 'user-1' },
+    });
+    assert.equal(response.status, 200);
+    const [event] = await response.json();
+    assert.equal(event.taskId, 'task-1');
+    assert.equal(event.taskBoardId, 'board-team-1');
+    assert.equal(event.taskParentId, 'task-parent-1');
+    assert.equal(event.isTaskDeadline, true);
+  });
+});
+
 test('rejeita reordenação para coluna de outro quadro', async () => {
   let transactions = 0;
   await withRouter('../routes/kanban', fakeDb => {
@@ -166,5 +190,56 @@ test('impede editar ou excluir a agenda automatica de tarefas', async () => {
     assert.equal(deleteResponse.status, 409);
     assert.equal(writes, 0);
     assert.equal(transactions, 0);
+  });
+});
+
+test('impede membro comum de excluir tarefa pelo endpoint', async () => {
+  let readsAfterAuthorization = 0;
+  let transactions = 0;
+  await withRouter('../routes/kanban', fakeDb => {
+    fakeDb.get = async sql => {
+      if (sql.includes('FROM kanban_tasks WHERE id')) return { id: 'task-1', board_id: 'board-team-1', archived: 0 };
+      if (sql.includes('FROM kanban_boards')) return { id: 'board-team-1', scope_type: 'team', team_id: 'team-1' };
+      if (sql.includes('FROM kanban_team_members')) return { role: 'member' };
+      return null;
+    };
+    fakeDb.all = async () => { readsAfterAuthorization++; return []; };
+    fakeDb.transaction = async () => { transactions++; };
+  }, async baseUrl => {
+    const response = await fetch(`${baseUrl}/tasks/task-1`, {
+      method: 'DELETE',
+      headers: { 'x-user-id': 'member-1' },
+    });
+    assert.equal(response.status, 403);
+    assert.deepEqual(await response.json(), { error: 'Somente administradores podem excluir tarefas' });
+    assert.equal(readsAfterAuthorization, 0);
+    assert.equal(transactions, 0);
+  });
+});
+
+test('permite administrador excluir tarefa ativa', async () => {
+  const statements = [];
+  await withRouter('../routes/kanban', fakeDb => {
+    fakeDb.get = async sql => {
+      if (sql.includes('FROM kanban_tasks WHERE id')) return { id: 'task-1', board_id: 'board-team-1', archived: 0 };
+      if (sql.includes('FROM kanban_boards')) return { id: 'board-team-1', scope_type: 'team', team_id: 'team-1' };
+      if (sql.includes('FROM kanban_team_members')) return { role: 'admin' };
+      return null;
+    };
+    fakeDb.all = async () => [];
+    fakeDb.transaction = callback => callback({
+      run: async (sql, params = []) => {
+        statements.push({ sql, params });
+        return { rowCount: 1 };
+      },
+    });
+  }, async baseUrl => {
+    const response = await fetch(`${baseUrl}/tasks/task-1`, {
+      method: 'DELETE',
+      headers: { 'x-user-id': 'admin-1' },
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { success: true, deletedDescendants: 0 });
+    assert.ok(statements.some(item => item.sql.includes('DELETE FROM kanban_tasks') && item.params.includes('task-1')));
   });
 });

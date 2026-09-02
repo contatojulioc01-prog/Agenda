@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { KanbanService } from '../../../core/services/kanban.service';
 import { KanbanColumn, KanbanTask, KanbanTaskInput, KanbanTeam, KanbanTeamMember, TaskPriority } from '../../../core/models/kanban.model';
@@ -19,6 +20,8 @@ import { DEFAULT_AVATAR } from '../../../core/models/user.model';
 export class KanbanBoardComponent {
   readonly service = inject(KanbanService);
   readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   readonly board = this.service.activeBoard;
   readonly boards = this.service.boards;
   readonly loading = this.service.loading;
@@ -26,11 +29,23 @@ export class KanbanBoardComponent {
   readonly teamInvitations = this.service.teamInvitations;
   readonly defaultAvatar = DEFAULT_AVATAR;
   private loadedWorkspaceUserId = '';
+  private loadedTeamMembersKey = '';
   private readonly workspaceInitialization = effect(() => {
     const userId = this.auth.currentUser()?.id;
     if (!userId || userId === this.loadedWorkspaceUserId) return;
     this.loadedWorkspaceUserId = userId;
-    this.service.loadWorkspace();
+    this.service.loadWorkspace(this.route.snapshot.paramMap.get('boardId') || undefined);
+  });
+  private readonly activeTeamMembersSynchronization = effect(() => {
+    const userId = this.auth.currentUser()?.id;
+    const board = this.board();
+    if (!userId || !board) return;
+    const teamId = board.scopeType === 'team' ? board.teamId : null;
+    const key = `${userId}|${teamId || 'personal'}`;
+    if (key === this.loadedTeamMembersKey) return;
+    this.loadedTeamMembersKey = key;
+    if (teamId) this.service.loadTeamMembers(teamId);
+    else this.service.clearTeamMembers();
   });
 
   readonly search = signal('');
@@ -54,9 +69,53 @@ export class KanbanBoardComponent {
   readonly teamContextMenu = signal<{ team: KanbanTeam; x: number; y: number } | null>(null);
   readonly taskContextMenu = signal<{ task: KanbanTask; x: number; y: number } | null>(null);
   readonly teamDeleteTarget = signal<KanbanTeam | null>(null);
+  readonly taskDeleteTarget = signal<KanbanTask | null>(null);
   readonly expandedChecklistIds = signal<Set<string>>(new Set());
   readonly savingTask = signal(false);
   readonly teamDeleteLoading = signal(false);
+  readonly taskDeleteLoading = signal(false);
+  readonly inviteableUsers = computed(() => [...this.auth.allUsers()].sort((first, second) =>
+    (first.name || first.email || '').localeCompare(second.name || second.email || '', 'pt-BR', { sensitivity: 'base' })
+  ));
+  private readonly routeState = signal({ boardId: '', taskId: '', parentId: '', action: '', search: '', priority: 'all', assignee: 'all', archived: false });
+  private hydratedRouteKey = '';
+  private readonly routeHydration = effect(() => {
+    const state = this.routeState();
+    const board = this.board();
+    if (!board || (state.boardId && state.boardId !== board.id)) return;
+    // O Kanban permanece montado (apenas oculto) quando o usuário abre a
+    // Agenda. Só complete uma URL sem boardId se a rota atual for realmente
+    // do módulo de tarefas; caso contrário este efeito sequestra a navegação
+    // e manda o usuário de volta ao último quadro.
+    if (!state.boardId && this.router.url.split('?')[0].startsWith('/tarefas')) {
+      void this.router.navigate(['/tarefas', board.id], { replaceUrl: true });
+    }
+    const key = `${board.id}|${state.taskId}|${state.parentId}|${state.action}|${state.search}|${state.priority}|${state.assignee}|${state.archived}`;
+    if (key === this.hydratedRouteKey) return;
+    this.hydratedRouteKey = key;
+
+    this.search.set(state.search);
+    this.priorityFilter.set(['urgent', 'high', 'medium', 'low'].includes(state.priority) ? state.priority as TaskPriority : 'all');
+    this.assigneeFilter.set(state.assignee || 'all');
+    this.showArchived.set(state.archived);
+
+    if (state.parentId) {
+      const ancestors: KanbanTask[] = [];
+      let current = board.tasks.find(task => task.id === state.parentId);
+      while (current) {
+        ancestors.unshift(current);
+        current = current.parentTaskId ? board.tasks.find(task => task.id === current?.parentTaskId) : undefined;
+      }
+      this.parentStack.set(ancestors);
+    } else {
+      this.parentStack.set([]);
+    }
+
+    const task = state.taskId ? board.tasks.find(item => item.id === state.taskId) : undefined;
+    if (task) this.openEditDraft(task);
+    else if (state.action === 'nova-tarefa') this.openCreateDraft();
+    else this.modalOpen.set(false);
+  });
 
   newColumnTitle = '';
   newBoardName = '';
@@ -69,6 +128,29 @@ export class KanbanBoardComponent {
   boardNameDraft = '';
 
   draft: KanbanTaskInput = this.emptyDraft('');
+
+  constructor() {
+    const updateRouteState = () => {
+      const params = this.route.snapshot.paramMap;
+      const query = this.route.snapshot.queryParamMap;
+      this.routeState.set({
+        boardId: params.get('boardId') || '',
+        taskId: query.get('tarefa') || '',
+        parentId: query.get('ramificacao') || '',
+        action: query.get('acao') || '',
+        search: query.get('busca') || '',
+        priority: query.get('prioridade') || 'all',
+        assignee: query.get('responsavel') || 'all',
+        archived: query.get('arquivadas') === '1',
+      });
+      const requestedBoardId = params.get('boardId');
+      if (requestedBoardId && this.board()?.id && this.board()?.id !== requestedBoardId) {
+        this.service.loadBoard(requestedBoardId);
+      }
+    };
+    this.route.paramMap.subscribe(updateRouteState);
+    this.route.queryParamMap.subscribe(updateRouteState);
+  }
 
   readonly visibleTasks = computed(() => {
     const query = this.search().trim().toLocaleLowerCase('pt-BR');
@@ -155,16 +237,32 @@ export class KanbanBoardComponent {
   }
 
   openCreate(columnId?: string): void {
+    if (!this.openCreateDraft(columnId)) return;
+    this.updateUrl({ acao: 'nova-tarefa', tarefa: null });
+  }
+
+  private openCreateDraft(columnId?: string): boolean {
     const first = columnId || this.board()?.columns[0]?.id;
-    if (!first) return;
+    if (!first) return false;
     this.editingId.set(null);
     this.draft = this.emptyDraft(first, this.currentParentId());
     this.labelText = '';
     this.checklistText = '';
     this.modalOpen.set(true);
+    return true;
+  }
+
+  closeTaskModal(): void {
+    this.modalOpen.set(false);
+    this.updateUrl({ tarefa: null, acao: null });
   }
 
   openEdit(task: KanbanTask): void {
+    this.openEditDraft(task);
+    this.updateUrl({ tarefa: task.id, acao: null });
+  }
+
+  private openEditDraft(task: KanbanTask): void {
     this.editingId.set(task.id);
     this.draft = {
       title: task.title, description: task.description, columnId: task.columnId, priority: task.priority,
@@ -186,7 +284,7 @@ export class KanbanBoardComponent {
     this.savingTask.set(true);
     const completed = (success: boolean) => {
       this.savingTask.set(false);
-      if (success) this.modalOpen.set(false);
+      if (success) this.closeTaskModal();
     };
     if (editing) this.service.updateTask(editing, this.draft, completed);
     else this.service.createTask(board.id, this.draft, completed);
@@ -196,7 +294,7 @@ export class KanbanBoardComponent {
     this.savingTask.set(true);
     this.service.updateTask(task.id, { archived: !task.archived }, success => {
       this.savingTask.set(false);
-      if (success) this.modalOpen.set(false);
+      if (success) this.closeTaskModal();
     });
   }
 
@@ -207,17 +305,33 @@ export class KanbanBoardComponent {
 
   deleteEditing(): void {
     const task = this.board()?.tasks.find(item => item.id === this.editingId());
-    if (task) this.deleteTask(task);
+    if (task) this.requestTaskDeletion(task);
   }
 
-  deleteTask(task: KanbanTask): void {
-    if (task.archived && confirm(`Excluir permanentemente “${task.title}”?`)) {
-      this.savingTask.set(true);
-      this.service.deleteTask(task.id, success => {
-        this.savingTask.set(false);
-        if (success) this.modalOpen.set(false);
-      });
-    }
+  canDeleteTasks(): boolean {
+    return this.board()?.myRole === 'admin';
+  }
+
+  requestTaskDeletion(task: KanbanTask): void {
+    this.closeTaskContextMenu();
+    if (this.canDeleteTasks()) this.taskDeleteTarget.set(task);
+  }
+
+  cancelTaskDeletion(): void {
+    if (this.taskDeleteLoading()) return;
+    this.taskDeleteTarget.set(null);
+  }
+
+  confirmTaskDeletion(): void {
+    const task = this.taskDeleteTarget();
+    if (!task || !this.canDeleteTasks()) return;
+    this.taskDeleteLoading.set(true);
+    this.service.deleteTask(task.id, success => {
+      this.taskDeleteLoading.set(false);
+      if (!success) return;
+      this.taskDeleteTarget.set(null);
+      if (this.editingId() === task.id) this.closeTaskModal();
+    });
   }
 
   addChecklistItem(): void {
@@ -285,7 +399,12 @@ export class KanbanBoardComponent {
   }
 
   switchBoard(boardId: string): void {
-    if (this.board()?.id === boardId) return;
+    // Atualiza a rota mesmo quando o quadro já está em memória. Isso é
+    // importante após cargas assíncronas, quando a tela pode estar no quadro
+    // correto mas o endereço ainda aponta para o quadro anterior.
+    const boardChanged = this.board()?.id !== boardId;
+    void this.router.navigate(['/tarefas', boardId]);
+    if (!boardChanged) return;
     this.parentStack.set([]);
     this.showArchived.set(false);
     const team = this.teams().find(item => item.boardId === boardId);
@@ -314,7 +433,7 @@ export class KanbanBoardComponent {
     event.preventDefault();
     event.stopPropagation();
     this.teamContextMenu.set(null);
-    const menuHeight = task.archived ? 184 : 144;
+    const menuHeight = this.canDeleteTasks() ? 184 : 144;
     this.taskContextMenu.set({
       task,
       x: Math.max(8, Math.min(event.clientX, window.innerWidth - 206)),
@@ -347,8 +466,7 @@ export class KanbanBoardComponent {
   }
 
   deleteTaskFromContext(task: KanbanTask): void {
-    this.closeTaskContextMenu();
-    this.deleteTask(task);
+    this.requestTaskDeletion(task);
   }
 
   requestTeamDeletion(team: KanbanTeam): void {
@@ -431,7 +549,11 @@ export class KanbanBoardComponent {
   assignableUsers() {
     if (this.board()?.scopeType !== 'team') return [];
     const memberIds = new Set(this.service.teamMembers().map(member => member.user_id));
-    return this.auth.allUsers().filter(user => memberIds.has(user.id) && user.id !== this.auth.currentUser()?.id);
+    return this.auth.allUsers()
+      .filter(user => memberIds.has(user.id) && user.id !== this.auth.currentUser()?.id)
+      .sort((first, second) => (first.name || first.email || '').localeCompare(
+        second.name || second.email || '', 'pt-BR', { sensitivity: 'base' }
+      ));
   }
 
   childCount(task: KanbanTask): number {
@@ -466,6 +588,7 @@ export class KanbanBoardComponent {
     this.parentStack.update(stack => [...stack, task]);
     this.modalOpen.set(false);
     this.showArchived.set(false);
+    this.updateUrl({ ramificacao: task.id, tarefa: null, acao: null, arquivadas: null });
   }
 
   openEditingChildBoard(): void {
@@ -476,6 +599,27 @@ export class KanbanBoardComponent {
   navigateTree(level: number): void {
     this.parentStack.update(stack => level < 0 ? [] : stack.slice(0, level + 1));
     this.showArchived.set(false);
+    this.updateUrl({ ramificacao: this.currentParentId(), tarefa: null, acao: null, arquivadas: null });
+  }
+
+  setSearch(value: string): void {
+    this.search.set(value);
+    this.updateUrl({ busca: value.trim() || null }, true);
+  }
+
+  setPriorityFilter(value: TaskPriority | 'all'): void {
+    this.priorityFilter.set(value);
+    this.updateUrl({ prioridade: value === 'all' ? null : value });
+  }
+
+  setAssigneeFilter(value: string): void {
+    this.assigneeFilter.set(value);
+    this.updateUrl({ responsavel: value === 'all' ? null : value });
+  }
+
+  toggleArchived(): void {
+    this.showArchived.update(value => !value);
+    this.updateUrl({ arquivadas: this.showArchived() ? '1' : null });
   }
 
   renameBoard(): void {
@@ -564,6 +708,15 @@ export class KanbanBoardComponent {
   }
 
   trackById(_: number, item: { id: string }): string { return item.id; }
+
+  private updateUrl(queryParams: Record<string, string | null>, replaceUrl = false): void {
+    const boardId = this.board()?.id || this.route.snapshot.paramMap.get('boardId');
+    void this.router.navigate(boardId ? ['/tarefas', boardId] : ['/tarefas'], {
+      replaceUrl,
+      queryParams,
+      queryParamsHandling: 'merge',
+    });
+  }
 
   private emptyDraft(columnId: string, parentTaskId: string | null = null): KanbanTaskInput {
     return { title: '', description: '', columnId, priority: 'medium', dueDate: null, labels: [], assigneeIds: [], checklist: [], parentTaskId };

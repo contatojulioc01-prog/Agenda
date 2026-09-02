@@ -577,9 +577,9 @@ router.post('/boards/:boardId/reorder', asyncRoute(async (req, res) => {
 
 router.delete('/tasks/:taskId', asyncRoute(async (req, res) => {
   const task = await db.get('SELECT * FROM kanban_tasks WHERE id = ?', [req.params.taskId]);
-  const access = task && await boardAccess(task.board_id, userId(req), true);
+  const access = task && await boardAccess(task.board_id, userId(req));
   if (!task || !access) return res.status(404).json({ error: 'Tarefa não encontrada' });
-  if (!task.archived) return res.status(409).json({ error: 'Arquive a tarefa antes de excluí-la' });
+  if (access.role !== 'admin') return res.status(403).json({ error: 'Somente administradores podem excluir tarefas' });
   const descendants = await db.all(`WITH RECURSIVE tree(id) AS (
     SELECT id FROM kanban_tasks WHERE parent_task_id = ?
     UNION ALL SELECT t.id FROM kanban_tasks t JOIN tree ON t.parent_task_id = tree.id

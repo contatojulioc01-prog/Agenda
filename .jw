@@ -8,7 +8,7 @@
   ],
   "backup": {
     "enabled": true,
-    "folder": "BKP-Agenda",
+    "folder": "BKS/BKP-Agenda",
     "format": "tar.gz"
   },
   "manifestFile": "jw-deploys.json",
