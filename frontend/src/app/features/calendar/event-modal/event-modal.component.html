@@ -94,6 +94,32 @@
         </div>
       </div>
 
+      <div class='form-card attachment-card'>
+        <div class='card-header'>
+          <mat-icon class='section-icon color-purple'>attach_file</mat-icon>
+          <h3>Anexos</h3><span class='attachment-count'>{{ attachments.length + pendingFiles.length }}/10</span>
+        </div>
+        <p class='attachment-help'>Arquivos de até 10 MB. Clique em uma imagem para visualizá-la.</p>
+        <label class='attachment-picker' *ngIf='!isReadOnly && attachments.length + pendingFiles.length < 10'>
+          <mat-icon>upload_file</mat-icon><span>Adicionar arquivos ou imagens</span>
+          <input type='file' multiple (change)='selectFiles($event)' />
+        </label>
+        <div class='attachment-list' *ngIf='attachments.length || pendingFiles.length'>
+          <div class='attachment-item' *ngFor='let attachment of attachments' (click)='openAttachment(attachment)' role='button' tabindex='0' (keydown.enter)='openAttachment(attachment)'>
+            <mat-icon>{{ attachment.previewable ? 'image' : 'description' }}</mat-icon>
+            <div><strong>{{ attachment.fileName }}</strong><span>{{ attachment.byteSize / 1048576 | number:'1.0-2' }} MB</span></div>
+            <button type='button' *ngIf='!isReadOnly' (click)='$event.stopPropagation(); deleteAttachment(attachment)' title='Excluir anexo'><mat-icon>delete_outline</mat-icon></button>
+            <mat-icon *ngIf='isReadOnly'>{{ attachment.previewable ? 'visibility' : 'download' }}</mat-icon>
+          </div>
+          <div class='attachment-item pending' *ngFor='let file of pendingFiles; let index = index' (click)='openPending(file)'>
+            <mat-icon>{{ file.type.startsWith('image/') ? 'image' : 'description' }}</mat-icon>
+            <div><strong>{{ file.name }}</strong><span>Aguardando salvar · {{ file.size / 1048576 | number:'1.0-2' }} MB</span></div>
+            <button type='button' (click)='$event.stopPropagation(); removePending(index)' title='Remover'><mat-icon>close</mat-icon></button>
+          </div>
+        </div>
+        <p class='attachment-error' *ngIf='attachmentError'>{{ attachmentError }}</p>
+      </div>
+
       <!-- SKILL: Form Groups — Grupo 2: Data e Horário -->
       <div class="form-card">
         <div class="card-header">
@@ -266,4 +292,10 @@
     </section>
   </div>
 
+  <div class='image-preview-backdrop' *ngIf='previewUrl()' (mousedown)='closePreview()'>
+    <section class='image-preview' (mousedown)='$event.stopPropagation()'>
+      <header><strong>{{ previewName() }}</strong><button type='button' (click)='closePreview()'><mat-icon>close</mat-icon></button></header>
+      <img [src]='previewUrl()' [alt]='previewName()' />
+    </section>
+  </div>
 </div>

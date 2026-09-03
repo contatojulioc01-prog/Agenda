@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../db');
 const asyncRoute = require('../async-route');
 const { isHexColor, isNonEmptyString, isOptionalString, validateTaskInput } = require('../validation');
+const { listAttachments } = require('./attachments');
 
 const id = prefix => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 const userId = req => String(req.headers['x-user-id'] || '');
@@ -33,7 +34,7 @@ async function validAssignees(board, assigneeIds) {
   return checks.every(Boolean);
 }
 
-function taskDto(task) {
+function taskDto(task, attachments = []) {
   const assigneeIds = parseJson(task.assignee_ids || '[]', []);
   if (!assigneeIds.length && task.assignee_id) assigneeIds.push(task.assignee_id);
   return {
@@ -50,6 +51,7 @@ function taskDto(task) {
     labels: parseJson(task.labels || '[]', []),
     checklist: parseJson(task.checklist || '[]', []),
     archived: task.archived === 1,
+    attachments,
   };
 }
 
@@ -414,7 +416,8 @@ router.get('/boards/:boardId', asyncRoute(async (req, res) => {
   const access = await boardAccess(req.params.boardId, userId(req));
   if (!access) return res.status(404).json({ error: 'Quadro não encontrado' });
   const columns = await db.all('SELECT * FROM kanban_columns WHERE board_id = ? ORDER BY position, created_at', [access.board.id]);
-  const tasks = (await db.all('SELECT * FROM kanban_tasks WHERE board_id = ? ORDER BY parent_task_id, column_id, position, created_at', [access.board.id])).map(taskDto);
+  const taskRows = await db.all('SELECT * FROM kanban_tasks WHERE board_id = ? ORDER BY parent_task_id, column_id, position, created_at', [access.board.id]);
+  const tasks = await Promise.all(taskRows.map(async task => taskDto(task, await listAttachments('task', task.id))));
   res.json({ ...boardDto(access.board, access.role), columns, tasks });
 }));
 
@@ -437,6 +440,8 @@ router.delete('/boards/:boardId', asyncRoute(async (req, res) => {
   if (!access || access.board.scope_type === 'team' || access.board.owner_id !== userId(req)) return res.status(403).json({ error: 'Quadros de time são excluídos junto com o time' });
   await deleteBoardCalendarEvents(access.board.id, req.broadcast);
   await db.transaction(async tx => {
+    await tx.run(`DELETE FROM attachments WHERE owner_type = 'task' AND owner_id IN
+      (SELECT id FROM kanban_tasks WHERE board_id = ?)`, [access.board.id]);
     await tx.run('DELETE FROM kanban_tasks WHERE board_id = ?', [access.board.id]);
     await tx.run('DELETE FROM kanban_columns WHERE board_id = ?', [access.board.id]);
     await tx.run('DELETE FROM kanban_boards WHERE id = ?', [access.board.id]);
@@ -485,7 +490,10 @@ router.delete('/columns/:columnId', asyncRoute(async (req, res) => {
   if (tasks.some(task => !task.archived)) return res.status(409).json({ error: 'Mova ou arquive os cartões e suas subtarefas antes de excluir a lista' });
   for (const task of tasks) await deleteTaskCalendarEvents(task.id, req.broadcast);
   await db.transaction(async tx => {
-    for (const task of [...tasks].reverse()) await tx.run('DELETE FROM kanban_tasks WHERE id = ?', [task.id]);
+    for (const task of [...tasks].reverse()) {
+      await tx.run(`DELETE FROM attachments WHERE owner_type = 'task' AND owner_id = ?`, [task.id]);
+      await tx.run('DELETE FROM kanban_tasks WHERE id = ?', [task.id]);
+    }
     await tx.run('DELETE FROM kanban_columns WHERE id = ?', [column.id]);
   });
   req.broadcast({ type: 'kanban_updated', boardId: column.board_id });
@@ -515,7 +523,7 @@ router.post('/boards/:boardId/tasks', asyncRoute(async (req, res) => {
     JSON.stringify(req.body.labels || []), assigneeIds[0] || null, JSON.stringify(assigneeIds), JSON.stringify(req.body.checklist || []), userId(req), now, now, parentTaskId]);
   await syncTaskCalendarEvents(taskId, req.broadcast);
   req.broadcast({ type: 'kanban_updated', boardId: access.board.id, taskId });
-  res.status(201).json(taskDto(await db.get('SELECT * FROM kanban_tasks WHERE id = ?', [taskId])));
+  res.status(201).json(taskDto(await db.get('SELECT * FROM kanban_tasks WHERE id = ?', [taskId]), await listAttachments('task', taskId)));
 }));
 
 router.put('/tasks/:taskId', asyncRoute(async (req, res) => {
@@ -543,7 +551,7 @@ router.put('/tasks/:taskId', asyncRoute(async (req, res) => {
   if (nextAssigneeIds) await db.run('UPDATE kanban_tasks SET assignee_ids = ?, assignee_id = ?, updated_at = ? WHERE id = ?', [JSON.stringify(nextAssigneeIds), nextAssigneeIds[0] || null, new Date().toISOString(), task.id]);
   await syncTaskCalendarEvents(task.id, req.broadcast);
   req.broadcast({ type: 'kanban_updated', boardId: task.board_id, taskId: task.id });
-  res.json(taskDto(await db.get('SELECT * FROM kanban_tasks WHERE id = ?', [task.id])));
+  res.json(taskDto(await db.get('SELECT * FROM kanban_tasks WHERE id = ?', [task.id]), await listAttachments('task', task.id)));
 }));
 
 router.post('/boards/:boardId/reorder', asyncRoute(async (req, res) => {
@@ -587,7 +595,11 @@ router.delete('/tasks/:taskId', asyncRoute(async (req, res) => {
   for (const child of descendants) await deleteTaskCalendarEvents(child.id, req.broadcast);
   await deleteTaskCalendarEvents(task.id, req.broadcast);
   await db.transaction(async tx => {
-    for (const child of [...descendants].reverse()) await tx.run('DELETE FROM kanban_tasks WHERE id = ?', [child.id]);
+    for (const child of [...descendants].reverse()) {
+      await tx.run(`DELETE FROM attachments WHERE owner_type = 'task' AND owner_id = ?`, [child.id]);
+      await tx.run('DELETE FROM kanban_tasks WHERE id = ?', [child.id]);
+    }
+    await tx.run(`DELETE FROM attachments WHERE owner_type = 'task' AND owner_id = ?`, [task.id]);
     await tx.run('DELETE FROM kanban_tasks WHERE id = ?', [task.id]);
   });
   req.broadcast({ type: 'kanban_updated', boardId: task.board_id, taskId: task.id });

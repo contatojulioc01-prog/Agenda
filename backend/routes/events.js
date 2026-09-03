@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../db');
 const asyncRoute = require('../async-route');
 const { validateEventInput } = require('../validation');
+const { listAttachments } = require('./attachments');
 
 function genId() {
   return 'evt-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
@@ -25,7 +26,7 @@ async function isTaskDeadlineEvent(eventId) {
   return !!(await db.get('SELECT 1 FROM kanban_task_events WHERE event_id = ?', [eventId]));
 }
 
-function eventDto(event) {
+function eventDto(event, attachments = []) {
   let dayTimes = {};
   try { dayTimes = JSON.parse(event.day_times || '{}'); } catch {}
   return {
@@ -42,6 +43,7 @@ function eventDto(event) {
     taskId: event.task_id || undefined,
     taskBoardId: event.task_board_id || undefined,
     taskParentId: event.task_parent_id || undefined,
+    attachments,
   };
 }
 
@@ -57,7 +59,8 @@ router.get('/:calendarId/events', asyncRoute(async (req, res) => {
     LEFT JOIN kanban_tasks kt ON kt.id = kte.task_id
     WHERE e.calendar_id = ?
     ORDER BY e.date ASC, e.start_time ASC`, [calendarId]);
-  res.json(events.map(eventDto));
+  res.json(await Promise.all(events.map(async event => eventDto(event,
+    await listAttachments(event.task_id ? 'task' : 'event', event.task_id || event.id)))));
 }));
 
 router.post('/:calendarId/events', asyncRoute(async (req, res) => {
@@ -78,7 +81,7 @@ router.post('/:calendarId/events', asyncRoute(async (req, res) => {
 
   const event = await db.get('SELECT * FROM events WHERE id = ?', [id]);
   req.broadcast({ type: 'event_created', calendarId, eventId: id });
-  res.status(201).json(eventDto(event));
+  res.status(201).json(eventDto(event, await listAttachments('event', id)));
 }));
 
 router.put('/:id', asyncRoute(async (req, res) => {
@@ -106,7 +109,7 @@ router.put('/:id', asyncRoute(async (req, res) => {
 
   const updated = await db.get('SELECT * FROM events WHERE id = ?', [id]);
   req.broadcast({ type: 'event_updated', calendarId: event.calendar_id, eventId: id });
-  res.json(eventDto(updated));
+  res.json(eventDto(updated, await listAttachments('event', id)));
 }));
 
 router.delete('/:id', asyncRoute(async (req, res) => {
@@ -116,7 +119,10 @@ router.delete('/:id', asyncRoute(async (req, res) => {
   if (!event) return res.status(404).json({ error: 'Evento não encontrado' });
   if (!(await hasAccess(event.calendar_id, userId, true))) return res.status(403).json({ error: 'Sem permissão' });
   if (await isTaskDeadlineEvent(id)) return res.status(409).json({ error: 'O prazo desta tarefa só pode ser removido pelo card no Kanban' });
-  await db.run('DELETE FROM events WHERE id = ?', [id]);
+  await db.transaction(async tx => {
+    await tx.run(`DELETE FROM attachments WHERE owner_type = 'event' AND owner_id = ?`, [id]);
+    await tx.run('DELETE FROM events WHERE id = ?', [id]);
+  });
   req.broadcast({ type: 'event_deleted', calendarId: event.calendar_id, eventId: id });
   res.json({ success: true });
 }));

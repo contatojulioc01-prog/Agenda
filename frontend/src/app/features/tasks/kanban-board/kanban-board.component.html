@@ -236,10 +236,36 @@
       <label class="field"><span>Prazo</span><input type="date" [(ngModel)]="draft.dueDate"></label>
       <div class="field assignees-field"><span>Responsáveis <small>{{ draft.assigneeIds.length || 'Nenhum' }}</small></span><div class="assignee-options"><button type="button" [class.selected]="isDraftAssignee(auth.currentUser()?.id || '')" (click)="toggleDraftAssignee(auth.currentUser()?.id || '')"><img [src]="auth.currentUser()?.avatar || defaultAvatar" (error)="$any($event.target).src = defaultAvatar"><span>{{ auth.currentUser()?.name || 'Eu' }}</span><mat-icon>{{ isDraftAssignee(auth.currentUser()?.id || '') ? 'check_circle' : 'add_circle_outline' }}</mat-icon></button><button type="button" *ngFor="let user of assignableUsers()" [class.selected]="isDraftAssignee(user.id)" (click)="toggleDraftAssignee(user.id)"><img [src]="user.avatar || defaultAvatar" (error)="$any($event.target).src = defaultAvatar"><span>{{ user.name }}</span><mat-icon>{{ isDraftAssignee(user.id) ? 'check_circle' : 'add_circle_outline' }}</mat-icon></button></div></div>
       <label class="field full"><span>Etiquetas <small>separadas por vírgula</small></span><input [(ngModel)]="labelText" placeholder="Ex.: Produto, Cliente, Bloqueado"></label>
+      <div class='task-attachments full'>
+        <div class='attachment-heading'><span><mat-icon>attach_file</mat-icon>Anexos</span><strong>{{ taskAttachments.length + pendingFiles.length }}/10</strong></div>
+        <p>Arquivos de até 10 MB. Clique em uma imagem para visualizá-la.</p>
+        <label class='attachment-picker' *ngIf='taskAttachments.length + pendingFiles.length < 10'>
+          <mat-icon>upload_file</mat-icon><span>Adicionar arquivos ou imagens</span><input type='file' multiple (change)='selectTaskFiles($event)'>
+        </label>
+        <div class='attachment-list' *ngIf='taskAttachments.length || pendingFiles.length'>
+          <div class='attachment-item' *ngFor='let attachment of taskAttachments' (click)='openTaskAttachment(attachment)' role='button' tabindex='0' (keydown.enter)='openTaskAttachment(attachment)'>
+            <mat-icon>{{ attachment.previewable ? 'image' : 'description' }}</mat-icon>
+            <div><strong>{{ attachment.fileName }}</strong><span>{{ attachment.byteSize / 1048576 | number:'1.0-2' }} MB</span></div>
+            <button type='button' (click)='$event.stopPropagation(); deleteTaskAttachment(attachment)' title='Excluir anexo'><mat-icon>delete_outline</mat-icon></button>
+          </div>
+          <div class='attachment-item pending' *ngFor='let file of pendingFiles; let index = index' (click)='openPendingFile(file)'>
+            <mat-icon>{{ file.type.startsWith('image/') ? 'image' : 'description' }}</mat-icon>
+            <div><strong>{{ file.name }}</strong><span>Aguardando salvar · {{ file.size / 1048576 | number:'1.0-2' }} MB</span></div>
+            <button type='button' (click)='$event.stopPropagation(); removePendingFile(index)' title='Remover'><mat-icon>close</mat-icon></button>
+          </div>
+        </div>
+        <p class='attachment-error' *ngIf='attachmentError'>{{ attachmentError }}</p>
+      </div>
       <div class="checklist-field full"><div class="checklist-heading"><span><mat-icon>checklist</mat-icon>Checklist</span><strong *ngIf="draft.checklist.length">{{ draft.checklist.filter(item => item.done).length }}/{{ draft.checklist.length }}</strong></div>
         <label class="check-item" *ngFor="let item of draft.checklist; let index = index"><input type="checkbox" [(ngModel)]="item.done"><span [class.done]="item.done">{{ item.text }}</span><button (click)="removeChecklistItem(index)" type="button"><mat-icon>close</mat-icon></button></label>
         <div class="add-check-item"><input [(ngModel)]="checklistText" (keydown.enter)="$event.preventDefault(); addChecklistItem()" placeholder="Adicionar item"><button type="button" (click)="addChecklistItem()"><mat-icon>add</mat-icon></button></div>
       </div>
+    </div>
+    <div class='image-preview-backdrop' *ngIf='attachmentPreviewUrl()' (mousedown)='closeAttachmentPreview()'>
+      <section class='image-preview' (mousedown)='$event.stopPropagation()'>
+        <header><strong>{{ attachmentPreviewName() }}</strong><button type='button' (click)='closeAttachmentPreview()'><mat-icon>close</mat-icon></button></header>
+        <img [src]='attachmentPreviewUrl()' [alt]='attachmentPreviewName()'>
+      </section>
     </div>
     <footer><div><button *ngIf="editingId() && !showArchived()" class="archive-btn" [disabled]="savingTask()" (click)="archiveEditing()"><mat-icon>archive</mat-icon>Arquivar</button><button *ngIf="editingId() && !showArchived()" class="subtasks-btn" [disabled]="savingTask()" (click)="openEditingChildBoard()"><mat-icon>account_tree</mat-icon>Subtarefas</button><button *ngIf="editingId() && showArchived()" class="archive-btn" [disabled]="savingTask()" (click)="archiveEditing()"><mat-icon>unarchive</mat-icon>Restaurar</button><button *ngIf="editingId() && canDeleteTasks()" class="delete-btn" [disabled]="savingTask()" (click)="deleteEditing()"><mat-icon>delete_forever</mat-icon>Excluir</button></div><div><button class="cancel-btn" [disabled]="savingTask()" (click)="closeTaskModal()">Cancelar</button><button class="primary-btn" [disabled]="savingTask() || !draft.title.trim()" (click)="saveTask()"><mat-icon>{{ savingTask() ? 'hourglass_top' : 'save' }}</mat-icon>{{ savingTask() ? 'Salvando...' : 'Salvar tarefa' }}</button></div></footer>
   </section>

@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { catchError, finalize, of, tap } from 'rxjs';
 import { AuthService } from './auth.service';
 import { KanbanBoard, KanbanBoardSummary, KanbanColumn, KanbanTask, KanbanTaskInput, KanbanTeam, KanbanTeamInvitation, KanbanTeamMember } from '../models/kanban.model';
+import { Attachment } from '../models/attachment.model';
 
 @Injectable({ providedIn: 'root' })
 export class KanbanService {
@@ -215,16 +216,20 @@ export class KanbanService {
       });
   }
 
-  createTask(boardId: string, input: KanbanTaskInput, onComplete?: (success: boolean) => void): void {
+  createTask(boardId: string, input: KanbanTaskInput, onComplete?: (task: KanbanTask | null) => void): void {
     this.http.post<KanbanTask>(`/api/kanban/boards/${boardId}/tasks`, input, { headers: this.headers })
       .pipe(catchError(err => { this.error.set(err.error?.error || 'Erro ao criar tarefa.'); return of(null); }))
-      .subscribe(task => { if (task) this.upsertTask(task); onComplete?.(!!task); });
+      .subscribe(task => { if (task) this.upsertTask(task); onComplete?.(task); });
   }
 
-  updateTask(id: string, changes: Partial<KanbanTask>, onComplete?: (success: boolean) => void): void {
+  updateTask(id: string, changes: Partial<KanbanTask>, onComplete?: (task: KanbanTask | null) => void): void {
     this.http.put<KanbanTask>(`/api/kanban/tasks/${id}`, changes, { headers: this.headers })
       .pipe(catchError(err => { this.error.set(err.error?.error || 'Erro ao atualizar tarefa.'); return of(null); }))
-      .subscribe(task => { if (task) this.upsertTask(task); onComplete?.(!!task); });
+      .subscribe(task => { if (task) this.upsertTask(task); onComplete?.(task); });
+  }
+
+  setTaskAttachments(id: string, attachments: Attachment[]): void {
+    this.activeBoard.update(board => board ? { ...board, tasks: board.tasks.map(task => task.id === id ? { ...task, attachments } : task) } : board);
   }
 
   deleteTask(id: string, onComplete?: (success: boolean) => void): void {

@@ -10,7 +10,8 @@ async function withRouter(routerPath, configureDb, run) {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => { req.broadcast = () => {}; next(); });
-  app.use(require(routerPath));
+  const loadedRouter = require(routerPath);
+  app.use(loadedRouter.router || loadedRouter);
   const server = await new Promise(resolve => {
     const instance = app.listen(0, '127.0.0.1', () => resolve(instance));
   });
@@ -241,5 +242,51 @@ test('permite administrador excluir tarefa ativa', async () => {
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { success: true, deletedDescendants: 0 });
     assert.ok(statements.some(item => item.sql.includes('DELETE FROM kanban_tasks') && item.params.includes('task-1')));
+  });
+});
+
+test('envia arquivo binário para uma tarefa acessível', async () => {
+  let inserted = null;
+  await withRouter('../routes/attachments', fakeDb => {
+    fakeDb.all = async () => [];
+    fakeDb.run = async (_sql, params) => { inserted = params; return { rowCount: 1 }; };
+    fakeDb.get = async sql => {
+      if (sql.includes('FROM kanban_tasks')) return { id: 'task-1', board_id: 'board-1' };
+      if (sql.includes('FROM kanban_boards')) return { id: 'board-1', owner_id: 'user-1', scope_type: 'personal' };
+      if (sql.includes('COUNT(*)')) return { attachment_count: 0, total_bytes: 0 };
+      if (sql.includes('FROM attachments')) return {
+        id: inserted[0], file_name: 'imagem.png', mime_type: 'image/png', byte_size: 4, created_at: inserted[8],
+      };
+      return null;
+    };
+  }, async baseUrl => {
+    const response = await fetch(`${baseUrl}/task/task-1`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/octet-stream', 'x-user-id': 'user-1', 'x-file-name': 'imagem.png', 'x-file-type': 'image/png' },
+      body: Buffer.from([1, 2, 3, 4]),
+    });
+    assert.equal(response.status, 201);
+    assert.equal((await response.json()).previewable, true);
+    assert.ok(Buffer.isBuffer(inserted[6]));
+  });
+});
+
+test('protege e entrega imagem de anexo para pré-visualização', async () => {
+  await withRouter('../routes/attachments', fakeDb => {
+    fakeDb.all = async () => [];
+    fakeDb.get = async sql => {
+      if (sql.includes('FROM attachments')) return { id: 'att-1', owner_type: 'task', owner_id: 'task-1', file_name: 'foto.jpg', mime_type: 'image/jpeg', byte_size: 3, content: Buffer.from([7, 8, 9]) };
+      if (sql.includes('FROM kanban_tasks')) return { id: 'task-1', board_id: 'board-1' };
+      if (sql.includes('FROM kanban_boards')) return { id: 'board-1', owner_id: 'user-1', scope_type: 'personal' };
+      return null;
+    };
+  }, async baseUrl => {
+    const allowed = await fetch(`${baseUrl}/att-1/content`, { headers: { 'x-user-id': 'user-1' } });
+    assert.equal(allowed.status, 200);
+    assert.equal(allowed.headers.get('content-type'), 'image/jpeg');
+    assert.match(allowed.headers.get('content-disposition'), /^inline;/);
+    assert.deepEqual([...new Uint8Array(await allowed.arrayBuffer())], [7, 8, 9]);
+    const denied = await fetch(`${baseUrl}/att-1/content`, { headers: { 'x-user-id': 'other-user' } });
+    assert.equal(denied.status, 403);
   });
 });

@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, computed, effect, inject, signal } from '@angular/core';
+import { Component, OnDestroy, computed, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
 import { MatIconModule } from '@angular/material/icon';
@@ -9,6 +9,9 @@ import { AuthService } from '../../../core/services/auth.service';
 import { KanbanService } from '../../../core/services/kanban.service';
 import { KanbanColumn, KanbanTask, KanbanTaskInput, KanbanTeam, KanbanTeamMember, TaskPriority } from '../../../core/models/kanban.model';
 import { DEFAULT_AVATAR } from '../../../core/models/user.model';
+import { Attachment } from '../../../core/models/attachment.model';
+import { AttachmentsService } from '../../../core/services/attachments.service';
+import { forkJoin } from 'rxjs';
 
 @Component({
   selector: 'app-kanban-board',
@@ -17,11 +20,12 @@ import { DEFAULT_AVATAR } from '../../../core/models/user.model';
   templateUrl: './kanban-board.component.html',
   styleUrl: './kanban-board.component.scss',
 })
-export class KanbanBoardComponent {
+export class KanbanBoardComponent implements OnDestroy {
   readonly service = inject(KanbanService);
   readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly attachmentsService = inject(AttachmentsService);
   readonly board = this.service.activeBoard;
   readonly boards = this.service.boards;
   readonly loading = this.service.loading;
@@ -72,6 +76,8 @@ export class KanbanBoardComponent {
   readonly taskDeleteTarget = signal<KanbanTask | null>(null);
   readonly expandedChecklistIds = signal<Set<string>>(new Set());
   readonly savingTask = signal(false);
+  readonly attachmentPreviewUrl = signal<string | null>(null);
+  readonly attachmentPreviewName = signal('');
   readonly teamDeleteLoading = signal(false);
   readonly taskDeleteLoading = signal(false);
   readonly inviteableUsers = computed(() => [...this.auth.allUsers()].sort((first, second) =>
@@ -124,6 +130,8 @@ export class KanbanBoardComponent {
   invitedUserId = '';
   labelText = '';
   checklistText = '';
+  pendingFiles: File[] = [];
+  attachmentError = '';
   columnTitleDraft = '';
   boardNameDraft = '';
 
@@ -151,6 +159,8 @@ export class KanbanBoardComponent {
     this.route.paramMap.subscribe(updateRouteState);
     this.route.queryParamMap.subscribe(updateRouteState);
   }
+
+  ngOnDestroy(): void { this.closeAttachmentPreview(); }
 
   readonly visibleTasks = computed(() => {
     const query = this.search().trim().toLocaleLowerCase('pt-BR');
@@ -248,6 +258,8 @@ export class KanbanBoardComponent {
     this.draft = this.emptyDraft(first, this.currentParentId());
     this.labelText = '';
     this.checklistText = '';
+    this.pendingFiles = [];
+    this.attachmentError = '';
     this.modalOpen.set(true);
     return true;
   }
@@ -271,6 +283,8 @@ export class KanbanBoardComponent {
     };
     this.labelText = task.labels.join(', ');
     this.checklistText = '';
+    this.pendingFiles = [];
+    this.attachmentError = '';
     this.modalOpen.set(true);
   }
 
@@ -282,9 +296,12 @@ export class KanbanBoardComponent {
     this.draft.labels = this.labelText.split(',').map(value => value.trim()).filter(Boolean).slice(0, 8);
     const editing = this.editingId();
     this.savingTask.set(true);
-    const completed = (success: boolean) => {
-      this.savingTask.set(false);
-      if (success) this.closeTaskModal();
+    const completed = (task: KanbanTask | null) => {
+      if (!task) { this.savingTask.set(false); return; }
+      this.uploadPending(task, success => {
+        this.savingTask.set(false);
+        if (success) this.closeTaskModal();
+      });
     };
     if (editing) this.service.updateTask(editing, this.draft, completed);
     else this.service.createTask(board.id, this.draft, completed);
@@ -342,6 +359,72 @@ export class KanbanBoardComponent {
   }
 
   removeChecklistItem(index: number): void { this.draft.checklist.splice(index, 1); }
+
+  get taskAttachments(): Attachment[] {
+    return this.board()?.tasks.find(task => task.id === this.editingId())?.attachments || [];
+  }
+
+  selectTaskFiles(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const available = Math.max(0, 10 - this.taskAttachments.length - this.pendingFiles.length);
+    const selected = [...(input.files || [])].slice(0, available);
+    const tooLarge = selected.find(file => file.size > 10 * 1024 * 1024);
+    this.attachmentError = tooLarge ? `${tooLarge.name} excede o limite de 10 MB.` : '';
+    this.pendingFiles.push(...selected.filter(file => file.size <= 10 * 1024 * 1024));
+    input.value = '';
+  }
+
+  removePendingFile(index: number): void { this.pendingFiles.splice(index, 1); }
+
+  openTaskAttachment(attachment: Attachment): void {
+    const uid = this.auth.currentUser()?.id || '';
+    if (!attachment.previewable) return this.attachmentsService.download(attachment, uid);
+    this.attachmentsService.content(attachment.id, uid).subscribe({
+      next: blob => this.showAttachmentPreview(URL.createObjectURL(blob), attachment.fileName),
+      error: () => this.attachmentError = 'Não foi possível abrir a imagem.',
+    });
+  }
+
+  openPendingFile(file: File): void {
+    if (file.type.startsWith('image/')) this.showAttachmentPreview(URL.createObjectURL(file), file.name);
+  }
+
+  closeAttachmentPreview(): void {
+    const url = this.attachmentPreviewUrl();
+    if (url) URL.revokeObjectURL(url);
+    this.attachmentPreviewUrl.set(null);
+    this.attachmentPreviewName.set('');
+  }
+
+  deleteTaskAttachment(attachment: Attachment): void {
+    const uid = this.auth.currentUser()?.id || '';
+    this.attachmentsService.remove(attachment.id, uid).subscribe({
+      next: () => this.service.setTaskAttachments(this.editingId() || '', this.taskAttachments.filter(item => item.id !== attachment.id)),
+      error: error => this.attachmentError = error.error?.error || 'Não foi possível excluir o anexo.',
+    });
+  }
+
+  private showAttachmentPreview(url: string, name: string): void {
+    this.closeAttachmentPreview();
+    this.attachmentPreviewUrl.set(url);
+    this.attachmentPreviewName.set(name);
+  }
+
+  private uploadPending(task: KanbanTask, onComplete: (success: boolean) => void): void {
+    if (!this.pendingFiles.length) return onComplete(true);
+    const uid = this.auth.currentUser()?.id || '';
+    forkJoin(this.pendingFiles.map(file => this.attachmentsService.upload('task', task.id, file, uid))).subscribe({
+      next: uploaded => {
+        this.service.setTaskAttachments(task.id, [...(task.attachments || []), ...uploaded]);
+        this.pendingFiles = [];
+        onComplete(true);
+      },
+      error: error => {
+        this.attachmentError = error.error?.error || 'A tarefa foi salva, mas não foi possível enviar todos os anexos.';
+        onComplete(false);
+      },
+    });
+  }
 
   saveColumn(): void {
     const title = this.newColumnTitle.trim();

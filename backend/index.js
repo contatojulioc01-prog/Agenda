@@ -68,7 +68,7 @@ wss.on('connection', (ws, req) => {
 });
 
 // ── Middlewares ──────────────────────────────────────────────────────────────
-app.use(cors({ origin: '*', methods: ['GET','POST','PUT','DELETE','OPTIONS'], allowedHeaders: ['Content-Type','Authorization','x-user-id'] }));
+app.use(cors({ origin: '*', methods: ['GET','POST','PUT','DELETE','OPTIONS'], allowedHeaders: ['Content-Type','Authorization','x-user-id','x-file-name','x-file-type'] }));
 // Aceita tanto o acesso direto http://servidor:9900/agenda quanto o proxy IIS,
 // que remove /agenda antes de encaminhar a requisicao para o Node.
 app.use((req, _res, next) => {
@@ -226,12 +226,14 @@ initDb().then(() => {
   const membersRouter   = require('./routes/members');
   const eventsRouter    = require('./routes/events');
   const kanbanRouter    = require('./routes/kanban');
+  const attachmentsRouter = require('./routes/attachments').router;
 
   app.use('/api/calendars', authenticateAgendaRequest, calendarsRouter);
   app.use('/api/calendars', authenticateAgendaRequest, membersRouter);  // /:id/members
   app.use('/api/calendars', authenticateAgendaRequest, eventsRouter);   // /:calendarId/events
   app.use('/api/events',    authenticateAgendaRequest, eventsRouter);   // /:id (edit/delete)
   app.use('/api/kanban',    authenticateAgendaRequest, kanbanRouter);
+  app.use('/api/attachments', authenticateAgendaRequest, attachmentsRouter);
 
   // Em producao, o mesmo processo entrega Angular, API e WebSocket.
   const frontendCandidates = [

@@ -1,4 +1,4 @@
-import { Component, Inject, OnInit, inject, computed, signal } from '@angular/core';
+import { Component, Inject, OnDestroy, OnInit, inject, computed, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatDialogRef, MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
@@ -11,6 +11,9 @@ import { HolidaysService } from '../../../core/services/holidays.service';
 import { CalendarsService } from '../../../core/services/calendars.service';
 import { CalendarEvent, EventColor, EVENT_COLOR_MAP, EVENT_COLOR_LABELS } from '../../../core/models/event.model';
 import { Holiday } from '../../../core/models/holiday.model';
+import { Attachment } from '../../../core/models/attachment.model';
+import { AttachmentsService } from '../../../core/services/attachments.service';
+import { forkJoin } from 'rxjs';
 
 export interface EventModalData {
   event?: CalendarEvent;
@@ -33,8 +36,9 @@ export interface EventModalData {
   templateUrl: './event-modal.component.html',
   styleUrl: './event-modal.component.scss'
 })
-export class EventModalComponent implements OnInit {
+export class EventModalComponent implements OnInit, OnDestroy {
   private calendarsService = inject(CalendarsService);
+  private attachmentsService = inject(AttachmentsService);
   isEdit = false;
   get isReadOnly(): boolean { return !!this.data.readOnly; }
 
@@ -57,7 +61,13 @@ export class EventModalComponent implements OnInit {
     color: 'indigo',
     category: 'Geral',
     allDay: false,
+    attachments: [],
   };
+
+  pendingFiles: File[] = [];
+  attachmentError = '';
+  readonly previewUrl = signal<string | null>(null);
+  readonly previewName = signal('');
 
   holidayWarning: string | null = null;
   holidays: Holiday[] = [];
@@ -109,6 +119,79 @@ export class EventModalComponent implements OnInit {
       if (this.data?.targetCalendarIds?.[0]) this.formData.calendarId = this.data.targetCalendarIds[0];
     }
     this.loadHolidays();
+  }
+
+  ngOnDestroy(): void { this.closePreview(); }
+
+  get attachments(): Attachment[] { return this.formData.attachments || []; }
+
+  selectFiles(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const available = Math.max(0, 10 - this.attachments.length - this.pendingFiles.length);
+    const selected = [...(input.files || [])].slice(0, available);
+    const tooLarge = selected.find(file => file.size > 10 * 1024 * 1024);
+    this.attachmentError = tooLarge ? `${tooLarge.name} excede o limite de 10 MB.` : '';
+    this.pendingFiles.push(...selected.filter(file => file.size <= 10 * 1024 * 1024));
+    input.value = '';
+  }
+
+  removePending(index: number): void { this.pendingFiles.splice(index, 1); }
+
+  openAttachment(attachment: Attachment): void {
+    const userId = this.eventsService.currentUserId();
+    if (!attachment.previewable) return this.attachmentsService.download(attachment, userId);
+    this.attachmentsService.content(attachment.id, userId).subscribe({
+      next: blob => this.showPreview(URL.createObjectURL(blob), attachment.fileName),
+      error: () => this.attachmentError = 'Não foi possível abrir a imagem.',
+    });
+  }
+
+  openPending(file: File): void {
+    if (file.type.startsWith('image/')) this.showPreview(URL.createObjectURL(file), file.name);
+  }
+
+  closePreview(): void {
+    const url = this.previewUrl();
+    if (url) URL.revokeObjectURL(url);
+    this.previewUrl.set(null);
+    this.previewName.set('');
+  }
+
+  private showPreview(url: string, name: string): void {
+    this.closePreview();
+    this.previewUrl.set(url);
+    this.previewName.set(name);
+  }
+
+  deleteAttachment(attachment: Attachment): void {
+    if (this.isReadOnly) return;
+    this.attachmentsService.remove(attachment.id, this.eventsService.currentUserId()).subscribe({
+      next: () => {
+        this.formData.attachments = this.attachments.filter(item => item.id !== attachment.id);
+        if (this.data.event) this.eventsService.setAttachments(this.data.event.id, this.formData.attachments);
+      },
+      error: error => this.attachmentError = error.error?.error || 'Não foi possível excluir o anexo.',
+    });
+  }
+
+  private uploadPending(events: CalendarEvent[], onComplete: (success: boolean) => void): void {
+    if (!this.pendingFiles.length) return onComplete(true);
+    const userId = this.eventsService.currentUserId();
+    const requests = events.flatMap(event => this.pendingFiles.map(file => this.attachmentsService.upload('event', event.id, file, userId)));
+    forkJoin(requests).subscribe({
+      next: uploaded => {
+        events.forEach((event, index) => {
+          const start = index * this.pendingFiles.length;
+          this.eventsService.setAttachments(event.id, [...(event.attachments || []), ...uploaded.slice(start, start + this.pendingFiles.length)]);
+        });
+        this.pendingFiles = [];
+        onComplete(true);
+      },
+      error: error => {
+        this.attachmentError = error.error?.error || 'O evento foi salvo, mas não foi possível enviar todos os anexos.';
+        onComplete(false);
+      },
+    });
   }
 
   toggleDuplicateCalendar(calendarId: string): void {
@@ -181,9 +264,12 @@ export class EventModalComponent implements OnInit {
       title: this.formData.title.trim(),
     };
 
-    const completed = (success: boolean) => {
-      this.loadingSalvar = false;
-      if (success) this.dialogRef.close(true);
+    const completed = (saved: CalendarEvent | CalendarEvent[] | null) => {
+      if (!saved) { this.loadingSalvar = false; return; }
+      this.uploadPending(Array.isArray(saved) ? saved : [saved], success => {
+        this.loadingSalvar = false;
+        if (success) this.dialogRef.close(true);
+      });
     };
     if (this.isEdit && this.data.event) this.eventsService.update(this.data.event.id, payload, completed);
     else this.eventsService.createInCalendars(payload, this.data.targetCalendarIds || [], completed);

@@ -45,6 +45,7 @@ export interface KanbanTask {
   createdAt: string;
   updatedAt: string;
   parentTaskId: string | null;
+  attachments: Attachment[];
 }
 
 export interface KanbanBoard extends KanbanBoardSummary {
@@ -81,3 +82,4 @@ export interface KanbanTeamInvitation {
   team_name: string;
   team_color: string;
 }
+import { Attachment } from './attachment.model';

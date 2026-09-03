@@ -592,6 +592,7 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
         category: 'Financeiro',
         allDay: true,
         isSystem: true,
+        attachments: [],
       };
     });
   }

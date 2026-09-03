@@ -1,3 +1,5 @@
+import { Attachment } from './attachment.model';
+
 export interface CalendarEvent {
   id: string;
   calendarId: string;   // ID da agenda à qual o evento pertence
@@ -20,6 +22,7 @@ export interface CalendarEvent {
   taskId?: string;
   taskBoardId?: string;
   taskParentId?: string;
+  attachments: Attachment[];
 }
 
 export type EventColor =

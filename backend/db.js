@@ -181,10 +181,23 @@ async function initDb() {
       UNIQUE(task_id, user_id)
     );
 
+    CREATE TABLE IF NOT EXISTS attachments (
+      id TEXT PRIMARY KEY,
+      owner_type TEXT NOT NULL CHECK (owner_type IN ('event', 'task')),
+      owner_id TEXT NOT NULL,
+      file_name TEXT NOT NULL,
+      mime_type TEXT NOT NULL DEFAULT 'application/octet-stream',
+      byte_size INTEGER NOT NULL,
+      content BYTEA NOT NULL,
+      created_by TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP::text)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_events_calendar ON events(calendar_id, date);
     CREATE INDEX IF NOT EXISTS idx_calendar_members_user ON calendar_members(user_id);
     CREATE INDEX IF NOT EXISTS idx_kanban_tasks_board ON kanban_tasks(board_id, parent_task_id, column_id, position);
     CREATE INDEX IF NOT EXISTS idx_kanban_team_members_user ON kanban_team_members(user_id);
+    CREATE INDEX IF NOT EXISTS idx_attachments_owner ON attachments(owner_type, owner_id, created_at);
 
     ALTER TABLE events ADD COLUMN IF NOT EXISTS end_date TEXT;
     ALTER TABLE calendars ADD COLUMN IF NOT EXISTS is_default INTEGER NOT NULL DEFAULT 0;

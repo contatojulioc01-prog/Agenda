@@ -1,7 +1,8 @@
 import { Injectable, signal, inject, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { catchError, of, forkJoin } from 'rxjs';
-import { CalendarEvent, EventColor } from '../models/event.model';
+import { CalendarEvent } from '../models/event.model';
+import { Attachment } from '../models/attachment.model';
 
 function generateUniqueId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -91,11 +92,11 @@ export class EventsService {
   }
 
   /** Cria novo evento no backend */
-  create(event: Omit<CalendarEvent, 'id'>, onComplete?: (success: boolean) => void): void {
+  create(event: Omit<CalendarEvent, 'id'>, onComplete?: (created: CalendarEvent | null) => void): void {
     const userId = this.currentUserId();
     if (!event.calendarId || !userId) {
       this.error.set('Não foi possível identificar o usuário ou a agenda para salvar no PostgreSQL.');
-      onComplete?.(false);
+      onComplete?.(null);
       return;
     }
     this.error.set('');
@@ -127,28 +128,28 @@ export class EventsService {
             return exists ? list.map(event => event.id === created.id ? created : event) : [...list, created];
           });
         }
-        onComplete?.(!!created);
+        onComplete?.(created);
       });
   }
 
   /** Cria a mesma atividade em todas as agendas selecionadas. */
-  createInCalendars(event: Omit<CalendarEvent, 'id'>, calendarIds: string[], onComplete?: (success: boolean) => void): void {
+  createInCalendars(event: Omit<CalendarEvent, 'id'>, calendarIds: string[], onComplete?: (created: CalendarEvent[] | null) => void): void {
     const copyGroupId = event.copyGroupId || generateUniqueId();
     const targets = [...new Set(calendarIds)];
-    if (!targets.length) { onComplete?.(false); return; }
+    if (!targets.length) { onComplete?.(null); return; }
     let pending = targets.length;
-    let succeeded = true;
-    targets.forEach(calendarId => this.create({ ...event, calendarId, copyGroupId }, success => {
-      succeeded = succeeded && success;
-      if (--pending === 0) onComplete?.(succeeded);
+    const createdEvents: CalendarEvent[] = [];
+    targets.forEach(calendarId => this.create({ ...event, calendarId, copyGroupId }, created => {
+      if (created) createdEvents.push(created);
+      if (--pending === 0) onComplete?.(createdEvents.length === targets.length ? createdEvents : null);
     }));
   }
 
   /** Atualiza evento existente no backend */
-  update(id: string, changes: Partial<Omit<CalendarEvent, 'id'>>, onComplete?: (success: boolean) => void): void {
-    if (this.events().find(event => event.id === id)?.isSystem) { onComplete?.(false); return; }
+  update(id: string, changes: Partial<Omit<CalendarEvent, 'id'>>, onComplete?: (updated: CalendarEvent | null) => void): void {
+    if (this.events().find(event => event.id === id)?.isSystem) { onComplete?.(null); return; }
     const userId = this.currentUserId();
-    if (!userId) { this.error.set('Usuário não identificado para salvar no PostgreSQL.'); onComplete?.(false); return; }
+    if (!userId) { this.error.set('Usuário não identificado para salvar no PostgreSQL.'); onComplete?.(null); return; }
     this.error.set('');
 
     // Converte camelCase para o formato esperado pelo backend
@@ -173,8 +174,12 @@ export class EventsService {
       return of(null);
     })).subscribe(updated => {
       if (updated) this.events.update(list => list.map(event => event.id === id ? updated : event));
-      onComplete?.(!!updated);
+      onComplete?.(updated);
     });
+  }
+
+  setAttachments(id: string, attachments: Attachment[]): void {
+    this.events.update(list => list.map(event => event.id === id ? { ...event, attachments } : event));
   }
 
   /** Remove evento no backend */
