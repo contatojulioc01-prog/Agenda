@@ -4,6 +4,7 @@ import { CalendarsService } from './calendars.service';
 import { EventsService } from './events.service';
 import { InvitationsService } from './invitations.service';
 import { KanbanService } from './kanban.service';
+import { AuthService } from './auth.service';
 
 export type SyncStatus = 'connected' | 'connecting' | 'disconnected';
 
@@ -31,12 +32,14 @@ function shouldUseWebSocket(): boolean {
   return getHttpUrl() === '';
 }
 
+
 @Injectable({ providedIn: 'root' })
 export class SyncService implements OnDestroy {
   private calendarsService = inject(CalendarsService);
   private eventsService = inject(EventsService);
   private invitationsService = inject(InvitationsService);
   private kanbanService = inject(KanbanService);
+  private authService = inject(AuthService);
   private http = inject(HttpClient);
   private ngZone = inject(NgZone);
 
@@ -75,7 +78,9 @@ export class SyncService implements OnDestroy {
         this.ws = null;
       }
 
-      const url = getWsUrl();
+      const token = this.authService.getToken();
+      const rawUrl = getWsUrl();
+      const url = token ? `${rawUrl}${rawUrl.includes('?') ? '&' : '?'}token=${encodeURIComponent(token)}` : rawUrl;
       this.ws = new WebSocket(url);
 
       this.ws.onopen = () => {
@@ -165,7 +170,10 @@ export class SyncService implements OnDestroy {
 
   private connectEventSource(): void {
     if (typeof EventSource === 'undefined' || this.eventSource) return;
-    this.eventSource = new EventSource(`${getHttpUrl()}/api/realtime`);
+    const token = this.authService.getToken();
+    const rawUrl = `${getHttpUrl()}/api/realtime`;
+    const sseUrl = token ? `${rawUrl}?token=${encodeURIComponent(token)}` : rawUrl;
+    this.eventSource = new EventSource(sseUrl);
     this.eventSource.onopen = () => this.ngZone.run(() => {
       this.status.set('connected');
       this.lastSyncAt.set(new Date());

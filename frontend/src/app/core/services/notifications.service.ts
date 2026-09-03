@@ -53,10 +53,10 @@ export class NotificationsService {
       });
   }
 
-  createDevice(name: string, complete: (result: { device: NotificationDevice; token: string } | null) => void): void {
+  createDevice(name: string, complete: (result: { device: NotificationDevice; deviceKey: string } | null) => void): void {
     this.saving.set(true);
     this.error.set('');
-    this.http.post<{ device: NotificationDevice; token: string }>('/api/notifications/devices', { name })
+    this.http.post<{ device: NotificationDevice; deviceKey: string }>('/api/notifications/devices', { name })
       .pipe(
         catchError(error => {
           this.error.set(error.error?.error || 'Não foi possível gerar o código de ativação.');

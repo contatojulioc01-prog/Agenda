@@ -50,8 +50,27 @@ function broadcast(data) {
   });
 }
 
-wss.on('connection', (ws, req) => {
+wss.on('connection', async (ws, req) => {
   const ip = req.socket.remoteAddress;
+  let token = '';
+  try {
+    const url = new URL(req.url, 'http://localhost');
+    token = url.searchParams.get('token') || '';
+  } catch {}
+  if (!token) {
+    token = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
+  }
+
+  if (token) {
+    const uid = await validateUserToken(token);
+    if (!uid) {
+      console.warn(`[WS] Conexão recusada (${ip}): token inválido`);
+      ws.close(4003, 'Sessão inválida ou expirada');
+      return;
+    }
+    ws.userId = uid;
+  }
+
   console.log(`[WS] +1 cliente (${ip}) | Total: ${wss.clients.size}`);
   ws.isAlive = true;
   ws.on('pong', () => { ws.isAlive = true; });
@@ -68,7 +87,13 @@ wss.on('connection', (ws, req) => {
 });
 
 // ── Middlewares ──────────────────────────────────────────────────────────────
-app.use(cors({ origin: '*', methods: ['GET','POST','PUT','DELETE','OPTIONS'], allowedHeaders: ['Content-Type','Authorization','x-user-id','x-file-name','x-file-type'] }));
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
+app.use(cors({ origin: '*', methods: ['GET','POST','PUT','DELETE','OPTIONS'], allowedHeaders: ['Content-Type','Authorization','x-user-id','x-device-key','x-file-name','x-file-type'] }));
 // Aceita tanto o acesso direto http://servidor:9900/agenda quanto o proxy IIS,
 // que remove /agenda antes de encaminhar a requisicao para o Node.
 app.use((req, _res, next) => {
@@ -82,31 +107,6 @@ app.use((req, _res, next) => {
 app.use(express.json());
 app.use((req, _res, next) => { req.broadcast = broadcast; next(); });
 
-// ── Rotas ────────────────────────────────────────────────────────────────────
-app.get('/health', (_req, res) => res.json({
-  status: 'ok',
-  clients: Math.max(wss.clients.size, realtimeClients.size),
-  transports: { websocket: wss.clients.size, eventStream: realtimeClients.size },
-  ts: new Date().toISOString(),
-}));
-
-// Canal HTTP contínuo usado como redundância quando proxies não encaminham WebSocket.
-app.get('/api/realtime', (req, res) => {
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache, no-transform');
-  res.setHeader('Connection', 'keep-alive');
-  res.setHeader('X-Accel-Buffering', 'no');
-  res.flushHeaders?.();
-  res.write(': connected\n\n');
-  realtimeClients.add(res);
-
-  const keepAlive = setInterval(() => res.write(': keep-alive\n\n'), 20000);
-  req.on('close', () => {
-    clearInterval(keepAlive);
-    realtimeClients.delete(res);
-  });
-});
-
 // Proxy transparente para a API corporativa (elimina problemas de CORS e rede do browser)
 const PORTAL_API = process.env.PORTAL_API || 'http://192.168.13.244:7000';
 const authCache = new Map();
@@ -116,32 +116,73 @@ function extractAuthenticatedUserId(payload) {
   return value?.id ? String(value.id) : '';
 }
 
+async function validateUserToken(token) {
+  if (!token) return null;
+  const cleanToken = String(token).replace(/^Bearer\s+/i, '').trim();
+  if (!cleanToken) return null;
+
+  let cached = authCache.get(cleanToken);
+  if (!cached || cached.expiresAt <= Date.now()) {
+    try {
+      const response = await fetch(`${PORTAL_API}/api/auth/me`, { headers: { Authorization: `Bearer ${cleanToken}` } });
+      if (!response.ok) return null;
+      const authenticatedUserId = extractAuthenticatedUserId(await response.json());
+      if (!authenticatedUserId) return null;
+      cached = { userId: authenticatedUserId, expiresAt: Date.now() + 30000 };
+      if (authCache.size >= 500) authCache.delete(authCache.keys().next().value);
+      authCache.set(cleanToken, cached);
+    } catch (error) {
+      console.error('[AUTH] Falha ao validar sessão:', error.message);
+      return null;
+    }
+  }
+  return cached?.userId || null;
+}
+
 async function authenticateAgendaRequest(req, res, next) {
   const authorization = String(req.headers.authorization || '');
-  const token = authorization.replace(/^Bearer\s+/i, '').trim();
+  const token = authorization.replace(/^Bearer\s+/i, '').trim() || String(req.query.token || '').trim();
   if (!token) return res.status(401).json({ error: 'Autenticação obrigatória' });
 
   try {
-    let cached = authCache.get(token);
-    if (!cached || cached.expiresAt <= Date.now()) {
-      const response = await fetch(`${PORTAL_API}/api/auth/me`, { headers: { Authorization: `Bearer ${token}` } });
-      if (!response.ok) return res.status(response.status === 403 ? 403 : 401).json({ error: 'Sessão inválida ou expirada' });
-      const authenticatedUserId = extractAuthenticatedUserId(await response.json());
-      if (!authenticatedUserId) return res.status(401).json({ error: 'Usuário autenticado não identificado' });
-      cached = { userId: authenticatedUserId, expiresAt: Date.now() + 30000 };
-      if (authCache.size >= 500) authCache.delete(authCache.keys().next().value);
-      authCache.set(token, cached);
-    }
+    const authenticatedUserId = await validateUserToken(token);
+    if (!authenticatedUserId) return res.status(401).json({ error: 'Sessão inválida ou expirada' });
 
     const requestedUserId = String(req.headers['x-user-id'] || '');
-    if (requestedUserId && requestedUserId !== cached.userId) return res.status(403).json({ error: 'Identidade da requisição não corresponde à sessão' });
-    req.headers['x-user-id'] = cached.userId;
+    if (requestedUserId && requestedUserId !== authenticatedUserId) return res.status(403).json({ error: 'Identidade da requisição não corresponde à sessão' });
+    req.headers['x-user-id'] = authenticatedUserId;
     next();
   } catch (error) {
-    console.error('[AUTH] Falha ao validar sessão:', error.message);
+    console.error('[AUTH] Falha ao validar requisição:', error.message);
     res.status(503).json({ error: 'Serviço de autenticação indisponível' });
   }
 }
+
+// ── Rotas ────────────────────────────────────────────────────────────────────
+app.get('/health', (_req, res) => res.json({
+  status: 'ok',
+  clients: Math.max(wss.clients.size, realtimeClients.size),
+  transports: { websocket: wss.clients.size, eventStream: realtimeClients.size },
+  ts: new Date().toISOString(),
+}));
+
+// Canal HTTP contínuo usado como redundância quando proxies não encaminham WebSocket.
+app.get('/api/realtime', authenticateAgendaRequest, (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders?.();
+  res.write(': connected\n\n');
+  res.userId = req.headers['x-user-id'];
+  realtimeClients.add(res);
+
+  const keepAlive = setInterval(() => res.write(': keep-alive\n\n'), 20000);
+  req.on('close', () => {
+    clearInterval(keepAlive);
+    realtimeClients.delete(res);
+  });
+});
 
 const handleUsersProxy = async (req, res) => {
   try {
@@ -178,8 +219,8 @@ const handleUsersProxy = async (req, res) => {
   }
 };
 
-app.get('/api/users/all', handleUsersProxy);
-app.get('/api/users', handleUsersProxy);
+app.get('/api/users/all', authenticateAgendaRequest, handleUsersProxy);
+app.get('/api/users', authenticateAgendaRequest, handleUsersProxy);
 
 app.get('/api/auth/me', async (req, res) => {
   try {
@@ -228,6 +269,7 @@ initDb().then(async () => {
   const kanbanRouter    = require('./routes/kanban');
   const attachmentsRouter = require('./routes/attachments').router;
   const notifications = require('./routes/notifications');
+  const privacyRouter = require('./routes/privacy');
 
   try {
     await kanbanRouter.purgeExpiredTrash(broadcast);
@@ -247,6 +289,7 @@ initDb().then(async () => {
   app.use('/api/attachments', authenticateAgendaRequest, attachmentsRouter);
   app.use('/api/notifications/device', notifications.deviceRouter);
   app.use('/api/notifications', authenticateAgendaRequest, notifications.router);
+  app.use('/api/privacy', authenticateAgendaRequest, privacyRouter);
 
   // Em producao, o mesmo processo entrega Angular, API e WebSocket.
   const frontendCandidates = [

@@ -55,9 +55,9 @@ async function getPreferences(userId) {
 
 async function authenticateDevice(req, res, next) {
   const authorization = String(req.headers.authorization || '');
-  const token = String(req.headers['x-device-token'] || authorization.replace(/^Bearer\\s+/i, '')).trim();
-  if (!token) return res.status(401).json({ error: 'Chave do dispositivo obrigatória' });
-  const device = await db.get('SELECT * FROM notification_devices WHERE token_hash = ? AND enabled = 1', [tokenHash(token)]);
+  const deviceKey = String(req.headers['x-device-key'] || req.headers['x-device-token'] || authorization.replace(/^Bearer\s+/i, '')).trim();
+  if (!deviceKey) return res.status(401).json({ error: 'Chave do dispositivo obrigatória' });
+  const device = await db.get('SELECT * FROM notification_devices WHERE token_hash = ? AND enabled = 1', [tokenHash(deviceKey)]);
   if (!device) return res.status(401).json({ error: 'Chave do dispositivo inválida ou revogada' });
   req.notificationDevice = device;
   req.headers['x-user-id'] = device.user_id;
@@ -106,13 +106,13 @@ router.post('/devices', asyncRoute(async (req, res) => {
   const userId = req.headers['x-user-id'];
   const name = String(req.body?.name || 'Meu computador').trim();
   if (!name || name.length > 80) return res.status(400).json({ error: 'Nome do computador inválido' });
-  const token = crypto.randomBytes(32).toString('base64url');
+  const deviceKey = crypto.randomBytes(32).toString('base64url');
   const now = new Date().toISOString();
   const deviceId = id('ndv');
   await db.run(`INSERT INTO notification_devices
     (id, user_id, name, token_hash, enabled, created_at) VALUES (?, ?, ?, ?, 1, ?)`,
-    [deviceId, userId, name, tokenHash(token), now]);
-  res.status(201).json({ device: deviceDto({ id: deviceId, name, enabled: 1, created_at: now, last_seen_at: null }), token });
+    [deviceId, userId, name, tokenHash(deviceKey), now]);
+  res.status(201).json({ device: deviceDto({ id: deviceId, name, enabled: 1, created_at: now, last_seen_at: null }), deviceKey });
 }));
 
 router.delete('/devices/:deviceId', asyncRoute(async (req, res) => {

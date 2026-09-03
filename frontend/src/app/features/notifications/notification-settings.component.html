@@ -22,7 +22,7 @@
         <div class="section-title"><div><strong>Aplicativo para Windows</strong><span>Baixe uma vez e conecte este computador.</span></div><a class="download-button" [href]="downloadUrl" download><mat-icon>download</mat-icon>Baixar EXE</a></div>
         <ol><li>Baixe e abra o <strong>Agenda.Notifier.exe</strong>.</li><li>Gere e copie o código abaixo.</li><li>Cole o código no aplicativo e clique em Ativar.</li></ol>
         <div class="activation-row"><input [(ngModel)]="deviceName" maxlength="80" placeholder="Nome deste computador"><button type="button" (click)="generateCode()" [disabled]="service.saving() || !deviceName.trim()"><mat-icon>key</mat-icon>Gerar código</button></div>
-        <div class="activation-code" *ngIf="activationCode"><code>{{ activationCode }}</code><button type="button" (click)="copyCode()"><mat-icon>{{ copied() ? 'check' : 'content_copy' }}</mat-icon>{{ copied() ? 'Copiado' : 'Copiar' }}</button><p>Este código é exibido somente agora. Não o compartilhe.</p></div>
+        <div class="activation-code" *ngIf="activationCode"><code>{{ activationCode }}</code><button type="button" (click)="copyCode()"><mat-icon>{{ copied() ? 'check' : 'content_copy' }}</mat-icon>{{ copied() ? 'Copiado' : 'Copiar' }}</button><p>Use somente este código iniciado por AGENDA1-. Não cole o token do portal.</p></div>
       </section>
 
       <section class="settings-card" *ngIf="service.devices().length">

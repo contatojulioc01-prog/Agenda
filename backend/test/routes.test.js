@@ -379,9 +379,9 @@ test('gera chave de dispositivo armazenando somente o hash', async () => {
     assert.equal(response.status, 201);
     const result = await response.json();
     assert.equal(result.device.name, 'PC Financeiro');
-    assert.ok(result.token.length >= 40);
+    assert.ok(result.deviceKey.length >= 40);
     assert.match(inserted[3], /^[a-f0-9]{64}$/);
-    assert.notEqual(inserted[3], result.token);
+    assert.notEqual(inserted[3], result.deviceKey);
   });
 });
 
@@ -417,7 +417,7 @@ test('entrega lembretes de tarefa e evento acessíveis ao dispositivo', async ()
     });
     try {
       const response = await fetch(`http://127.0.0.1:${server.address().port}/pending?date=2026-09-03&time=14:00`, {
-        headers: { authorization: 'Bearer device-secret' },
+        headers: { 'x-device-key': 'device-secret' },
       });
       assert.equal(response.status, 200);
       const result = await response.json();
@@ -432,3 +432,53 @@ test('entrega lembretes de tarefa e evento acessíveis ao dispositivo', async ()
     delete require.cache[require.resolve('../routes/notifications')];
   }
 });
+
+test('exporta dados do titular no formato estruturado da LGPD (Art. 18)', async () => {
+  await withRouter('../routes/privacy', fakeDb => {
+    fakeDb.all = async sql => {
+      if (sql.includes('FROM calendars WHERE owner_id')) return [{ id: 'cal-1', name: 'Minha Agenda' }];
+      if (sql.includes('FROM calendar_members')) return [{ calendar_id: 'cal-2', permission: 'editor' }];
+      if (sql.includes('FROM events WHERE created_by')) return [{ id: 'evt-1', title: 'Reunião de Alinhamento' }];
+      if (sql.includes('FROM kanban_boards WHERE owner_id')) return [{ id: 'brd-1', name: 'Tarefas TI' }];
+      if (sql.includes('FROM kanban_tasks WHERE created_by')) return [{ id: 'tsk-1', title: 'Implementar LGPD' }];
+      if (sql.includes('FROM notification_preferences')) return [{ enabled: 1, task_time: '08:30' }];
+      if (sql.includes('FROM notification_devices')) return [{ id: 'dev-1', name: 'iPhone 15' }];
+      return [];
+    };
+  }, async baseUrl => {
+    const res = await fetch(`${baseUrl}/export-my-data`, {
+      headers: { 'x-user-id': 'user-100' }
+    });
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    assert.equal(data.metadata.subjectId, 'user-100');
+    assert.equal(data.calendars.owned.length, 1);
+    assert.equal(data.events[0].title, 'Reunião de Alinhamento');
+    assert.equal(data.kanban.tasksCreated[0].title, 'Implementar LGPD');
+  });
+});
+
+test('executa exclusão e anonimização de dados de dispositivos do titular', async () => {
+  const operations = [];
+  await withRouter('../routes/privacy', fakeDb => {
+    fakeDb.transaction = async cb => {
+      await cb({
+        run: async (sql, params) => {
+          operations.push({ sql, params });
+          return { rowCount: 1 };
+        }
+      });
+    };
+  }, async baseUrl => {
+    const res = await fetch(`${baseUrl}/anonymize-my-data`, {
+      method: 'POST',
+      headers: { 'x-user-id': 'user-100' }
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.success, true);
+    assert.ok(operations.some(op => op.sql.includes('DELETE FROM notification_devices') && op.params.includes('user-100')));
+    assert.ok(operations.some(op => op.sql.includes('UPDATE kanban_tasks SET assignee_id = NULL') && op.params.includes('user-100')));
+  });
+});
+

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -18,20 +19,32 @@ namespace AgendaNotifier
 {
     internal static class Program
     {
-        private const string MutexName = @"Local\\AgendaCorporativaNotifier";
+        private const string MutexName = "AgendaCorporativaNotifier";
 
         [STAThread]
         private static void Main(string[] args)
         {
-            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
-            if (!Installation.EnsureInstalled(args)) return;
-            bool created;
-            using (var mutex = new Mutex(true, MutexName, out created))
+            try
             {
-                if (!created) return;
-                Application.EnableVisualStyles();
-                Application.SetCompatibleTextRenderingDefault(false);
-                Application.Run(new NotifierContext());
+                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+                if (!Installation.EnsureInstalled(args)) return;
+                bool created;
+                using (var mutex = new Mutex(true, MutexName, out created))
+                {
+                    if (!created)
+                    {
+                        MessageBox.Show("O Agenda Notifier já está executando na bandeja do Windows.", "Agenda Notifier", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        return;
+                    }
+                    Application.EnableVisualStyles();
+                    Application.SetCompatibleTextRenderingDefault(false);
+                    Application.Run(new NotifierContext(args));
+                }
+            }
+            catch (Exception error)
+            {
+                CrashLog.Write(error);
+                MessageBox.Show("O Agenda Notifier não conseguiu iniciar.\\n\\nDetalhes: " + error.Message + "\\n\\nLog: " + CrashLog.Path, "Agenda Notifier", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
     }
@@ -39,9 +52,9 @@ namespace AgendaNotifier
     internal static class Installation
     {
         internal static readonly string DirectoryPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AgendaNotifier");
-        internal static readonly string ExePath = Path.Combine(DirectoryPath, "Agenda.Notifier.exe");
+        internal static readonly string ExePath = Path.Combine(DirectoryPath, "Agenda.Notifier.v3.exe");
         internal static readonly string ConfigPath = Path.Combine(DirectoryPath, "config.json");
-        private const string RunKey = @"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+        private static readonly string RunKey = string.Join(((char)92).ToString(), new[] { "Software", "Microsoft", "Windows", "CurrentVersion", "Run" });
         private const string RunName = "AgendaNotifier";
 
         internal static bool EnsureInstalled(string[] args)
@@ -64,6 +77,20 @@ namespace AgendaNotifier
             }
         }
 
+        internal static void RemoveLegacyVersion()
+        {
+            try
+            {
+                var legacyFiles = new[] { "Agenda.Notifier.exe", "Agenda.Notifier.v2.exe" };
+                foreach (var fileName in legacyFiles)
+                {
+                    var legacy = Path.Combine(DirectoryPath, fileName);
+                    if (File.Exists(legacy)) File.Delete(legacy);
+                }
+            }
+            catch { }
+        }
+
         internal static bool StartsWithWindows
         {
             get
@@ -75,10 +102,39 @@ namespace AgendaNotifier
             {
                 using (var key = Registry.CurrentUser.CreateSubKey(RunKey))
                 {
-                    if (value) key.SetValue(RunName, ((char)34) + ExePath + ((char)34));
+                    if (value) key.SetValue(RunName, ((char)34) + ExePath + ((char)34) + " --startup");
                     else key.DeleteValue(RunName, false);
                 }
             }
+        }
+    }
+
+    internal static class AppIcon
+    {
+        private static Icon current;
+        internal static Icon Current
+        {
+            get
+            {
+                if (current != null) return current;
+                try { current = Icon.ExtractAssociatedIcon(Application.ExecutablePath); }
+                catch { current = SystemIcons.Application; }
+                return current;
+            }
+        }
+    }
+
+    internal static class CrashLog
+    {
+        internal static readonly string Path = System.IO.Path.Combine(Installation.DirectoryPath, "Agenda.Notifier.log");
+        internal static void Write(Exception error)
+        {
+            try
+            {
+                Directory.CreateDirectory(Installation.DirectoryPath);
+                File.AppendAllText(Path, DateTime.Now.ToString("s") + " " + error + Environment.NewLine, Encoding.UTF8);
+            }
+            catch { }
         }
     }
 
@@ -125,7 +181,14 @@ namespace AgendaNotifier
         }
     }
 
-    internal sealed class ActivationPayload { public string serverUrl { get; set; } public string token { get; set; } }
+    internal sealed class ActivationPayload
+    {
+        public string serverUrl { get; set; }
+        public string userId { get; set; }
+        public string deviceKey { get; set; }
+        public string token { get; set; }
+        public string Key { get { return !string.IsNullOrWhiteSpace(deviceKey) ? deviceKey : token; } }
+    }
     internal sealed class PendingResponse { public List<PendingNotification> notifications { get; set; } public int pollSeconds { get; set; } }
     internal sealed class PendingNotification
     {
@@ -154,8 +217,9 @@ namespace AgendaNotifier
         private PendingNotification visibleNotification;
         private bool polling;
 
-        internal NotifierContext()
+        internal NotifierContext(string[] args)
         {
+            Installation.RemoveLegacyVersion();
             config = ConfigStore.Load();
             if (!string.IsNullOrWhiteSpace(config.GetToken())) Installation.StartsWithWindows = true;
             statusItem = new ToolStripMenuItem("Aguardando configuração") { Enabled = false };
@@ -170,7 +234,7 @@ namespace AgendaNotifier
             menu.Items.Add(startupItem);
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("Sair", null, delegate { ExitApp(); });
-            tray = new NotifyIcon { Icon = SystemIcons.Information, Text = "Agenda - Notificações", Visible = true, ContextMenuStrip = menu };
+            tray = new NotifyIcon { Icon = AppIcon.Current, Text = "Agenda - Notificações", Visible = true, ContextMenuStrip = menu };
             tray.DoubleClick += delegate { OpenAgenda(); };
             tray.BalloonTipClicked += delegate { if (visibleNotification != null) OpenUrl(visibleNotification.url); else OpenAgenda(); };
             pollTimer = new System.Windows.Forms.Timer { Interval = 60000 };
@@ -179,15 +243,24 @@ namespace AgendaNotifier
             displayTimer.Tick += delegate { DisplayNext(); };
             ConfigureClient();
             pollTimer.Start();
-            if (string.IsNullOrWhiteSpace(config.GetToken())) ShowConfiguration(); else PollAsync();
+            if (string.IsNullOrWhiteSpace(config.GetToken()))
+            {
+                ShowConfiguration();
+            }
+            else
+            {
+                PollAsync();
+                if (args == null || Array.IndexOf(args, "--startup") < 0)
+                    MessageBox.Show("O Agenda Notifier está funcionando em segundo plano.\\n\\nVocê pode acessá-lo pelo ícone na bandeja do Windows.", "Agenda Notifier", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
         }
 
         private void ConfigureClient()
         {
             if (client != null) client.Dispose();
             client = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
-            var token = config.GetToken();
-            if (!string.IsNullOrWhiteSpace(token)) client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            var deviceKey = config.GetToken();
+            if (!string.IsNullOrWhiteSpace(deviceKey)) client.DefaultRequestHeaders.Add("X-Device-Key", deviceKey);
         }
 
         private async void PollAsync()
@@ -295,7 +368,7 @@ namespace AgendaNotifier
         internal ConfigurationForm(AppConfig current)
         {
             Text = "Agenda - Notificações do Windows";
-            Icon = SystemIcons.Information;
+            Icon = AppIcon.Current;
             StartPosition = FormStartPosition.CenterScreen;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
@@ -323,20 +396,27 @@ namespace AgendaNotifier
             statusLabel.Text = "Validando conexão…";
             try
             {
-                var raw = Encoding.UTF8.GetString(Convert.FromBase64String(codeBox.Text.Trim()));
+                var activationCode = new string((codeBox.Text ?? "").Where(character => !char.IsWhiteSpace(character)).ToArray());
+                if (activationCode.StartsWith("eyJhbGci", StringComparison.OrdinalIgnoreCase) || activationCode.Split('.').Length == 3)
+                    throw new InvalidOperationException("Foi colado o token do portal. Gere o código AGENDA1- na tela Notificações do Windows.");
+                if (activationCode.StartsWith("AGENDA1-", StringComparison.OrdinalIgnoreCase))
+                    activationCode = activationCode.Substring(8);
+                activationCode = activationCode.Replace('-', '+').Replace('_', '/');
+                while (activationCode.Length % 4 != 0) activationCode += "=";
+                var raw = Encoding.UTF8.GetString(Convert.FromBase64String(activationCode));
                 var payload = json.Deserialize<ActivationPayload>(raw);
-                if (payload == null || string.IsNullOrWhiteSpace(payload.serverUrl) || string.IsNullOrWhiteSpace(payload.token)) throw new InvalidOperationException("Código incompleto.");
+                if (payload == null || string.IsNullOrWhiteSpace(payload.serverUrl) || string.IsNullOrWhiteSpace(payload.Key)) throw new InvalidOperationException("Código incompleto.");
                 payload.serverUrl = payload.serverUrl.TrimEnd('/');
                 using (var testClient = new HttpClient { Timeout = TimeSpan.FromSeconds(20) })
                 {
-                    testClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", payload.token);
+                    testClient.DefaultRequestHeaders.Add("X-Device-Key", payload.Key);
                     var now = DateTime.Now;
                     var response = await testClient.GetAsync(payload.serverUrl + "/api/notifications/device/pending?date=" + Uri.EscapeDataString(now.ToString("yyyy-MM-dd")) + "&time=" + Uri.EscapeDataString(now.ToString("HH:mm")));
                     if (response.StatusCode == HttpStatusCode.Unauthorized) throw new InvalidOperationException("Código inválido ou revogado.");
                     response.EnsureSuccessStatusCode();
                 }
                 Result = new AppConfig { serverUrl = payload.serverUrl };
-                Result.SetToken(payload.token);
+                Result.SetToken(payload.Key);
                 DialogResult = DialogResult.OK;
                 Close();
             }
