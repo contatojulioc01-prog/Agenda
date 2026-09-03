@@ -90,7 +90,7 @@ export class KanbanBoardComponent implements OnDestroy {
   readonly inviteableUsers = computed(() => [...this.auth.allUsers()].sort((first, second) =>
     (first.name || first.email || '').localeCompare(second.name || second.email || '', 'pt-BR', { sensitivity: 'base' })
   ));
-  private readonly routeState = signal({ boardId: '', taskId: '', parentId: '', action: '', search: '', priority: 'all', assignee: 'all', archived: false });
+  private readonly routeState = signal({ boardId: '', taskId: '', parentId: '', columnId: '', action: '', search: '', priority: 'all', assignee: 'all', archived: false });
   private hydratedRouteKey = '';
   private readonly routeHydration = effect(() => {
     const state = this.routeState();
@@ -103,7 +103,7 @@ export class KanbanBoardComponent implements OnDestroy {
     if (!state.boardId && this.router.url.split('?')[0].startsWith('/tarefas')) {
       void this.router.navigate(['/tarefas', board.id], { replaceUrl: true });
     }
-    const key = `${board.id}|${state.taskId}|${state.parentId}|${state.action}|${state.search}|${state.priority}|${state.assignee}|${state.archived}`;
+    const key = `${board.id}|${state.taskId}|${state.parentId}|${state.columnId}|${state.action}|${state.search}|${state.priority}|${state.assignee}|${state.archived}`;
     if (key === this.hydratedRouteKey) return;
     this.hydratedRouteKey = key;
 
@@ -126,7 +126,7 @@ export class KanbanBoardComponent implements OnDestroy {
 
     const task = state.taskId ? board.tasks.find(item => item.id === state.taskId) : undefined;
     if (task) this.openEditDraft(task);
-    else if (state.action === 'nova-tarefa') this.openCreateDraft();
+    else if (state.action === 'nova-tarefa') this.openCreateDraft(state.columnId || undefined);
     else this.modalOpen.set(false);
   });
 
@@ -152,6 +152,7 @@ export class KanbanBoardComponent implements OnDestroy {
         boardId: params.get('boardId') || '',
         taskId: query.get('tarefa') || '',
         parentId: query.get('ramificacao') || '',
+        columnId: query.get('lista') || '',
         action: query.get('acao') || '',
         search: query.get('busca') || '',
         priority: query.get('prioridade') || 'all',
@@ -255,7 +256,7 @@ export class KanbanBoardComponent implements OnDestroy {
 
   openCreate(columnId?: string): void {
     if (!this.openCreateDraft(columnId)) return;
-    this.updateUrl({ acao: 'nova-tarefa', tarefa: null });
+    this.updateUrl({ acao: 'nova-tarefa', tarefa: null, lista: this.draft.columnId });
   }
 
   private openCreateDraft(columnId?: string): boolean {
@@ -273,12 +274,12 @@ export class KanbanBoardComponent implements OnDestroy {
 
   closeTaskModal(): void {
     this.modalOpen.set(false);
-    this.updateUrl({ tarefa: null, acao: null });
+    this.updateUrl({ tarefa: null, acao: null, lista: null });
   }
 
   openEdit(task: KanbanTask): void {
     this.openEditDraft(task);
-    this.updateUrl({ tarefa: task.id, acao: null });
+    this.updateUrl({ tarefa: task.id, acao: null, lista: null });
   }
 
   private openEditDraft(task: KanbanTask): void {
