@@ -48,6 +48,8 @@ function taskDto(task, attachments = []) {
     createdBy: task.created_by,
     createdAt: task.created_at,
     updatedAt: task.updated_at,
+    deletedAt: task.deleted_at || null,
+    deletedBy: task.deleted_by || null,
     labels: parseJson(task.labels || '[]', []),
     checklist: parseJson(task.checklist || '[]', []),
     archived: task.archived === 1,
@@ -156,10 +158,10 @@ async function syncTaskCalendarEvents(taskId, broadcast) {
     WHERE kt.id = ?`, [taskId]);
   if (!task) return;
   const targets = new Map();
-  if (!task.archived && task.due_date && task.scope_type === 'team' && task.team_id) {
+  if (!task.deleted_at && !task.archived && task.due_date && task.scope_type === 'team' && task.team_id) {
     const calendar = await ensureTeamCalendar(task.team_id, broadcast);
     if (calendar) targets.set(`team:${task.team_id}`, calendar);
-  } else if (!task.archived && task.due_date) {
+  } else if (!task.deleted_at && !task.archived && task.due_date) {
     let responsibleIds = parseJson(task.assignee_ids || '[]', []);
     if (!responsibleIds.length && task.assignee_id) responsibleIds = [task.assignee_id];
     if (!responsibleIds.length && task.created_by) responsibleIds = [task.created_by];
@@ -219,6 +221,40 @@ async function deleteTaskCalendarEvents(taskId, broadcast) {
 async function deleteBoardCalendarEvents(boardId, broadcast) {
   const tasks = await db.all('SELECT id FROM kanban_tasks WHERE board_id = ?', [boardId]);
   for (const task of tasks) await deleteTaskCalendarEvents(task.id, broadcast);
+}
+
+async function taskDescendants(taskId) {
+  return db.all(`WITH RECURSIVE tree(id) AS (
+    SELECT id FROM kanban_tasks WHERE parent_task_id = ?
+    UNION ALL SELECT t.id FROM kanban_tasks t JOIN tree ON t.parent_task_id = tree.id
+  ) SELECT id FROM tree`, [taskId]);
+}
+
+async function permanentlyDeleteTaskTree(task, broadcast = () => {}) {
+  const descendants = await taskDescendants(task.id);
+  const allTasks = [task, ...descendants];
+  for (const item of allTasks) await deleteTaskCalendarEvents(item.id, broadcast);
+  await db.transaction(async tx => {
+    for (const item of [...allTasks].reverse()) {
+      await tx.run(`DELETE FROM attachments WHERE owner_type = 'task' AND owner_id = ?`, [item.id]);
+      await tx.run('DELETE FROM kanban_tasks WHERE id = ?', [item.id]);
+    }
+  });
+  return descendants.length;
+}
+
+async function purgeExpiredTrash(broadcast = () => {}) {
+  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const expiredRoots = await db.all(`SELECT t.* FROM kanban_tasks t
+    WHERE t.deleted_at IS NOT NULL AND t.deleted_at <= ?
+      AND (t.parent_task_id IS NULL OR NOT EXISTS (
+        SELECT 1 FROM kanban_tasks parent WHERE parent.id = t.parent_task_id AND parent.deleted_at IS NOT NULL
+      ))`, [cutoff]);
+  for (const task of expiredRoots) {
+    await permanentlyDeleteTaskTree(task, broadcast);
+    broadcast({ type: 'kanban_updated', boardId: task.board_id, taskId: task.id });
+  }
+  return expiredRoots.length;
 }
 
 router.use((req, res, next) => {
@@ -392,14 +428,17 @@ router.get('/boards', asyncRoute(async (req, res) => {
   const rows = await db.all(`SELECT DISTINCT b.*,
     CASE WHEN b.scope_type = 'team' THEN tm.role ELSE 'admin' END AS my_role,
     t.name AS team_name,
-    (SELECT COUNT(*) FROM kanban_tasks x WHERE x.board_id = b.id AND x.archived = 0) task_count
+    (SELECT COUNT(*) FROM kanban_tasks x WHERE x.board_id = b.id AND x.archived = 0 AND x.deleted_at IS NULL) task_count,
+    (SELECT COUNT(*) FROM kanban_tasks x WHERE x.board_id = b.id AND x.deleted_at IS NOT NULL
+      AND (x.parent_task_id IS NULL OR NOT EXISTS (SELECT 1 FROM kanban_tasks p WHERE p.id = x.parent_task_id AND p.deleted_at IS NOT NULL))) trash_count
     FROM kanban_boards b
     LEFT JOIN kanban_team_members tm ON tm.team_id = b.team_id AND tm.user_id = ?
     LEFT JOIN kanban_teams t ON t.id = b.team_id
     WHERE (COALESCE(b.scope_type, 'personal') = 'personal' AND b.owner_id = ?)
        OR (b.scope_type = 'team' AND tm.user_id = ?)
     ORDER BY b.scope_type, b.created_at`, [userId(req), userId(req), userId(req)]);
-  res.json(rows.map(row => ({ ...boardDto(row, row.my_role), teamName: row.team_name, taskCount: Number(row.task_count) })));
+  res.json(rows.map(row => ({ ...boardDto(row, row.my_role), teamName: row.team_name,
+    taskCount: Number(row.task_count), trashCount: Number(row.trash_count) })));
 }));
 
 router.post('/boards', asyncRoute(async (req, res) => {
@@ -416,9 +455,24 @@ router.get('/boards/:boardId', asyncRoute(async (req, res) => {
   const access = await boardAccess(req.params.boardId, userId(req));
   if (!access) return res.status(404).json({ error: 'Quadro não encontrado' });
   const columns = await db.all('SELECT * FROM kanban_columns WHERE board_id = ? ORDER BY position, created_at', [access.board.id]);
-  const taskRows = await db.all('SELECT * FROM kanban_tasks WHERE board_id = ? ORDER BY parent_task_id, column_id, position, created_at', [access.board.id]);
+  const taskRows = await db.all('SELECT * FROM kanban_tasks WHERE board_id = ? AND deleted_at IS NULL ORDER BY parent_task_id, column_id, position, created_at', [access.board.id]);
   const tasks = await Promise.all(taskRows.map(async task => taskDto(task, await listAttachments('task', task.id))));
-  res.json({ ...boardDto(access.board, access.role), columns, tasks });
+  const trash = await db.get(`SELECT COUNT(*) trash_count FROM kanban_tasks t WHERE t.board_id = ? AND t.deleted_at IS NOT NULL
+    AND (t.parent_task_id IS NULL OR NOT EXISTS (SELECT 1 FROM kanban_tasks parent WHERE parent.id = t.parent_task_id AND parent.deleted_at IS NOT NULL))`, [access.board.id]);
+  res.json({ ...boardDto(access.board, access.role), columns, tasks, trashCount: Number(trash?.trash_count || 0) });
+}));
+
+router.get('/boards/:boardId/trash', asyncRoute(async (req, res) => {
+  const access = await boardAccess(req.params.boardId, userId(req));
+  if (!access) return res.status(404).json({ error: 'Quadro não encontrado' });
+  await purgeExpiredTrash(req.broadcast);
+  const rows = await db.all(`SELECT t.* FROM kanban_tasks t
+    WHERE t.board_id = ? AND t.deleted_at IS NOT NULL
+      AND (t.parent_task_id IS NULL OR NOT EXISTS (
+        SELECT 1 FROM kanban_tasks parent WHERE parent.id = t.parent_task_id AND parent.deleted_at IS NOT NULL
+      )) ORDER BY t.deleted_at DESC`, [access.board.id]);
+  const tasks = await Promise.all(rows.map(async task => taskDto(task, await listAttachments('task', task.id))));
+  res.json(tasks);
 }));
 
 router.put('/boards/:boardId', asyncRoute(async (req, res) => {
@@ -511,7 +565,7 @@ router.post('/boards/:boardId/tasks', asyncRoute(async (req, res) => {
   if (validationError) return res.status(400).json({ error: validationError });
   if (!column) return res.status(400).json({ error: 'A lista informada não pertence a este quadro' });
   if (!(await validAssignees(access.board, assigneeIds))) return res.status(400).json({ error: 'Um ou mais responsáveis não pertencem a este Kanban' });
-  if (parentTaskId && !(await db.get('SELECT 1 FROM kanban_tasks WHERE id = ? AND board_id = ?', [parentTaskId, access.board.id]))) return res.status(400).json({ error: 'Tarefa principal inválida' });
+  if (parentTaskId && !(await db.get('SELECT 1 FROM kanban_tasks WHERE id = ? AND board_id = ? AND deleted_at IS NULL', [parentTaskId, access.board.id]))) return res.status(400).json({ error: 'Tarefa principal inválida' });
   const next = await db.get(`SELECT COALESCE(MAX(position), -1) + 1 next FROM kanban_tasks
     WHERE column_id = ? AND archived = 0 AND COALESCE(parent_task_id, '') = COALESCE(?, '')`, [column.id, parentTaskId]);
   const taskId = id('tsk');
@@ -529,7 +583,7 @@ router.post('/boards/:boardId/tasks', asyncRoute(async (req, res) => {
 router.put('/tasks/:taskId', asyncRoute(async (req, res) => {
   const task = await db.get('SELECT * FROM kanban_tasks WHERE id = ?', [req.params.taskId]);
   const access = task && await boardAccess(task.board_id, userId(req), true);
-  if (!task || !access) return res.status(404).json({ error: 'Tarefa não encontrada' });
+  if (!task || !access || task.deleted_at) return res.status(404).json({ error: 'Tarefa não encontrada' });
   const validationError = validateTaskInput(req.body, true);
   if (validationError) return res.status(400).json({ error: validationError });
   if (req.body.columnId !== undefined && !(await db.get('SELECT 1 FROM kanban_columns WHERE id = ? AND board_id = ?', [req.body.columnId, task.board_id]))) {
@@ -583,27 +637,55 @@ router.post('/boards/:boardId/reorder', asyncRoute(async (req, res) => {
   res.json({ success: true });
 }));
 
+router.put('/tasks/:taskId/restore', asyncRoute(async (req, res) => {
+  const task = await db.get('SELECT * FROM kanban_tasks WHERE id = ?', [req.params.taskId]);
+  const access = task && await boardAccess(task.board_id, userId(req));
+  if (!task || !access) return res.status(404).json({ error: 'Tarefa não encontrada' });
+  if (access.role !== 'admin') return res.status(403).json({ error: 'Somente administradores podem restaurar tarefas' });
+  if (!task.deleted_at) return res.status(409).json({ error: 'A tarefa não está na lixeira' });
+  if (task.parent_task_id && await db.get('SELECT 1 FROM kanban_tasks WHERE id = ? AND deleted_at IS NOT NULL', [task.parent_task_id])) {
+    return res.status(409).json({ error: 'Restaure a tarefa principal para recuperar esta ramificação' });
+  }
+  const descendants = await taskDescendants(task.id);
+  const restoredIds = [task.id, ...descendants.map(item => item.id)];
+  const now = new Date().toISOString();
+  await db.transaction(async tx => {
+    for (const restoredId of restoredIds) await tx.run('UPDATE kanban_tasks SET deleted_at = NULL, deleted_by = NULL, updated_at = ? WHERE id = ?', [now, restoredId]);
+  });
+  for (const restoredId of restoredIds) await syncTaskCalendarEvents(restoredId, req.broadcast);
+  req.broadcast({ type: 'kanban_updated', boardId: task.board_id, taskId: task.id });
+  res.json({ success: true, restoredDescendants: descendants.length });
+}));
+
+router.delete('/tasks/:taskId/permanent', asyncRoute(async (req, res) => {
+  const task = await db.get('SELECT * FROM kanban_tasks WHERE id = ?', [req.params.taskId]);
+  const access = task && await boardAccess(task.board_id, userId(req));
+  if (!task || !access) return res.status(404).json({ error: 'Tarefa não encontrada' });
+  if (access.role !== 'admin') return res.status(403).json({ error: 'Somente administradores podem excluir tarefas permanentemente' });
+  if (!task.deleted_at) return res.status(409).json({ error: 'Mova a tarefa para a lixeira antes da exclusão permanente' });
+  const deletedDescendants = await permanentlyDeleteTaskTree(task, req.broadcast);
+  req.broadcast({ type: 'kanban_updated', boardId: task.board_id, taskId: task.id });
+  res.json({ success: true, deletedDescendants });
+}));
+
 router.delete('/tasks/:taskId', asyncRoute(async (req, res) => {
   const task = await db.get('SELECT * FROM kanban_tasks WHERE id = ?', [req.params.taskId]);
   const access = task && await boardAccess(task.board_id, userId(req));
   if (!task || !access) return res.status(404).json({ error: 'Tarefa não encontrada' });
   if (access.role !== 'admin') return res.status(403).json({ error: 'Somente administradores podem excluir tarefas' });
-  const descendants = await db.all(`WITH RECURSIVE tree(id) AS (
-    SELECT id FROM kanban_tasks WHERE parent_task_id = ?
-    UNION ALL SELECT t.id FROM kanban_tasks t JOIN tree ON t.parent_task_id = tree.id
-  ) SELECT id FROM tree`, [task.id]);
+  if (task.deleted_at) return res.status(409).json({ error: 'A tarefa já está na lixeira' });
+  const descendants = await taskDescendants(task.id);
   for (const child of descendants) await deleteTaskCalendarEvents(child.id, req.broadcast);
   await deleteTaskCalendarEvents(task.id, req.broadcast);
+  const now = new Date().toISOString();
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
   await db.transaction(async tx => {
-    for (const child of [...descendants].reverse()) {
-      await tx.run(`DELETE FROM attachments WHERE owner_type = 'task' AND owner_id = ?`, [child.id]);
-      await tx.run('DELETE FROM kanban_tasks WHERE id = ?', [child.id]);
-    }
-    await tx.run(`DELETE FROM attachments WHERE owner_type = 'task' AND owner_id = ?`, [task.id]);
-    await tx.run('DELETE FROM kanban_tasks WHERE id = ?', [task.id]);
+    await tx.run('UPDATE kanban_tasks SET deleted_at = ?, deleted_by = ?, updated_at = ? WHERE id = ?', [now, userId(req), now, task.id]);
+    for (const child of descendants) await tx.run('UPDATE kanban_tasks SET deleted_at = ?, deleted_by = ?, updated_at = ? WHERE id = ?', [now, userId(req), now, child.id]);
   });
   req.broadcast({ type: 'kanban_updated', boardId: task.board_id, taskId: task.id });
-  res.json({ success: true, deletedDescendants: descendants.length });
+  res.json({ success: true, trashedDescendants: descendants.length, expiresAt });
 }));
 
 module.exports = router;
+module.exports.purgeExpiredTrash = purgeExpiredTrash;

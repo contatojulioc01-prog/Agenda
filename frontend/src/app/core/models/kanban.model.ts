@@ -8,6 +8,7 @@ export interface KanbanBoardSummary {
   owner_id: string;
   task_count?: number;
   taskCount?: number;
+  trashCount?: number;
   scopeType: 'personal' | 'team';
   teamId: string | null;
   teamName?: string;
@@ -44,6 +45,8 @@ export interface KanbanTask {
   archived: boolean;
   createdAt: string;
   updatedAt: string;
+  deletedAt: string | null;
+  deletedBy: string | null;
   parentTaskId: string | null;
   attachments: Attachment[];
 }

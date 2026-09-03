@@ -13,6 +13,7 @@
 
     <div class="toolbar-actions">
       <button class="secondary-btn" (click)="openTeamManager()"><mat-icon>groups</mat-icon>Gerenciar times</button>
+      <button class="secondary-btn trash-open-btn" (click)="openTrash()" matTooltip="Abrir lixeira"><mat-icon>delete_outline</mat-icon>Lixeira<span *ngIf="board()?.trashCount" class="trash-count">{{ board()?.trashCount }}</span></button>
       <button class="primary-btn" (click)="openCreate()"><mat-icon>add</mat-icon>Nova tarefa</button>
     </div>
 
@@ -120,24 +121,52 @@
   <button type="button" (click)="editTaskFromContext(menu.task)"><mat-icon>edit</mat-icon>Editar tarefa</button>
   <button type="button" (click)="openTaskBranchFromContext(menu.task)"><mat-icon>account_tree</mat-icon>{{ branchHasContent(menu.task) ? 'Abrir subtarefas' : 'Criar subtarefas' }}</button>
   <button type="button" (click)="toggleTaskArchiveFromContext(menu.task)"><mat-icon>{{ menu.task.archived ? 'unarchive' : 'archive' }}</mat-icon>{{ menu.task.archived ? 'Restaurar tarefa' : 'Arquivar tarefa' }}</button>
-  <button type="button" class="danger" *ngIf="canDeleteTasks()" (click)="deleteTaskFromContext(menu.task)"><mat-icon>delete_forever</mat-icon>Excluir tarefa</button>
+  <button type="button" class="danger" *ngIf="canDeleteTasks()" (click)="deleteTaskFromContext(menu.task)"><mat-icon>delete_outline</mat-icon>Mover para lixeira</button>
 </div>
 
 <div class="column-dialog-backdrop" *ngIf="taskDeleteTarget() as task" (mousedown)="cancelTaskDeletion()">
   <section class="column-dialog team-delete-dialog" role="dialog" aria-modal="true" aria-labelledby="task-delete-title" (mousedown)="$event.stopPropagation()">
     <header>
-      <span class="column-dialog-icon delete"><mat-icon>delete_forever</mat-icon></span>
-      <div><h2 id="task-delete-title">Excluir tarefa</h2><p>Esta ação não poderá ser desfeita.</p></div>
+      <span class="column-dialog-icon delete"><mat-icon>delete_outline</mat-icon></span>
+      <div><h2 id="task-delete-title">Mover para lixeira</h2><p>A tarefa poderá ser restaurada durante 30 dias.</p></div>
       <button class="icon-btn" type="button" [disabled]="taskDeleteLoading()" (click)="cancelTaskDeletion()"><mat-icon>close</mat-icon></button>
     </header>
     <div class="column-dialog-body delete-copy">
-      <p>Deseja excluir permanentemente <strong>{{ task.title }}</strong>?</p>
-      <div class="blocked-warning"><mat-icon>warning_amber</mat-icon><span>As subtarefas vinculadas e os eventos de prazo desta tarefa também serão excluídos.</span></div>
+      <p>Deseja mover <strong>{{ task.title }}</strong> para a lixeira?</p>
+      <div class="blocked-warning"><mat-icon>info_outline</mat-icon><span>As subtarefas vinculadas também irão para a lixeira. Os prazos sairão da Agenda e voltarão caso a tarefa seja restaurada.</span></div>
     </div>
     <footer>
       <button class="cancel-btn" type="button" [disabled]="taskDeleteLoading()" (click)="cancelTaskDeletion()">Cancelar</button>
-      <button class="delete-confirm-btn" type="button" [disabled]="taskDeleteLoading()" (click)="confirmTaskDeletion()"><mat-icon>{{ taskDeleteLoading() ? 'hourglass_top' : 'delete_forever' }}</mat-icon>{{ taskDeleteLoading() ? 'Excluindo...' : 'Excluir tarefa' }}</button>
+      <button class="delete-confirm-btn" type="button" [disabled]="taskDeleteLoading()" (click)="confirmTaskDeletion()"><mat-icon>{{ taskDeleteLoading() ? 'hourglass_top' : 'delete_outline' }}</mat-icon>{{ taskDeleteLoading() ? 'Movendo...' : 'Mover para lixeira' }}</button>
     </footer>
+  </section>
+</div>
+
+<div class="trash-backdrop" *ngIf="trashOpen()" (mousedown)="closeTrash()">
+  <section class="trash-modal" role="dialog" aria-modal="true" aria-labelledby="trash-title" (mousedown)="$event.stopPropagation()">
+    <header>
+      <span class="trash-modal-icon"><mat-icon>delete_outline</mat-icon></span>
+      <div><h2 id="trash-title">Lixeira de tarefas</h2><p>Itens são excluídos permanentemente após 30 dias.</p></div>
+      <button class="icon-btn" type="button" [disabled]="trashActionLoading()" (click)="closeTrash()"><mat-icon>close</mat-icon></button>
+    </header>
+    <div class="trash-body">
+      <div class="trash-loading" *ngIf="service.trashLoading()"><span class="spinner"></span>Carregando lixeira...</div>
+      <div class="trash-empty" *ngIf="!service.trashLoading() && !service.trash().length"><mat-icon>delete_sweep</mat-icon><strong>A lixeira está vazia</strong><span>As tarefas excluídas aparecerão aqui.</span></div>
+      <article class="trash-item" *ngFor="let task of service.trash(); trackBy: trackById">
+        <div class="trash-item-icon"><mat-icon>task_alt</mat-icon></div>
+        <div class="trash-item-info"><strong>{{ task.title }}</strong><span>Excluída em {{ formatTrashDate(task) }} · {{ trashDaysRemaining(task) }} dia{{ trashDaysRemaining(task) === 1 ? '' : 's' }} restante{{ trashDaysRemaining(task) === 1 ? '' : 's' }}</span><small *ngIf="task.attachments.length"><mat-icon>attach_file</mat-icon>{{ task.attachments.length }} anexo{{ task.attachments.length === 1 ? '' : 's' }}</small></div>
+        <div class="trash-actions" *ngIf="canDeleteTasks()"><button type="button" class="restore-task-btn" [disabled]="trashActionLoading()" (click)="restoreFromTrash(task)"><mat-icon>restore</mat-icon>Restaurar</button><button type="button" class="permanent-task-btn" [disabled]="trashActionLoading()" (click)="requestPermanentDeletion(task)" matTooltip="Excluir permanentemente"><mat-icon>delete_forever</mat-icon></button></div>
+      </article>
+      <p class="trash-readonly" *ngIf="!canDeleteTasks() && service.trash().length"><mat-icon>info_outline</mat-icon>Somente administradores podem restaurar ou excluir tarefas permanentemente.</p>
+    </div>
+  </section>
+</div>
+
+<div class="column-dialog-backdrop permanent-delete-backdrop" *ngIf="permanentDeleteTarget() as task" (mousedown)="permanentDeleteTarget.set(null)">
+  <section class="column-dialog team-delete-dialog" role="alertdialog" aria-modal="true" aria-labelledby="permanent-delete-title" (mousedown)="$event.stopPropagation()">
+    <header><span class="column-dialog-icon delete"><mat-icon>delete_forever</mat-icon></span><div><h2 id="permanent-delete-title">Excluir permanentemente</h2><p>Esta ação não poderá ser desfeita.</p></div></header>
+    <div class="column-dialog-body delete-copy"><p>Deseja apagar definitivamente <strong>{{ task.title }}</strong>?</p><div class="blocked-warning"><mat-icon>warning_amber</mat-icon><span>Subtarefas, checklists e anexos vinculados também serão apagados.</span></div></div>
+    <footer><button class="cancel-btn" type="button" [disabled]="trashActionLoading()" (click)="permanentDeleteTarget.set(null)">Cancelar</button><button class="delete-confirm-btn" type="button" [disabled]="trashActionLoading()" (click)="confirmPermanentDeletion()"><mat-icon>{{ trashActionLoading() ? 'hourglass_top' : 'delete_forever' }}</mat-icon>{{ trashActionLoading() ? 'Excluindo...' : 'Excluir permanentemente' }}</button></footer>
   </section>
 </div>
 
@@ -268,7 +297,7 @@
         <iframe *ngIf='attachmentPreviewMimeType() === "application/pdf"' [src]='trustedAttachmentPreviewUrl()' [title]='attachmentPreviewName()'></iframe>
       </section>
     </div>
-    <footer><div><button *ngIf="editingId() && !showArchived()" class="archive-btn" [disabled]="savingTask()" (click)="archiveEditing()"><mat-icon>archive</mat-icon>Arquivar</button><button *ngIf="editingId() && !showArchived()" class="subtasks-btn" [disabled]="savingTask()" (click)="openEditingChildBoard()"><mat-icon>account_tree</mat-icon>Subtarefas</button><button *ngIf="editingId() && showArchived()" class="archive-btn" [disabled]="savingTask()" (click)="archiveEditing()"><mat-icon>unarchive</mat-icon>Restaurar</button><button *ngIf="editingId() && canDeleteTasks()" class="delete-btn" [disabled]="savingTask()" (click)="deleteEditing()"><mat-icon>delete_forever</mat-icon>Excluir</button></div><div><button class="cancel-btn" [disabled]="savingTask()" (click)="closeTaskModal()">Cancelar</button><button class="primary-btn" [disabled]="savingTask() || !draft.title.trim()" (click)="saveTask()"><mat-icon>{{ savingTask() ? 'hourglass_top' : 'save' }}</mat-icon>{{ savingTask() ? 'Salvando...' : 'Salvar tarefa' }}</button></div></footer>
+    <footer><div><button *ngIf="editingId() && !showArchived()" class="archive-btn" [disabled]="savingTask()" (click)="archiveEditing()"><mat-icon>archive</mat-icon>Arquivar</button><button *ngIf="editingId() && !showArchived()" class="subtasks-btn" [disabled]="savingTask()" (click)="openEditingChildBoard()"><mat-icon>account_tree</mat-icon>Subtarefas</button><button *ngIf="editingId() && showArchived()" class="archive-btn" [disabled]="savingTask()" (click)="archiveEditing()"><mat-icon>unarchive</mat-icon>Restaurar</button><button *ngIf="editingId() && canDeleteTasks()" class="delete-btn" [disabled]="savingTask()" (click)="deleteEditing()"><mat-icon>delete_outline</mat-icon>Lixeira</button></div><div><button class="cancel-btn" [disabled]="savingTask()" (click)="closeTaskModal()">Cancelar</button><button class="primary-btn" [disabled]="savingTask() || !draft.title.trim()" (click)="saveTask()"><mat-icon>{{ savingTask() ? 'hourglass_top' : 'save' }}</mat-icon>{{ savingTask() ? 'Salvando...' : 'Salvar tarefa' }}</button></div></footer>
   </section>
 </div>
 

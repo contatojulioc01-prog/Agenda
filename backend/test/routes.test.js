@@ -218,7 +218,7 @@ test('impede membro comum de excluir tarefa pelo endpoint', async () => {
   });
 });
 
-test('permite administrador excluir tarefa ativa', async () => {
+test('permite administrador mover tarefa ativa para a lixeira sem apagar anexos', async () => {
   const statements = [];
   await withRouter('../routes/kanban', fakeDb => {
     fakeDb.get = async sql => {
@@ -240,9 +240,79 @@ test('permite administrador excluir tarefa ativa', async () => {
       headers: { 'x-user-id': 'admin-1' },
     });
     assert.equal(response.status, 200);
+    const result = await response.json();
+    assert.equal(result.success, true);
+    assert.equal(result.trashedDescendants, 0);
+    assert.match(result.expiresAt, /^\d{4}-\d{2}-\d{2}T/);
+    assert.ok(statements.some(item => item.sql.includes('UPDATE kanban_tasks SET deleted_at') && item.params.includes('task-1')));
+    assert.ok(!statements.some(item => item.sql.includes('DELETE FROM attachments')));
+  });
+});
+
+test('restaura tarefa da lixeira e limpa a data de exclusão', async () => {
+  const statements = [];
+  const task = { id: 'task-1', board_id: 'board-1', parent_task_id: null, deleted_at: '2026-08-20T10:00:00.000Z', due_date: null, archived: 0 };
+  await withRouter('../routes/kanban', fakeDb => {
+    fakeDb.get = async sql => {
+      if (sql.includes('SELECT kt.*, kb.scope_type')) return { ...task, deleted_at: null, scope_type: 'personal' };
+      if (sql.includes('FROM kanban_tasks WHERE id')) return task;
+      if (sql.includes('FROM kanban_boards')) return { id: 'board-1', scope_type: 'team', team_id: 'team-1' };
+      if (sql.includes('FROM kanban_team_members')) return { role: 'admin' };
+      return null;
+    };
+    fakeDb.all = async () => [];
+    fakeDb.run = async () => ({ rowCount: 1 });
+    fakeDb.transaction = callback => callback({ run: async (sql, params = []) => { statements.push({ sql, params }); return { rowCount: 1 }; } });
+  }, async baseUrl => {
+    const response = await fetch(`${baseUrl}/tasks/task-1/restore`, { method: 'PUT', headers: { 'content-type': 'application/json', 'x-user-id': 'admin-1' }, body: '{}' });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { success: true, restoredDescendants: 0 });
+    assert.ok(statements.some(item => item.sql.includes('deleted_at = NULL') && item.params.includes('task-1')));
+  });
+});
+
+test('exclui permanentemente somente tarefa que está na lixeira', async () => {
+  const statements = [];
+  await withRouter('../routes/kanban', fakeDb => {
+    fakeDb.get = async sql => {
+      if (sql.includes('FROM kanban_tasks WHERE id')) return { id: 'task-1', board_id: 'board-1', deleted_at: '2026-08-20T10:00:00.000Z' };
+      if (sql.includes('FROM kanban_boards')) return { id: 'board-1', scope_type: 'team', team_id: 'team-1' };
+      if (sql.includes('FROM kanban_team_members')) return { role: 'admin' };
+      return null;
+    };
+    fakeDb.all = async () => [];
+    fakeDb.transaction = callback => callback({ run: async (sql, params = []) => { statements.push({ sql, params }); return { rowCount: 1 }; } });
+  }, async baseUrl => {
+    const response = await fetch(`${baseUrl}/tasks/task-1/permanent`, { method: 'DELETE', headers: { 'x-user-id': 'admin-1' } });
+    assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { success: true, deletedDescendants: 0 });
+    assert.ok(statements.some(item => item.sql.includes('DELETE FROM attachments') && item.params.includes('task-1')));
     assert.ok(statements.some(item => item.sql.includes('DELETE FROM kanban_tasks') && item.params.includes('task-1')));
   });
+});
+
+test('limpeza automática remove tarefas com mais de 30 dias e seus anexos', async () => {
+  const originals = { get: db.get, all: db.all, run: db.run, transaction: db.transaction };
+  const statements = [];
+  try {
+    db.all = async (sql, params = []) => {
+      if (sql.includes('t.deleted_at <= ?')) {
+        assert.ok(new Date(params[0]).getTime() <= Date.now() - 30 * 24 * 60 * 60 * 1000 + 1000);
+        return [{ id: 'expired-task', board_id: 'board-1', deleted_at: '2026-07-01T00:00:00.000Z' }];
+      }
+      return [];
+    };
+    db.transaction = callback => callback({ run: async (sql, params = []) => { statements.push({ sql, params }); return { rowCount: 1 }; } });
+    delete require.cache[require.resolve('../routes/kanban')];
+    const router = require('../routes/kanban');
+    const purged = await router.purgeExpiredTrash(() => {});
+    assert.equal(purged, 1);
+    assert.ok(statements.some(item => item.sql.includes('DELETE FROM attachments') && item.params.includes('expired-task')));
+    assert.ok(statements.some(item => item.sql.includes('DELETE FROM kanban_tasks') && item.params.includes('expired-task')));
+  } finally {
+    Object.assign(db, originals);
+    delete require.cache[require.resolve('../routes/kanban')];
+  }
 });
 
 test('envia PDF binário como anexo pré-visualizável para uma tarefa acessível', async () => {

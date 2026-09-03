@@ -15,6 +15,8 @@ export class KanbanService {
   readonly teams = signal<KanbanTeam[]>([]);
   readonly teamInvitations = signal<KanbanTeamInvitation[]>([]);
   readonly teamMembers = signal<KanbanTeamMember[]>([]);
+  readonly trash = signal<KanbanTask[]>([]);
+  readonly trashLoading = signal(false);
   readonly loading = signal(false);
   readonly error = signal('');
   private boardLoadVersion = new Map<string, number>();
@@ -242,9 +244,55 @@ export class KanbanService {
       }
     }
     this.http.delete(`/api/kanban/tasks/${id}`, { headers: this.headers })
-      .pipe(catchError(err => { this.error.set(err.error?.error || 'Erro ao excluir tarefa.'); return of(null); }))
+      .pipe(catchError(err => { this.error.set(err.error?.error || 'Erro ao mover tarefa para a lixeira.'); return of(null); }))
       .subscribe(result => {
-        if (result) this.activeBoard.update(board => board ? { ...board, tasks: board.tasks.filter(task => !deletedIds.has(task.id)) } : board);
+        if (result) {
+          this.activeBoard.update(board => board ? { ...board, tasks: board.tasks.filter(task => !deletedIds.has(task.id)), trashCount: (board.trashCount || 0) + 1 } : board);
+          this.boards.update(boards => boards.map(board => board.id === this.activeBoard()?.id
+            ? { ...board, taskCount: Math.max(0, (board.taskCount || 0) - deletedIds.size), trashCount: (board.trashCount || 0) + 1 }
+            : board));
+        }
+        onComplete?.(!!result);
+      });
+  }
+
+  loadTrash(boardId: string): void {
+    this.trashLoading.set(true);
+    this.http.get<KanbanTask[]>(`/api/kanban/boards/${boardId}/trash`, { headers: this.headers }).pipe(
+      catchError(err => { this.error.set(err.error?.error || 'Não foi possível carregar a lixeira.'); return of(null); }),
+      finalize(() => this.trashLoading.set(false))
+    ).subscribe(tasks => {
+      if (tasks !== null) {
+        this.trash.set(tasks);
+        this.activeBoard.update(board => board?.id === boardId ? { ...board, trashCount: tasks.length } : board);
+        this.boards.update(boards => boards.map(board => board.id === boardId ? { ...board, trashCount: tasks.length } : board));
+      }
+    });
+  }
+
+  restoreTask(id: string, onComplete?: (success: boolean) => void): void {
+    this.http.put(`/api/kanban/tasks/${id}/restore`, {}, { headers: this.headers })
+      .pipe(catchError(err => { this.error.set(err.error?.error || 'Não foi possível restaurar a tarefa.'); return of(null); }))
+      .subscribe(result => {
+        if (result && this.activeBoard()) {
+          const boardId = this.activeBoard()!.id;
+          this.loadBoard(boardId);
+          this.loadTrash(boardId);
+          this.loadBoards(boardId);
+        }
+        onComplete?.(!!result);
+      });
+  }
+
+  permanentlyDeleteTask(id: string, onComplete?: (success: boolean) => void): void {
+    this.http.delete(`/api/kanban/tasks/${id}/permanent`, { headers: this.headers })
+      .pipe(catchError(err => { this.error.set(err.error?.error || 'Não foi possível excluir a tarefa permanentemente.'); return of(null); }))
+      .subscribe(result => {
+        if (result && this.activeBoard()) {
+          const boardId = this.activeBoard()!.id;
+          this.loadTrash(boardId);
+          this.loadBoards(boardId);
+        }
         onComplete?.(!!result);
       });
   }

@@ -76,6 +76,8 @@ export class KanbanBoardComponent implements OnDestroy {
   readonly taskContextMenu = signal<{ task: KanbanTask; x: number; y: number } | null>(null);
   readonly teamDeleteTarget = signal<KanbanTeam | null>(null);
   readonly taskDeleteTarget = signal<KanbanTask | null>(null);
+  readonly trashOpen = signal(false);
+  readonly permanentDeleteTarget = signal<KanbanTask | null>(null);
   readonly expandedChecklistIds = signal<Set<string>>(new Set());
   readonly savingTask = signal(false);
   readonly attachmentPreviewUrl = signal<string | null>(null);
@@ -84,6 +86,7 @@ export class KanbanBoardComponent implements OnDestroy {
   readonly trustedAttachmentPreviewUrl = signal<SafeResourceUrl | null>(null);
   readonly teamDeleteLoading = signal(false);
   readonly taskDeleteLoading = signal(false);
+  readonly trashActionLoading = signal(false);
   readonly inviteableUsers = computed(() => [...this.auth.allUsers()].sort((first, second) =>
     (first.name || first.email || '').localeCompare(second.name || second.email || '', 'pt-BR', { sensitivity: 'base' })
   ));
@@ -355,6 +358,53 @@ export class KanbanBoardComponent implements OnDestroy {
     });
   }
 
+  openTrash(): void {
+    const board = this.board();
+    if (!board) return;
+    this.permanentDeleteTarget.set(null);
+    this.trashOpen.set(true);
+    this.service.loadTrash(board.id);
+  }
+
+  closeTrash(): void {
+    if (this.trashActionLoading()) return;
+    this.permanentDeleteTarget.set(null);
+    this.trashOpen.set(false);
+  }
+
+  restoreFromTrash(task: KanbanTask): void {
+    if (!this.canDeleteTasks()) return;
+    this.trashActionLoading.set(true);
+    this.service.restoreTask(task.id, success => {
+      this.trashActionLoading.set(false);
+      if (success && this.service.trash().length <= 1) this.trashOpen.set(false);
+    });
+  }
+
+  requestPermanentDeletion(task: KanbanTask): void {
+    if (this.canDeleteTasks()) this.permanentDeleteTarget.set(task);
+  }
+
+  confirmPermanentDeletion(): void {
+    const task = this.permanentDeleteTarget();
+    if (!task || !this.canDeleteTasks()) return;
+    this.trashActionLoading.set(true);
+    this.service.permanentlyDeleteTask(task.id, success => {
+      this.trashActionLoading.set(false);
+      if (success) this.permanentDeleteTarget.set(null);
+    });
+  }
+
+  trashDaysRemaining(task: KanbanTask): number {
+    if (!task.deletedAt) return 0;
+    const expiresAt = new Date(task.deletedAt).getTime() + 30 * 24 * 60 * 60 * 1000;
+    return Math.max(0, Math.ceil((expiresAt - Date.now()) / (24 * 60 * 60 * 1000)));
+  }
+
+  formatTrashDate(task: KanbanTask): string {
+    return task.deletedAt ? new Date(task.deletedAt).toLocaleDateString('pt-BR') : '';
+  }
+
   addChecklistItem(): void {
     const text = this.checklistText.trim();
     if (!text) return;
@@ -498,6 +548,8 @@ export class KanbanBoardComponent implements OnDestroy {
     const boardChanged = this.board()?.id !== boardId;
     void this.router.navigate(['/tarefas', boardId]);
     if (!boardChanged) return;
+    this.trashOpen.set(false);
+    this.service.trash.set([]);
     this.parentStack.set([]);
     this.showArchived.set(false);
     const team = this.teams().find(item => item.boardId === boardId);

@@ -150,7 +150,9 @@ async function initDb() {
       created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP::text),
       updated_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP::text),
       parent_task_id TEXT,
-      assignee_ids TEXT NOT NULL DEFAULT '[]'
+      assignee_ids TEXT NOT NULL DEFAULT '[]',
+      deleted_at TEXT,
+      deleted_by TEXT
     );
 
     CREATE TABLE IF NOT EXISTS kanban_team_members (
@@ -209,6 +211,9 @@ async function initDb() {
     ALTER TABLE kanban_teams ADD COLUMN IF NOT EXISTS calendar_id TEXT;
     ALTER TABLE kanban_tasks ADD COLUMN IF NOT EXISTS parent_task_id TEXT;
     ALTER TABLE kanban_tasks ADD COLUMN IF NOT EXISTS assignee_ids TEXT NOT NULL DEFAULT '[]';
+    ALTER TABLE kanban_tasks ADD COLUMN IF NOT EXISTS deleted_at TEXT;
+    ALTER TABLE kanban_tasks ADD COLUMN IF NOT EXISTS deleted_by TEXT;
+    CREATE INDEX IF NOT EXISTS idx_kanban_tasks_trash ON kanban_tasks(board_id, deleted_at) WHERE deleted_at IS NOT NULL;
 
     UPDATE calendars
     SET name = 'Tarefas', color = kanban_teams.color, is_private = 0, is_task_calendar = 1

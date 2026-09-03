@@ -221,12 +221,22 @@ app.get('/api/holidays/:year', async (req, res) => {
 });
 
 // Inicializar DB antes de registrar rotas que dependem dele
-initDb().then(() => {
+initDb().then(async () => {
   const calendarsRouter = require('./routes/calendars');
   const membersRouter   = require('./routes/members');
   const eventsRouter    = require('./routes/events');
   const kanbanRouter    = require('./routes/kanban');
   const attachmentsRouter = require('./routes/attachments').router;
+
+  try {
+    await kanbanRouter.purgeExpiredTrash(broadcast);
+  } catch (error) {
+    console.error('[LIXEIRA] Falha na limpeza inicial; uma nova tentativa será feita automaticamente:', error);
+  }
+  const trashCleanupTimer = setInterval(() => {
+    kanbanRouter.purgeExpiredTrash(broadcast).catch(error => console.error('[LIXEIRA] Falha na limpeza automática:', error));
+  }, 6 * 60 * 60 * 1000);
+  trashCleanupTimer.unref();
 
   app.use('/api/calendars', authenticateAgendaRequest, calendarsRouter);
   app.use('/api/calendars', authenticateAgendaRequest, membersRouter);  // /:id/members
