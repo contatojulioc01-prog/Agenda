@@ -244,12 +244,12 @@
         </label>
         <div class='attachment-list' *ngIf='taskAttachments.length || pendingFiles.length'>
           <div class='attachment-item' *ngFor='let attachment of taskAttachments' (click)='openTaskAttachment(attachment)' role='button' tabindex='0' (keydown.enter)='openTaskAttachment(attachment)'>
-            <mat-icon>{{ attachment.previewable ? 'image' : 'description' }}</mat-icon>
+            <mat-icon>{{ attachment.mimeType === 'application/pdf' ? 'picture_as_pdf' : attachment.previewable ? 'image' : 'description' }}</mat-icon>
             <div><strong>{{ attachment.fileName }}</strong><span>{{ attachment.byteSize / 1048576 | number:'1.0-2' }} MB</span></div>
             <button type='button' (click)='$event.stopPropagation(); deleteTaskAttachment(attachment)' title='Excluir anexo'><mat-icon>delete_outline</mat-icon></button>
           </div>
           <div class='attachment-item pending' *ngFor='let file of pendingFiles; let index = index' (click)='openPendingFile(file)'>
-            <mat-icon>{{ file.type.startsWith('image/') ? 'image' : 'description' }}</mat-icon>
+            <mat-icon>{{ file.type === 'application/pdf' ? 'picture_as_pdf' : file.type.startsWith('image/') ? 'image' : 'description' }}</mat-icon>
             <div><strong>{{ file.name }}</strong><span>Aguardando salvar · {{ file.size / 1048576 | number:'1.0-2' }} MB</span></div>
             <button type='button' (click)='$event.stopPropagation(); removePendingFile(index)' title='Remover'><mat-icon>close</mat-icon></button>
           </div>
@@ -264,7 +264,8 @@
     <div class='image-preview-backdrop' *ngIf='attachmentPreviewUrl()' (mousedown)='closeAttachmentPreview()'>
       <section class='image-preview' (mousedown)='$event.stopPropagation()'>
         <header><strong>{{ attachmentPreviewName() }}</strong><button type='button' (click)='closeAttachmentPreview()'><mat-icon>close</mat-icon></button></header>
-        <img [src]='attachmentPreviewUrl()' [alt]='attachmentPreviewName()'>
+        <img *ngIf='attachmentPreviewMimeType() !== "application/pdf"' [src]='attachmentPreviewUrl()' [alt]='attachmentPreviewName()'>
+        <iframe *ngIf='attachmentPreviewMimeType() === "application/pdf"' [src]='trustedAttachmentPreviewUrl()' [title]='attachmentPreviewName()'></iframe>
       </section>
     </div>
     <footer><div><button *ngIf="editingId() && !showArchived()" class="archive-btn" [disabled]="savingTask()" (click)="archiveEditing()"><mat-icon>archive</mat-icon>Arquivar</button><button *ngIf="editingId() && !showArchived()" class="subtasks-btn" [disabled]="savingTask()" (click)="openEditingChildBoard()"><mat-icon>account_tree</mat-icon>Subtarefas</button><button *ngIf="editingId() && showArchived()" class="archive-btn" [disabled]="savingTask()" (click)="archiveEditing()"><mat-icon>unarchive</mat-icon>Restaurar</button><button *ngIf="editingId() && canDeleteTasks()" class="delete-btn" [disabled]="savingTask()" (click)="deleteEditing()"><mat-icon>delete_forever</mat-icon>Excluir</button></div><div><button class="cancel-btn" [disabled]="savingTask()" (click)="closeTaskModal()">Cancelar</button><button class="primary-btn" [disabled]="savingTask() || !draft.title.trim()" (click)="saveTask()"><mat-icon>{{ savingTask() ? 'hourglass_top' : 'save' }}</mat-icon>{{ savingTask() ? 'Salvando...' : 'Salvar tarefa' }}</button></div></footer>

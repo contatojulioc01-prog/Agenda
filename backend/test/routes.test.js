@@ -245,7 +245,7 @@ test('permite administrador excluir tarefa ativa', async () => {
   });
 });
 
-test('envia arquivo binário para uma tarefa acessível', async () => {
+test('envia PDF binário como anexo pré-visualizável para uma tarefa acessível', async () => {
   let inserted = null;
   await withRouter('../routes/attachments', fakeDb => {
     fakeDb.all = async () => [];
@@ -255,14 +255,14 @@ test('envia arquivo binário para uma tarefa acessível', async () => {
       if (sql.includes('FROM kanban_boards')) return { id: 'board-1', owner_id: 'user-1', scope_type: 'personal' };
       if (sql.includes('COUNT(*)')) return { attachment_count: 0, total_bytes: 0 };
       if (sql.includes('FROM attachments')) return {
-        id: inserted[0], file_name: 'imagem.png', mime_type: 'image/png', byte_size: 4, created_at: inserted[8],
+        id: inserted[0], file_name: 'relatorio.pdf', mime_type: 'application/pdf', byte_size: 4, created_at: inserted[8],
       };
       return null;
     };
   }, async baseUrl => {
     const response = await fetch(`${baseUrl}/task/task-1`, {
       method: 'POST',
-      headers: { 'content-type': 'application/octet-stream', 'x-user-id': 'user-1', 'x-file-name': 'imagem.png', 'x-file-type': 'image/png' },
+      headers: { 'content-type': 'application/octet-stream', 'x-user-id': 'user-1', 'x-file-name': 'relatorio.pdf', 'x-file-type': 'application/pdf' },
       body: Buffer.from([1, 2, 3, 4]),
     });
     assert.equal(response.status, 201);

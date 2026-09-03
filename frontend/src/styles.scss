@@ -2100,6 +2100,7 @@ body.dragging-active * {
 }
 
 /* Anexos compartilhados pela Agenda e pelo Kanban */
+.image-preview iframe{width:min(920px,96vw);height:calc(92vh - 50px);border:0;background:#fff}
 .read-only-form .attachment-card{pointer-events:auto}.task-attachments{border:1px solid var(--border-light);border-radius:11px;padding:11px;background:var(--bg-surface-alt)}
 .attachment-heading{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}.attachment-heading span{display:flex;align-items:center;gap:5px;color:var(--text-secondary);font-size:10.5px;font-weight:700;text-transform:uppercase}.attachment-heading mat-icon{font-size:17px;width:17px;height:17px}.attachment-heading strong,.attachment-count{font-size:10px;color:var(--text-muted)}.attachment-count{margin-left:auto;padding:2px 7px;border-radius:12px;background:var(--bg-hover);font-weight:700}
 .task-attachments>p,.attachment-help{margin:0 0 8px;color:var(--text-muted);font-size:10.5px}.attachment-picker{min-height:40px;display:flex;align-items:center;justify-content:center;gap:7px;border:1.5px dashed var(--border);border-radius:9px;color:var(--brand-500);font-size:11px;font-weight:650;cursor:pointer;background:var(--bg-surface-alt)}.attachment-picker:hover{border-color:var(--brand-500);background:var(--bg-active)}.attachment-picker input{display:none}.attachment-picker mat-icon{font-size:18px;width:18px;height:18px}

@@ -5,9 +5,10 @@ const asyncRoute = require('../async-route');
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const PREVIEWABLE_IMAGE = /^image\/(?:png|jpe?g|gif|webp|bmp|avif)$/i;
+const isPreviewable = mimeType => PREVIEWABLE_IMAGE.test(mimeType) || mimeType === 'application/pdf';
 const userId = req => String(req.headers['x-user-id'] || '');
 const attachmentDto = row => ({ id: row.id, fileName: row.file_name, mimeType: row.mime_type,
-  byteSize: Number(row.byte_size), previewable: PREVIEWABLE_IMAGE.test(row.mime_type), createdAt: row.created_at });
+  byteSize: Number(row.byte_size), previewable: isPreviewable(row.mime_type), createdAt: row.created_at });
 
 async function listAttachments(ownerType, ownerId, store = db) {
   const rows = await store.all(`SELECT id, file_name, mime_type, byte_size, created_at FROM attachments
@@ -46,7 +47,7 @@ router.get('/:attachmentId/content', asyncRoute(async (req, res) => {
   const item = await db.get('SELECT * FROM attachments WHERE id = ?', [req.params.attachmentId]);
   if (!item) return res.status(404).json({ error: 'Anexo não encontrado' });
   if (!(await ownerAccess(item.owner_type, item.owner_id, userId(req)))) return res.status(403).json({ error: 'Sem acesso ao anexo' });
-  const inline = PREVIEWABLE_IMAGE.test(item.mime_type);
+  const inline = isPreviewable(item.mime_type);
   res.setHeader('Content-Type', item.mime_type || 'application/octet-stream');
   res.setHeader('Content-Length', String(item.byte_size));
   res.setHeader('Content-Disposition', `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(item.file_name)}`);

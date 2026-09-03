@@ -1,5 +1,5 @@
 {
-  "lastCommit": "84eb29f4-cc96-40a4-b565-8a20296ac94a",
+  "lastCommit": "d53a6eba-e3f3-4811-8506-d03e4db88573",
   "commits": [
     {
       "id": "029104f7-7ab2-4d57-b90c-cb17445d7fb0",
@@ -1190,13 +1190,81 @@
       "pushedTo": [
         "prod"
       ]
+    },
+    {
+      "id": "d53a6eba-e3f3-4811-8506-d03e4db88573",
+      "date": "2026-09-03T11:42:06.661Z",
+      "message": "midia_implementada",
+      "changes": {
+        "added": [
+          "backend/public/chunk-MGI3XJIP.js",
+          "backend/public/chunk-QQAJR55B.js",
+          "backend/public/main-RSI2UKJ5.js",
+          "backend/public/styles-OB3QR6O5.css",
+          "backend/routes/attachments.js"
+        ],
+        "modified": [
+          "backend/db.js",
+          "backend/index.js",
+          "backend/public/index.html",
+          "backend/routes/events.js",
+          "backend/routes/kanban.js",
+          "backend/test/routes.test.js"
+        ],
+        "deleted": [
+          "backend/public/chunk-M3QR3OQ6.js",
+          "backend/public/chunk-ORJCMO7Y.js",
+          "backend/public/main-2Z7OQCWO.js",
+          "backend/public/styles-U6VW676Q.css"
+        ]
+      },
+      "snapshot": {
+        "backend/.env": "1e3dc635b084cf1a6a17ad5a584e5e1f7f9be0da7517ded27104ee38998cd9f2",
+        "backend/.env.example": "42af06ac4fbd7b40ff1570f84884eefe2680909fb3e7d3d0e448b9613375f9be",
+        "backend/agenda.db": "17cde3325884d62298688b843141d9acd1af3b913f282c95d88e72dba61da8fd",
+        "backend/async-route.js": "6e55ff707ce96a5b15f2f01c306e20054035dbb1ba7b6d5f4281309c815c0eda",
+        "backend/db.js": "5b1af6ce20c1a038f6ca3c0f7a0cbe558a926c5eb2d93364b4f094af262d74d2",
+        "backend/ecosystem.config.cjs": "c27396c1a1a1cafa554dfa0fb895349caba70593c28723a1a585a45d534a9d00",
+        "backend/index.js": "1bf41637550352fcdec2ec08d0b676d1846b248389bae318c5512fe3301e796a",
+        "backend/package-lock.json": "baee13c344cad4594bf5ea8a322f7fbf7e26d65942fb59f7eab5054613f50ef3",
+        "backend/package.json": "152484486297d094b6c0739d1cde3176a67d8856257181982271c8d7338ce001",
+        "backend/public/3rdpartylicenses.txt": "3b0be8bc0928cddbb7fd50b16f1c6974ab823acbe1aacf1400b06179bbefd99e",
+        "backend/public/chunk-MGI3XJIP.js": "022b69ff5887a0d17e58ae934f72d8c3f0a98531483da95d7ef86a40b7f47f8f",
+        "backend/public/chunk-QQAJR55B.js": "e3e65c49cf2579b62317f0ec0027646910a03e4b5d1c49f97cb37dac52fd7b8b",
+        "backend/public/favicon-doce.png": "58d60b5dbc87a7f612a0ab6ae5ca624d616819d068b450e4162ebb2046dc9013",
+        "backend/public/favicon.ico": "f9102be80297c0529207607be5277b4f90bca89d65988fa1771b91c7894e815f",
+        "backend/public/header-favicon.jpg": "324252369933f4a073666db720fefefeecdd8d971e93306800c51e1b8d0fc7b6",
+        "backend/public/header.jfif": "324252369933f4a073666db720fefefeecdd8d971e93306800c51e1b8d0fc7b6",
+        "backend/public/index.html": "5e75824bfb5f932c4b89a7ecec7f9075e27b504cd04caa16deab33933666392b",
+        "backend/public/main-RSI2UKJ5.js": "93e1ad7bedb64b245738803f07107a85464ed9ed7b665ff34bc2391c17010ca6",
+        "backend/public/polyfills-JOTRX7ND.js": "ada6406bce793942b50bd47a7b63d72f69c8964fbc785e25043eedb19da4a32d",
+        "backend/public/prerendered-routes.json": "a79ddcc8a115190e9c19479ed36914741a7d1db74f0a1153529efc80725505fe",
+        "backend/public/sidebar-icon.png": "58d60b5dbc87a7f612a0ab6ae5ca624d616819d068b450e4162ebb2046dc9013",
+        "backend/public/sidebar.jpg": "fcecfcfa1f50a19c041215329e7c48d8c8cd88e56edd654b6e228dbaf3279653",
+        "backend/public/sidebar.png": "3638c4ce6f84f64b97426858ea40ac2d1b8d4e334d61d7ada9b6d37e77e546b6",
+        "backend/public/styles-OB3QR6O5.css": "4a24938786ebcb0e3871073bd2802482b7536d66e7b646ae1b102c5400e325b5",
+        "backend/routes/attachments.js": "c9d47df7a07924a2555b0f4a894b74b16f9878eb3eb5cb7e9c8fc58757379aa8",
+        "backend/routes/calendars.js": "2c4f3cbd8613d054b28fa8353816e02649f7391aedc355b10db61be936f94f03",
+        "backend/routes/events.js": "2a584ad21c37c9f78cd0988dc261387d56b1835c96236bdbf951cf307b3ad8dd",
+        "backend/routes/kanban.js": "8b92127347e4051223131b6c13c0c9b1a8243fcbad3d02728f68f44517317c0f",
+        "backend/routes/members.js": "816d6f235d87da25d963779bf65a359eef915d0c562a1b004fc88997d41f0f75",
+        "backend/scripts/migrate-sqlite-to-postgres.js": "55722ab4c04ad37900e9d3d4c849d9897157fc05e77a70469ad0e2aa605bdc5b",
+        "backend/scripts/setup-postgres.js": "bd1beff479fb265ef902a5f4a34188daa8c2fc6da4c5161749297f3795dedff1",
+        "backend/test/routes.test.js": "0bfdb0300926c45b2f7e523d29d92e4c98f54f4d40acb40e1ed3cf0501bc7c5f",
+        "backend/test/validation.test.js": "d85c4fc6fb444e8a37b192645b7e9ebb7af7049e02da24fc030d795e239d8fc8",
+        "backend/validation.js": "5b667b8dc8f9491df3e9726e4a96a5a352ef4fba3b9538e6ad885eb8a794186a"
+      },
+      "pushed": false,
+      "pushedTo": [
+        "prod"
+      ]
     }
   ],
   "lastPush": {
-    "date": "2026-09-02T14:33:53.382Z",
-    "backupFile": "c:/server/BKS/BKP-Agenda/backup_20260902_113349.tar.gz",
+    "date": "2026-09-03T11:42:18.716Z",
+    "backupFile": "c:/server/BKS/BKP-Agenda/backup_20260903_084213.tar.gz",
     "commitIds": [
-      "84eb29f4-cc96-40a4-b565-8a20296ac94a"
+      "d53a6eba-e3f3-4811-8506-d03e4db88573"
     ]
   },
   "lastPushes": {
@@ -1208,10 +1276,10 @@
       ]
     },
     "prod": {
-      "date": "2026-09-02T14:33:53.382Z",
-      "backupFile": "c:/server/BKS/BKP-Agenda/backup_20260902_113349.tar.gz",
+      "date": "2026-09-03T11:42:18.716Z",
+      "backupFile": "c:/server/BKS/BKP-Agenda/backup_20260903_084213.tar.gz",
       "commitIds": [
-        "84eb29f4-cc96-40a4-b565-8a20296ac94a"
+        "d53a6eba-e3f3-4811-8506-d03e4db88573"
       ]
     }
   }

@@ -12,6 +12,7 @@ import { DEFAULT_AVATAR } from '../../../core/models/user.model';
 import { Attachment } from '../../../core/models/attachment.model';
 import { AttachmentsService } from '../../../core/services/attachments.service';
 import { forkJoin } from 'rxjs';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 
 @Component({
   selector: 'app-kanban-board',
@@ -26,6 +27,7 @@ export class KanbanBoardComponent implements OnDestroy {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly attachmentsService = inject(AttachmentsService);
+  private readonly sanitizer = inject(DomSanitizer);
   readonly board = this.service.activeBoard;
   readonly boards = this.service.boards;
   readonly loading = this.service.loading;
@@ -78,6 +80,8 @@ export class KanbanBoardComponent implements OnDestroy {
   readonly savingTask = signal(false);
   readonly attachmentPreviewUrl = signal<string | null>(null);
   readonly attachmentPreviewName = signal('');
+  readonly attachmentPreviewMimeType = signal('');
+  readonly trustedAttachmentPreviewUrl = signal<SafeResourceUrl | null>(null);
   readonly teamDeleteLoading = signal(false);
   readonly taskDeleteLoading = signal(false);
   readonly inviteableUsers = computed(() => [...this.auth.allUsers()].sort((first, second) =>
@@ -380,13 +384,15 @@ export class KanbanBoardComponent implements OnDestroy {
     const uid = this.auth.currentUser()?.id || '';
     if (!attachment.previewable) return this.attachmentsService.download(attachment, uid);
     this.attachmentsService.content(attachment.id, uid).subscribe({
-      next: blob => this.showAttachmentPreview(URL.createObjectURL(blob), attachment.fileName),
+      next: blob => this.showAttachmentPreview(URL.createObjectURL(blob), attachment.fileName, attachment.mimeType),
       error: () => this.attachmentError = 'Não foi possível abrir a imagem.',
     });
   }
 
   openPendingFile(file: File): void {
-    if (file.type.startsWith('image/')) this.showAttachmentPreview(URL.createObjectURL(file), file.name);
+    if (file.type.startsWith('image/') || file.type === 'application/pdf') {
+      this.showAttachmentPreview(URL.createObjectURL(file), file.name, file.type);
+    }
   }
 
   closeAttachmentPreview(): void {
@@ -394,6 +400,8 @@ export class KanbanBoardComponent implements OnDestroy {
     if (url) URL.revokeObjectURL(url);
     this.attachmentPreviewUrl.set(null);
     this.attachmentPreviewName.set('');
+    this.attachmentPreviewMimeType.set('');
+    this.trustedAttachmentPreviewUrl.set(null);
   }
 
   deleteTaskAttachment(attachment: Attachment): void {
@@ -404,10 +412,12 @@ export class KanbanBoardComponent implements OnDestroy {
     });
   }
 
-  private showAttachmentPreview(url: string, name: string): void {
+  private showAttachmentPreview(url: string, name: string, mimeType: string): void {
     this.closeAttachmentPreview();
     this.attachmentPreviewUrl.set(url);
     this.attachmentPreviewName.set(name);
+    this.attachmentPreviewMimeType.set(mimeType);
+    this.trustedAttachmentPreviewUrl.set(this.sanitizer.bypassSecurityTrustResourceUrl(url));
   }
 
   private uploadPending(task: KanbanTask, onComplete: (success: boolean) => void): void {

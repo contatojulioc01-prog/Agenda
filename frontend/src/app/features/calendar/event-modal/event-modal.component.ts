@@ -14,6 +14,7 @@ import { Holiday } from '../../../core/models/holiday.model';
 import { Attachment } from '../../../core/models/attachment.model';
 import { AttachmentsService } from '../../../core/services/attachments.service';
 import { forkJoin } from 'rxjs';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 
 export interface EventModalData {
   event?: CalendarEvent;
@@ -39,6 +40,7 @@ export interface EventModalData {
 export class EventModalComponent implements OnInit, OnDestroy {
   private calendarsService = inject(CalendarsService);
   private attachmentsService = inject(AttachmentsService);
+  private sanitizer = inject(DomSanitizer);
   isEdit = false;
   get isReadOnly(): boolean { return !!this.data.readOnly; }
 
@@ -68,6 +70,8 @@ export class EventModalComponent implements OnInit, OnDestroy {
   attachmentError = '';
   readonly previewUrl = signal<string | null>(null);
   readonly previewName = signal('');
+  readonly previewMimeType = signal('');
+  readonly trustedPreviewUrl = signal<SafeResourceUrl | null>(null);
 
   holidayWarning: string | null = null;
   holidays: Holiday[] = [];
@@ -141,13 +145,15 @@ export class EventModalComponent implements OnInit, OnDestroy {
     const userId = this.eventsService.currentUserId();
     if (!attachment.previewable) return this.attachmentsService.download(attachment, userId);
     this.attachmentsService.content(attachment.id, userId).subscribe({
-      next: blob => this.showPreview(URL.createObjectURL(blob), attachment.fileName),
+      next: blob => this.showPreview(URL.createObjectURL(blob), attachment.fileName, attachment.mimeType),
       error: () => this.attachmentError = 'Não foi possível abrir a imagem.',
     });
   }
 
   openPending(file: File): void {
-    if (file.type.startsWith('image/')) this.showPreview(URL.createObjectURL(file), file.name);
+    if (file.type.startsWith('image/') || file.type === 'application/pdf') {
+      this.showPreview(URL.createObjectURL(file), file.name, file.type);
+    }
   }
 
   closePreview(): void {
@@ -155,12 +161,16 @@ export class EventModalComponent implements OnInit, OnDestroy {
     if (url) URL.revokeObjectURL(url);
     this.previewUrl.set(null);
     this.previewName.set('');
+    this.previewMimeType.set('');
+    this.trustedPreviewUrl.set(null);
   }
 
-  private showPreview(url: string, name: string): void {
+  private showPreview(url: string, name: string, mimeType: string): void {
     this.closePreview();
     this.previewUrl.set(url);
     this.previewName.set(name);
+    this.previewMimeType.set(mimeType);
+    this.trustedPreviewUrl.set(this.sanitizer.bypassSecurityTrustResourceUrl(url));
   }
 
   deleteAttachment(attachment: Attachment): void {
