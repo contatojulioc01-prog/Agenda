@@ -271,6 +271,9 @@
           <span class="user-name" [matTooltip]="user.name">{{ user.name }}</span>
           <span class="user-dept">{{ user.departamentName || 'Corporativo' }}</span>
         </div>
+        <button class="btn-logout btn-notifications" (click)="notificationSettingsOpen.set(true)" matTooltip="Notificações do Windows" aria-label="Configurar notificações">
+          <mat-icon>notifications</mat-icon>
+        </button>
         <button class="btn-logout" (click)="logout()" matTooltip="Encerrar sessão" aria-label="Sair">
           <mat-icon>logout</mat-icon>
         </button>
@@ -442,6 +445,11 @@
   (closed)="closeCalendarManager()"
   (saved)="onCalendarSaved()"
 ></app-calendar-manager>
+
+<app-notification-settings
+  *ngIf="notificationSettingsOpen()"
+  (closed)="notificationSettingsOpen.set(false)"
+></app-notification-settings>
 
 <div class="invitation-overlay" *ngIf="calendarDeleteTarget as calendar" (mousedown)="cancelCalendarDelete()">
   <section class="invitation-modal delete-calendar-modal" role="dialog" aria-modal="true" aria-labelledby="delete-calendar-title" (mousedown)="$event.stopPropagation()">

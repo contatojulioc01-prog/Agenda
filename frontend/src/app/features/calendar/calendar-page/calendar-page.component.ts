@@ -26,6 +26,7 @@ import { CalendarManagerComponent } from '../calendar-manager/calendar-manager.c
 import { ThemeService } from '../../../core/services/theme.service';
 import { KanbanBoardComponent } from '../../tasks/kanban-board/kanban-board.component';
 import { KanbanService } from '../../../core/services/kanban.service';
+import { NotificationSettingsComponent } from '../../notifications/notification-settings.component';
 
 export type CalendarView = 'month' | 'week' | 'day';
 
@@ -35,7 +36,7 @@ export type CalendarView = 'month' | 'week' | 'day';
   imports: [
     CommonModule, MatDialogModule, MatIconModule, MatTooltipModule,
     MonthViewComponent, WeekViewComponent, DayViewComponent,
-    MiniCalendarComponent, ThemeToggleComponent, CalendarManagerComponent, KanbanBoardComponent,
+    MiniCalendarComponent, ThemeToggleComponent, CalendarManagerComponent, KanbanBoardComponent, NotificationSettingsComponent,
   ],
   templateUrl: './calendar-page.component.html',
   styleUrl: './calendar-page.component.scss',
@@ -92,6 +93,7 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
   readonly eventDeleteLoading = signal(false);
   readonly collapsedSidebarSections = signal<Set<string>>(new Set());
   readonly agendaPillsExpanded = signal(true);
+  readonly notificationSettingsOpen = signal(false);
 
   readonly events = this.eventsService.events;
   /** Eventos exibidos, incluindo os pagamentos padrão da Minha Agenda. */

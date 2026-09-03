@@ -360,3 +360,75 @@ test('protege e entrega imagem de anexo para pré-visualização', async () => {
     assert.equal(denied.status, 403);
   });
 });
+
+test('gera chave de dispositivo armazenando somente o hash', async () => {
+  let inserted = null;
+  await withRouter('../routes/notifications', fakeDb => {
+    fakeDb.get = async () => null;
+    fakeDb.all = async () => [];
+    fakeDb.run = async (sql, params) => {
+      if (sql.includes('INSERT INTO notification_devices')) inserted = params;
+      return { rowCount: 1 };
+    };
+  }, async baseUrl => {
+    const response = await fetch(`${baseUrl}/devices`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-user-id': 'user-1' },
+      body: JSON.stringify({ name: 'PC Financeiro' }),
+    });
+    assert.equal(response.status, 201);
+    const result = await response.json();
+    assert.equal(result.device.name, 'PC Financeiro');
+    assert.ok(result.token.length >= 40);
+    assert.match(inserted[3], /^[a-f0-9]{64}$/);
+    assert.notEqual(inserted[3], result.token);
+  });
+});
+
+test('entrega lembretes de tarefa e evento acessíveis ao dispositivo', async () => {
+  const originals = { get: db.get, all: db.all, run: db.run, transaction: db.transaction };
+  try {
+    db.get = async sql => {
+      if (sql.includes('FROM notification_devices')) return { id: 'device-1', user_id: 'user-1', enabled: 1 };
+      if (sql.includes('FROM notification_preferences')) return {
+        enabled: 1, task_enabled: 1, event_enabled: 1, task_time: '09:00', event_minutes_before: 15,
+      };
+      return null;
+    };
+    db.run = async () => ({ rowCount: 1 });
+    db.all = async sql => {
+      if (sql.includes('notification_deliveries')) return [];
+      if (sql.includes('FROM kanban_tasks')) return [{
+        id: 'task-1', title: 'Enviar relatório', board_id: 'board-1', board_name: 'Financeiro',
+        parent_task_id: null, assignee_ids: '["user-1"]',
+      }];
+      if (sql.includes('FROM events')) return [{
+        id: 'event-1', title: 'Reunião', calendar_name: 'Minha Agenda', date: '2026-09-03',
+        end_date: '2026-09-03', start_time: '14:00', day_times: '{}', all_day: 0,
+      }];
+      return [];
+    };
+    delete require.cache[require.resolve('../routes/notifications')];
+    const app = express();
+    app.use(express.json());
+    app.use(require('../routes/notifications').deviceRouter);
+    const server = await new Promise(resolve => {
+      const instance = app.listen(0, '127.0.0.1', () => resolve(instance));
+    });
+    try {
+      const response = await fetch(`http://127.0.0.1:${server.address().port}/pending?date=2026-09-03&time=14:00`, {
+        headers: { authorization: 'Bearer device-secret' },
+      });
+      assert.equal(response.status, 200);
+      const result = await response.json();
+      assert.deepEqual(result.notifications.map(item => item.type).sort(), ['event', 'task']);
+      assert.ok(result.notifications.find(item => item.type === 'task').url.includes('/tarefas/board-1?tarefa=task-1'));
+      assert.ok(result.notifications.find(item => item.type === 'event').url.includes('/calendario/day/2026-09-03?evento=event-1'));
+    } finally {
+      await new Promise(resolve => server.close(resolve));
+    }
+  } finally {
+    Object.assign(db, originals);
+    delete require.cache[require.resolve('../routes/notifications')];
+  }
+});

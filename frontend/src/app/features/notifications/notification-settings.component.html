@@ -1,0 +1,37 @@
+<div class="notification-backdrop" (mousedown)="closed.emit()">
+  <section class="notification-modal" role="dialog" aria-modal="true" aria-labelledby="notification-title" (mousedown)="$event.stopPropagation()">
+    <header>
+      <span class="notification-icon"><mat-icon>notifications_active</mat-icon></span>
+      <div><h2 id="notification-title">Notificações do Windows</h2><p>Receba lembretes mesmo com a Agenda fechada.</p></div>
+      <button type="button" class="close-button" (click)="closed.emit()" aria-label="Fechar"><mat-icon>close</mat-icon></button>
+    </header>
+
+    <div class="notification-body" *ngIf="!service.loading(); else loading">
+      <section class="settings-card">
+        <div class="section-title"><div><strong>Preferências</strong><span>Defina quando deseja receber os avisos.</span></div><label class="switch"><input type="checkbox" [(ngModel)]="draft.enabled"><span></span></label></div>
+        <div class="settings-grid" [class.disabled]="!draft.enabled">
+          <label class="check-setting"><input type="checkbox" [(ngModel)]="draft.taskEnabled"><span><strong>Tarefas</strong><small>Avisar no dia do prazo</small></span></label>
+          <label><span>Horário das tarefas</span><input type="time" [(ngModel)]="draft.taskTime" [disabled]="!draft.enabled || !draft.taskEnabled"></label>
+          <label class="check-setting"><input type="checkbox" [(ngModel)]="draft.eventEnabled"><span><strong>Eventos</strong><small>Avisar antes do início</small></span></label>
+          <label><span>Antecedência</span><select [(ngModel)]="draft.eventMinutesBefore" [disabled]="!draft.enabled || !draft.eventEnabled"><option [ngValue]="0">Na hora</option><option [ngValue]="5">5 minutos</option><option [ngValue]="10">10 minutos</option><option [ngValue]="15">15 minutos</option><option [ngValue]="30">30 minutos</option><option [ngValue]="60">1 hora</option><option [ngValue]="1440">1 dia</option></select></label>
+        </div>
+        <button type="button" class="primary-action" [disabled]="service.saving()" (click)="save()"><mat-icon>{{ saved() ? 'check' : 'save' }}</mat-icon>{{ saved() ? 'Preferências salvas' : 'Salvar preferências' }}</button>
+      </section>
+
+      <section class="settings-card setup-card">
+        <div class="section-title"><div><strong>Aplicativo para Windows</strong><span>Baixe uma vez e conecte este computador.</span></div><a class="download-button" [href]="downloadUrl" download><mat-icon>download</mat-icon>Baixar EXE</a></div>
+        <ol><li>Baixe e abra o <strong>Agenda.Notifier.exe</strong>.</li><li>Gere e copie o código abaixo.</li><li>Cole o código no aplicativo e clique em Ativar.</li></ol>
+        <div class="activation-row"><input [(ngModel)]="deviceName" maxlength="80" placeholder="Nome deste computador"><button type="button" (click)="generateCode()" [disabled]="service.saving() || !deviceName.trim()"><mat-icon>key</mat-icon>Gerar código</button></div>
+        <div class="activation-code" *ngIf="activationCode"><code>{{ activationCode }}</code><button type="button" (click)="copyCode()"><mat-icon>{{ copied() ? 'check' : 'content_copy' }}</mat-icon>{{ copied() ? 'Copiado' : 'Copiar' }}</button><p>Este código é exibido somente agora. Não o compartilhe.</p></div>
+      </section>
+
+      <section class="settings-card" *ngIf="service.devices().length">
+        <div class="section-title"><div><strong>Computadores conectados</strong><span>Revogue dispositivos que você não utiliza mais.</span></div></div>
+        <div class="device-row" *ngFor="let device of service.devices()"><span class="device-icon"><mat-icon>computer</mat-icon></span><div><strong>{{ device.name }}</strong><small>{{ formatLastSeen(device.lastSeenAt) }}</small></div><button type="button" (click)="service.revokeDevice(device.id)" title="Revogar acesso"><mat-icon>delete_outline</mat-icon></button></div>
+      </section>
+
+      <p class="error-message" *ngIf="service.error()"><mat-icon>error_outline</mat-icon>{{ service.error() }}</p>
+    </div>
+    <ng-template #loading><div class="loading-notifications"><span></span>Carregando configurações...</div></ng-template>
+  </section>
+</div>

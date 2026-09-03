@@ -195,11 +195,51 @@ async function initDb() {
       created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP::text)
     );
 
+    CREATE TABLE IF NOT EXISTS notification_preferences (
+      user_id TEXT PRIMARY KEY,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      task_enabled INTEGER NOT NULL DEFAULT 1,
+      event_enabled INTEGER NOT NULL DEFAULT 1,
+      task_time TEXT NOT NULL DEFAULT '08:30',
+      event_minutes_before INTEGER NOT NULL DEFAULT 15,
+      updated_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP::text)
+    );
+
+    CREATE TABLE IF NOT EXISTS notification_devices (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      token_hash TEXT NOT NULL UNIQUE,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP::text),
+      last_seen_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS notification_deliveries (
+      id TEXT PRIMARY KEY,
+      device_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      delivery_key TEXT NOT NULL,
+      source_type TEXT NOT NULL,
+      source_id TEXT NOT NULL,
+      occurrence_date TEXT NOT NULL,
+      scheduled_for TEXT NOT NULL,
+      delivered_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP::text),
+      UNIQUE(device_id, delivery_key)
+    );
+
+    CREATE TABLE IF NOT EXISTS agenda_migrations (
+      id TEXT PRIMARY KEY,
+      applied_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP::text)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_events_calendar ON events(calendar_id, date);
     CREATE INDEX IF NOT EXISTS idx_calendar_members_user ON calendar_members(user_id);
     CREATE INDEX IF NOT EXISTS idx_kanban_tasks_board ON kanban_tasks(board_id, parent_task_id, column_id, position);
     CREATE INDEX IF NOT EXISTS idx_kanban_team_members_user ON kanban_team_members(user_id);
     CREATE INDEX IF NOT EXISTS idx_attachments_owner ON attachments(owner_type, owner_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_notification_devices_user ON notification_devices(user_id, enabled);
+    CREATE INDEX IF NOT EXISTS idx_notification_deliveries_device ON notification_deliveries(device_id, occurrence_date);
 
     ALTER TABLE events ADD COLUMN IF NOT EXISTS end_date TEXT;
     ALTER TABLE calendars ADD COLUMN IF NOT EXISTS is_default INTEGER NOT NULL DEFAULT 0;
@@ -213,6 +253,15 @@ async function initDb() {
     ALTER TABLE kanban_tasks ADD COLUMN IF NOT EXISTS assignee_ids TEXT NOT NULL DEFAULT '[]';
     ALTER TABLE kanban_tasks ADD COLUMN IF NOT EXISTS deleted_at TEXT;
     ALTER TABLE kanban_tasks ADD COLUMN IF NOT EXISTS deleted_by TEXT;
+    ALTER TABLE notification_preferences ALTER COLUMN task_time SET DEFAULT '08:30';
+    WITH applied AS (
+      INSERT INTO agenda_migrations (id) VALUES ('notification-task-time-0830-v1')
+      ON CONFLICT (id) DO NOTHING
+      RETURNING id
+    )
+    UPDATE notification_preferences
+    SET task_time = '08:30', updated_at = CURRENT_TIMESTAMP::text
+    WHERE task_time = '09:00' AND EXISTS (SELECT 1 FROM applied);
     CREATE INDEX IF NOT EXISTS idx_kanban_tasks_trash ON kanban_tasks(board_id, deleted_at) WHERE deleted_at IS NOT NULL;
 
     UPDATE calendars

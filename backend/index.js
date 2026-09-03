@@ -227,6 +227,7 @@ initDb().then(async () => {
   const eventsRouter    = require('./routes/events');
   const kanbanRouter    = require('./routes/kanban');
   const attachmentsRouter = require('./routes/attachments').router;
+  const notifications = require('./routes/notifications');
 
   try {
     await kanbanRouter.purgeExpiredTrash(broadcast);
@@ -244,6 +245,8 @@ initDb().then(async () => {
   app.use('/api/events',    authenticateAgendaRequest, eventsRouter);   // /:id (edit/delete)
   app.use('/api/kanban',    authenticateAgendaRequest, kanbanRouter);
   app.use('/api/attachments', authenticateAgendaRequest, attachmentsRouter);
+  app.use('/api/notifications/device', notifications.deviceRouter);
+  app.use('/api/notifications', authenticateAgendaRequest, notifications.router);
 
   // Em producao, o mesmo processo entrega Angular, API e WebSocket.
   const frontendCandidates = [

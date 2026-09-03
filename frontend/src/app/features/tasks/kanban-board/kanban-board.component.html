@@ -51,7 +51,7 @@
       <option *ngFor="let user of assignableUsers()" [value]="user.id">{{ user.name }}</option>
     </select>
     <button class="archive-toggle" [class.active]="showArchived()" (click)="toggleArchived()"><mat-icon>archive</mat-icon>{{ showArchived() ? 'Ver quadro' : 'Arquivadas' }}</button>
-    <button class="secondary-btn trash-open-btn" (click)="openTrash()" matTooltip="Abrir lixeira"><mat-icon>delete_outline</mat-icon>Lixeira<span *ngIf="board()?.trashCount" class="trash-count">{{ board()?.trashCount }}</span></button>
+    <button class="archive-toggle trash-open-btn" (click)="openTrash()" matTooltip="Abrir lixeira"><mat-icon>delete_outline</mat-icon>Lixeira<span *ngIf="board()?.trashCount" class="trash-count">{{ board()?.trashCount }}</span></button>
     <div class="filter-stat overdue" *ngIf="overdueCount()"><mat-icon>schedule</mat-icon>{{ overdueCount() }} atrasada{{ overdueCount() > 1 ? 's' : '' }}</div>
   </section>
 
