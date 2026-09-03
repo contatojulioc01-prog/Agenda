@@ -1,5 +1,5 @@
 {
-  "lastCommit": "8d2dc24d-3b32-449c-8cb4-8d837a548ffd",
+  "lastCommit": "78d572b6-7478-476a-9114-aba79e9bf9d5",
   "commits": [
     {
       "id": "029104f7-7ab2-4d57-b90c-cb17445d7fb0",
@@ -1378,13 +1378,79 @@
       "pushedTo": [
         "prod"
       ]
+    },
+    {
+      "id": "78d572b6-7478-476a-9114-aba79e9bf9d5",
+      "date": "2026-09-03T16:53:50.450Z",
+      "message": "Thrasher",
+      "changes": {
+        "added": [
+          "backend/public/chunk-I5O7SV6C.js",
+          "backend/public/chunk-SCCCT33B.js",
+          "backend/public/main-DPWSWE77.js",
+          "backend/public/styles-4CKJCY5H.css"
+        ],
+        "modified": [
+          "backend/db.js",
+          "backend/index.js",
+          "backend/public/index.html",
+          "backend/routes/kanban.js",
+          "backend/test/routes.test.js"
+        ],
+        "deleted": [
+          "backend/public/chunk-3726M4YJ.js",
+          "backend/public/chunk-GXFD6VVV.js",
+          "backend/public/main-NOQIBBBF.js",
+          "backend/public/styles-FJSWUSQZ.css"
+        ]
+      },
+      "snapshot": {
+        "backend/.env": "1e3dc635b084cf1a6a17ad5a584e5e1f7f9be0da7517ded27104ee38998cd9f2",
+        "backend/.env.example": "42af06ac4fbd7b40ff1570f84884eefe2680909fb3e7d3d0e448b9613375f9be",
+        "backend/agenda.db": "17cde3325884d62298688b843141d9acd1af3b913f282c95d88e72dba61da8fd",
+        "backend/async-route.js": "6e55ff707ce96a5b15f2f01c306e20054035dbb1ba7b6d5f4281309c815c0eda",
+        "backend/db.js": "41920c76ab0994bb515c479aff51ce82425a988396b5493b064350e6a18086bd",
+        "backend/ecosystem.config.cjs": "c27396c1a1a1cafa554dfa0fb895349caba70593c28723a1a585a45d534a9d00",
+        "backend/index.js": "0ea7de832f0c2ba9b0aa1df372336905961414f87772f4a63b30b54a3141ed70",
+        "backend/package-lock.json": "baee13c344cad4594bf5ea8a322f7fbf7e26d65942fb59f7eab5054613f50ef3",
+        "backend/package.json": "152484486297d094b6c0739d1cde3176a67d8856257181982271c8d7338ce001",
+        "backend/public/3rdpartylicenses.txt": "3b0be8bc0928cddbb7fd50b16f1c6974ab823acbe1aacf1400b06179bbefd99e",
+        "backend/public/chunk-I5O7SV6C.js": "49ceadda634c22a7ddcd0804e70fd356c09030df94cfafa3237e0238a8cad9c0",
+        "backend/public/chunk-SCCCT33B.js": "c6e0c33c63c6ac1080d15eec0c99633c67ef1859667fcbb866a7485e6cd6a689",
+        "backend/public/favicon-doce.png": "58d60b5dbc87a7f612a0ab6ae5ca624d616819d068b450e4162ebb2046dc9013",
+        "backend/public/favicon.ico": "f9102be80297c0529207607be5277b4f90bca89d65988fa1771b91c7894e815f",
+        "backend/public/header-favicon.jpg": "324252369933f4a073666db720fefefeecdd8d971e93306800c51e1b8d0fc7b6",
+        "backend/public/header.jfif": "324252369933f4a073666db720fefefeecdd8d971e93306800c51e1b8d0fc7b6",
+        "backend/public/index.html": "86042fc51a5f73ec965265718a283f9f414b0eea4b77e91a1fe296be70490684",
+        "backend/public/main-DPWSWE77.js": "d80678bbf56cb002aaa766fa8eb45e5f7b4e288ebbdeec7538745d817206e17c",
+        "backend/public/polyfills-JOTRX7ND.js": "ada6406bce793942b50bd47a7b63d72f69c8964fbc785e25043eedb19da4a32d",
+        "backend/public/prerendered-routes.json": "a79ddcc8a115190e9c19479ed36914741a7d1db74f0a1153529efc80725505fe",
+        "backend/public/sidebar-icon.png": "58d60b5dbc87a7f612a0ab6ae5ca624d616819d068b450e4162ebb2046dc9013",
+        "backend/public/sidebar.jpg": "fcecfcfa1f50a19c041215329e7c48d8c8cd88e56edd654b6e228dbaf3279653",
+        "backend/public/sidebar.png": "3638c4ce6f84f64b97426858ea40ac2d1b8d4e334d61d7ada9b6d37e77e546b6",
+        "backend/public/styles-4CKJCY5H.css": "41939b65f8692cca5695fac20c29418ecac19f17b9140572af7dd647341f159e",
+        "backend/routes/attachments.js": "f85c1f9b7b6af025f879bb863e2e42a7897573c997311bdc6d1717a4cb439345",
+        "backend/routes/calendars.js": "2c4f3cbd8613d054b28fa8353816e02649f7391aedc355b10db61be936f94f03",
+        "backend/routes/events.js": "2a584ad21c37c9f78cd0988dc261387d56b1835c96236bdbf951cf307b3ad8dd",
+        "backend/routes/kanban.js": "2fd88cb5768aec845aa7213ebbd2e4c7a90950c9754f216eff706f51acc227ac",
+        "backend/routes/members.js": "816d6f235d87da25d963779bf65a359eef915d0c562a1b004fc88997d41f0f75",
+        "backend/scripts/migrate-sqlite-to-postgres.js": "55722ab4c04ad37900e9d3d4c849d9897157fc05e77a70469ad0e2aa605bdc5b",
+        "backend/scripts/setup-postgres.js": "bd1beff479fb265ef902a5f4a34188daa8c2fc6da4c5161749297f3795dedff1",
+        "backend/test/routes.test.js": "eb5fb8fa4c2bf88a405799fd823eac72268b4e3140dcffa77d6995535e47e476",
+        "backend/test/validation.test.js": "d85c4fc6fb444e8a37b192645b7e9ebb7af7049e02da24fc030d795e239d8fc8",
+        "backend/validation.js": "5b667b8dc8f9491df3e9726e4a96a5a352ef4fba3b9538e6ad885eb8a794186a"
+      },
+      "pushed": false,
+      "pushedTo": [
+        "prod"
+      ]
     }
   ],
   "lastPush": {
-    "date": "2026-09-03T12:05:13.895Z",
-    "backupFile": "c:/server/BKS/BKP-Agenda/backup_20260903_090509.tar.gz",
+    "date": "2026-09-03T16:54:05.025Z",
+    "backupFile": "c:/server/BKS/BKP-Agenda/backup_20260903_135400.tar.gz",
     "commitIds": [
-      "8d2dc24d-3b32-449c-8cb4-8d837a548ffd"
+      "78d572b6-7478-476a-9114-aba79e9bf9d5"
     ]
   },
   "lastPushes": {
@@ -1396,10 +1462,10 @@
       ]
     },
     "prod": {
-      "date": "2026-09-03T12:05:13.895Z",
-      "backupFile": "c:/server/BKS/BKP-Agenda/backup_20260903_090509.tar.gz",
+      "date": "2026-09-03T16:54:05.025Z",
+      "backupFile": "c:/server/BKS/BKP-Agenda/backup_20260903_135400.tar.gz",
       "commitIds": [
-        "8d2dc24d-3b32-449c-8cb4-8d837a548ffd"
+        "78d572b6-7478-476a-9114-aba79e9bf9d5"
       ]
     }
   }
