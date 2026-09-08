@@ -27,6 +27,8 @@ import { ThemeService } from '../../../core/services/theme.service';
 import { KanbanBoardComponent } from '../../tasks/kanban-board/kanban-board.component';
 import { KanbanService } from '../../../core/services/kanban.service';
 import { NotificationSettingsComponent } from '../../notifications/notification-settings.component';
+import { UserPreferencesService } from '../../../core/services/user-preferences.service';
+import { AppLoadingService } from '../../../core/services/app-loading.service';
 
 export type CalendarView = 'month' | 'week' | 'day';
 
@@ -54,6 +56,8 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   readonly themeService = inject(ThemeService);
+  private readonly userPreferences = inject(UserPreferencesService);
+  private readonly appLoading = inject(AppLoadingService);
   private initializedUserId = '';
   private readonly authInitialization = effect(() => {
     const user = this.authService.currentUser();
@@ -66,6 +70,7 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
         ? requestedId
         : [...this.calendarsService.visibleCalendarIds()][0];
       if (id) this.selectOnlyCalendar(id);
+      this.appLoading.complete();
     });
     this.invitationsService.load();
     this.kanbanService.loadTeamInvitations();
@@ -74,7 +79,7 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
   readonly defaultAvatar = DEFAULT_AVATAR;
 
   // ── Estado ──
-  currentView: CalendarView = 'month';
+  currentView: CalendarView = this.userPreferences.calendarView();
   activeSection: 'calendar' | 'tasks' = 'calendar';
   selectedDate = new Date();
   holidays: Holiday[] = [];
@@ -91,8 +96,10 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
   readonly dayContextMenu = signal<{ date: string; x: number; y: number } | null>(null);
   readonly eventDeleteTarget = signal<CalendarEvent | null>(null);
   readonly eventDeleteLoading = signal(false);
-  readonly collapsedSidebarSections = signal<Set<string>>(new Set());
-  readonly agendaPillsExpanded = signal(true);
+  readonly collapsedSidebarSections = signal<Set<string>>(
+    new Set(this.userPreferences.collapsedSidebarSections())
+  );
+  readonly agendaPillsExpanded = signal(this.userPreferences.agendaPillsExpanded());
   readonly notificationSettingsOpen = signal(false);
 
   readonly events = this.eventsService.events;
@@ -365,12 +372,17 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
     this.collapsedSidebarSections.update(current => {
       const next = new Set(current);
       next.has(sectionId) ? next.delete(sectionId) : next.add(sectionId);
+      this.userPreferences.setCollapsedSidebarSections(next);
       return next;
     });
   }
 
   toggleAgendaPills(): void {
-    this.agendaPillsExpanded.update(expanded => !expanded);
+    this.agendaPillsExpanded.update(expanded => {
+      const next = !expanded;
+      this.userPreferences.setAgendaPillsExpanded(next);
+      return next;
+    });
   }
 
   // ── Navegação ──
@@ -394,6 +406,7 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
 
   setView(view: CalendarView): void {
     this.currentView = view;
+    this.userPreferences.setCalendarView(view);
     this.navigateToCalendar();
   }
   setSection(section: 'calendar' | 'tasks'): void {
@@ -512,7 +525,10 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
     this.activeSection = 'calendar';
     const viewParam = this.route.snapshot.paramMap.get('view');
     const views: Record<string, CalendarView> = { mes: 'month', semana: 'week', dia: 'day' };
-    if (viewParam && views[viewParam]) this.currentView = views[viewParam];
+    if (viewParam && views[viewParam]) {
+      this.currentView = views[viewParam];
+      this.userPreferences.setCalendarView(this.currentView);
+    }
 
     const dateParam = this.route.snapshot.paramMap.get('date');
     if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {

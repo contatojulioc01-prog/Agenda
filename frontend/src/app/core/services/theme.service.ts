@@ -1,4 +1,5 @@
-import { Injectable, signal, effect } from '@angular/core';
+import { Injectable, effect, inject } from '@angular/core';
+import { StoredTheme, UserPreferencesService } from './user-preferences.service';
 
 /**
  * Temas disponíveis:
@@ -9,16 +10,16 @@ import { Injectable, signal, effect } from '@angular/core';
  *  - light-angel → reino angelical claro
  *  - light-demon → reino demoníaco claro
  */
-export type Theme = 'light' | 'dark' | 'dark-angel' | 'dark-demon' | 'light-angel' | 'light-demon';
+export type Theme = StoredTheme;
 
 /** Qual "reino" especial está ativo (null = nenhum) */
 export type Realm = 'angel' | 'demon' | null;
 
 @Injectable({ providedIn: 'root' })
 export class ThemeService {
-  private readonly STORAGE_KEY = 'agenda-theme';
+  private readonly userPreferences = inject(UserPreferencesService);
 
-  theme = signal<Theme>(this.loadTheme());
+  readonly theme = this.userPreferences.theme;
 
   /** true quando qualquer variante escura está ativa */
   isDark = (() => {
@@ -37,7 +38,6 @@ export class ThemeService {
   })();
 
   constructor() {
-    this.applyTheme(this.theme());
     effect(() => {
       this.applyTheme(this.theme());
     });
@@ -81,28 +81,7 @@ export class ThemeService {
   }
 
   setTheme(t: Theme): void {
-    this.theme.set(t);
-    try {
-      localStorage.setItem(this.STORAGE_KEY, t);
-    } catch {
-      // Ignora
-    }
-  }
-
-  private loadTheme(): Theme {
-    try {
-      const saved = localStorage.getItem(this.STORAGE_KEY) as Theme | null;
-      if (saved === 'light' || saved === 'dark' || saved === 'dark-angel' || saved === 'dark-demon' || saved === 'light-angel' || saved === 'light-demon') {
-        return saved;
-      }
-      const prefersDark =
-        typeof window !== 'undefined' &&
-        !!window.matchMedia &&
-        window.matchMedia('(prefers-color-scheme: dark)').matches;
-      return prefersDark ? 'dark' : 'light';
-    } catch {
-      return 'light';
-    }
+    this.userPreferences.setTheme(t);
   }
 
   private applyTheme(t: Theme): void {

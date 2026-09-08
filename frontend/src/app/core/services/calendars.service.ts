@@ -56,7 +56,11 @@ export class CalendarsService {
         }),
         tap(cals => {
           if (version !== this.loadVersion) return;
-          if (cals === null) { this.isLoading.set(false); return; }
+          if (cals === null) {
+            this.isLoading.set(false);
+            afterLoad?.([]);
+            return;
+          }
           const finalList = (Array.isArray(cals) ? cals : []).map(calendar => ({
             ...calendar,
             members: this.enrichMembersWithUserData(calendar.members || [], this.authService.allUsers()),
