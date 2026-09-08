@@ -7,7 +7,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   if (typeof window !== 'undefined') {
     try {
       const urlParams = new URLSearchParams(window.location.search);
-      token = urlParams.get('token') || localStorage.getItem('agenda_token');
+      token = urlParams.get('ticket') || urlParams.get('token') || localStorage.getItem('agenda_token');
       appBasePath = new URL(document.baseURI).pathname.replace(/\/$/, '');
     } catch {
       token = null;

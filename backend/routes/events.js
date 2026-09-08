@@ -5,25 +5,28 @@ const asyncRoute = require('../async-route');
 const { validateEventInput } = require('../validation');
 const { listAttachments } = require('./attachments');
 
+// F-02 FIX: regex de sanitização para o campo category (allowlist de caracteres seguros)
+const SAFE_CATEGORY_RE = /^[\w\sÀ-ú!@#(),.:\-]{1,60}$/u;
+
 function genId() {
   return 'evt-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
 }
 
 async function hasAccess(calendarId, userId, requireWrite = false) {
   if (!calendarId) return true;
-  const calendar = await db.get('SELECT * FROM calendars WHERE id = ?', [calendarId]);
+  const calendar = await db.get('SELECT * FROM calendars WHERE id = $1', [calendarId]);
   if (!calendar) return false;
-  if (requireWrite && (calendar.is_task_calendar || await db.get('SELECT 1 FROM kanban_teams WHERE calendar_id = ?', [calendarId]))) return false;
+  if (requireWrite && (calendar.is_task_calendar || await db.get('SELECT 1 FROM kanban_teams WHERE calendar_id = $1', [calendarId]))) return false;
   if (calendar.owner_id === userId) return true;
   if (!userId) return false;
 
-  const member = await db.get('SELECT permission FROM calendar_members WHERE calendar_id = ? AND user_id = ?', [calendarId, String(userId)]);
+  const member = await db.get('SELECT permission FROM calendar_members WHERE calendar_id = $1 AND user_id = $2', [calendarId, String(userId)]);
   if (!member) return false;
   return !requireWrite || ['owner', 'editor'].includes(member.permission);
 }
 
 async function isTaskDeadlineEvent(eventId) {
-  return !!(await db.get('SELECT 1 FROM kanban_task_events WHERE event_id = ?', [eventId]));
+  return !!(await db.get('SELECT 1 FROM kanban_task_events WHERE event_id = $1', [eventId]));
 }
 
 function eventDto(event, attachments = []) {
@@ -57,7 +60,7 @@ router.get('/:calendarId/events', asyncRoute(async (req, res) => {
     FROM events e
     LEFT JOIN kanban_task_events kte ON kte.event_id = e.id
     LEFT JOIN kanban_tasks kt ON kt.id = kte.task_id
-    WHERE e.calendar_id = ?
+    WHERE e.calendar_id = $1
     ORDER BY e.date ASC, e.start_time ASC`, [calendarId]);
   res.json(await Promise.all(events.map(async event => eventDto(event,
     await listAttachments(event.task_id ? 'task' : 'event', event.task_id || event.id)))));
@@ -69,17 +72,22 @@ router.post('/:calendarId/events', asyncRoute(async (req, res) => {
   if (!(await hasAccess(calendarId, userId, true))) return res.status(403).json({ error: 'Sem permissão para criar eventos' });
 
   const { title, description = '', date, endDate, startTime = '09:00', endTime = '10:00', dayTimes = {}, color = 'indigo', category = 'Geral', allDay = false, copyGroupId } = req.body;
-  const validationError = validateEventInput({ title, description, date, endDate: endDate || date, startTime, endTime, dayTimes, color, category, allDay });
+
+  // F-02 FIX: sanitizar category
+  const safeCategory = (typeof category === 'string' && SAFE_CATEGORY_RE.test(category.trim()))
+    ? category.trim() : 'Geral';
+
+  const validationError = validateEventInput({ title, description, date, endDate: endDate || date, startTime, endTime, dayTimes, color, category: safeCategory, allDay });
   if (validationError) return res.status(400).json({ error: validationError });
 
   const id = genId();
   const now = new Date().toISOString();
   await db.run(`INSERT INTO events (id, calendar_id, title, description, date, end_date, start_time, end_time,
     day_times, color, category, all_day, created_by, copy_group_id, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [id, calendarId, title.trim(), description, date, endDate || date, startTime, endTime, JSON.stringify(dayTimes || {}), color, category, allDay ? 1 : 0, userId, copyGroupId || id, now]);
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+    [id, calendarId, title.trim(), description, date, endDate || date, startTime, endTime, JSON.stringify(dayTimes || {}), color, safeCategory, allDay ? 1 : 0, userId, copyGroupId || id, now]);
 
-  const event = await db.get('SELECT * FROM events WHERE id = ?', [id]);
+  const event = await db.get('SELECT * FROM events WHERE id = $1', [id]);
   req.broadcast({ type: 'event_created', calendarId, eventId: id });
   res.status(201).json(eventDto(event, await listAttachments('event', id)));
 }));
@@ -87,27 +95,34 @@ router.post('/:calendarId/events', asyncRoute(async (req, res) => {
 router.put('/:id', asyncRoute(async (req, res) => {
   const userId = req.headers['x-user-id'];
   const { id } = req.params;
-  const event = await db.get('SELECT * FROM events WHERE id = ?', [id]);
+  const event = await db.get('SELECT * FROM events WHERE id = $1', [id]);
   if (!event) return res.status(404).json({ error: 'Evento não encontrado' });
   if (!(await hasAccess(event.calendar_id, userId, true))) return res.status(403).json({ error: 'Sem permissão' });
   if (await isTaskDeadlineEvent(id)) return res.status(409).json({ error: 'O prazo desta tarefa deve ser alterado pelo card no Kanban' });
 
   const { title, description, date, endDate, startTime, endTime, dayTimes, color, category, allDay } = req.body;
-  const validationError = validateEventInput({ ...eventDto(event), ...req.body });
+
+  // F-02 FIX: sanitizar category se fornecido
+  const safeCategory = category !== undefined
+    ? ((typeof category === 'string' && SAFE_CATEGORY_RE.test(category.trim())) ? category.trim() : null)
+    : undefined;
+  if (safeCategory === null) return res.status(400).json({ error: 'Categoria contém caracteres inválidos' });
+
+  const validationError = validateEventInput({ ...eventDto(event), ...req.body, ...(safeCategory !== undefined ? { category: safeCategory } : {}) });
   if (validationError) return res.status(400).json({ error: validationError });
   const now = new Date().toISOString();
-  if (title !== undefined) await db.run('UPDATE events SET title = ?, updated_at = ? WHERE id = ?', [title.trim(), now, id]);
-  if (description !== undefined) await db.run('UPDATE events SET description = ?, updated_at = ? WHERE id = ?', [description, now, id]);
-  if (date) await db.run('UPDATE events SET date = ?, updated_at = ? WHERE id = ?', [date, now, id]);
-  if (endDate !== undefined) await db.run('UPDATE events SET end_date = ?, updated_at = ? WHERE id = ?', [endDate, now, id]);
-  if (startTime) await db.run('UPDATE events SET start_time = ?, updated_at = ? WHERE id = ?', [startTime, now, id]);
-  if (endTime) await db.run('UPDATE events SET end_time = ?, updated_at = ? WHERE id = ?', [endTime, now, id]);
-  if (dayTimes !== undefined) await db.run('UPDATE events SET day_times = ?, updated_at = ? WHERE id = ?', [JSON.stringify(dayTimes), now, id]);
-  if (color) await db.run('UPDATE events SET color = ?, updated_at = ? WHERE id = ?', [color, now, id]);
-  if (category) await db.run('UPDATE events SET category = ?, updated_at = ? WHERE id = ?', [category, now, id]);
-  if (allDay !== undefined) await db.run('UPDATE events SET all_day = ?, updated_at = ? WHERE id = ?', [allDay ? 1 : 0, now, id]);
+  if (title !== undefined) await db.run('UPDATE events SET title = $1, updated_at = $2 WHERE id = $3', [title.trim(), now, id]);
+  if (description !== undefined) await db.run('UPDATE events SET description = $1, updated_at = $2 WHERE id = $3', [description, now, id]);
+  if (date) await db.run('UPDATE events SET date = $1, updated_at = $2 WHERE id = $3', [date, now, id]);
+  if (endDate !== undefined) await db.run('UPDATE events SET end_date = $1, updated_at = $2 WHERE id = $3', [endDate, now, id]);
+  if (startTime) await db.run('UPDATE events SET start_time = $1, updated_at = $2 WHERE id = $3', [startTime, now, id]);
+  if (endTime) await db.run('UPDATE events SET end_time = $1, updated_at = $2 WHERE id = $3', [endTime, now, id]);
+  if (dayTimes !== undefined) await db.run('UPDATE events SET day_times = $1, updated_at = $2 WHERE id = $3', [JSON.stringify(dayTimes), now, id]);
+  if (color) await db.run('UPDATE events SET color = $1, updated_at = $2 WHERE id = $3', [color, now, id]);
+  if (safeCategory !== undefined) await db.run('UPDATE events SET category = $1, updated_at = $2 WHERE id = $3', [safeCategory, now, id]);
+  if (allDay !== undefined) await db.run('UPDATE events SET all_day = $1, updated_at = $2 WHERE id = $3', [allDay ? 1 : 0, now, id]);
 
-  const updated = await db.get('SELECT * FROM events WHERE id = ?', [id]);
+  const updated = await db.get('SELECT * FROM events WHERE id = $1', [id]);
   req.broadcast({ type: 'event_updated', calendarId: event.calendar_id, eventId: id });
   res.json(eventDto(updated, await listAttachments('event', id)));
 }));
@@ -115,13 +130,13 @@ router.put('/:id', asyncRoute(async (req, res) => {
 router.delete('/:id', asyncRoute(async (req, res) => {
   const userId = req.headers['x-user-id'];
   const { id } = req.params;
-  const event = await db.get('SELECT * FROM events WHERE id = ?', [id]);
+  const event = await db.get('SELECT * FROM events WHERE id = $1', [id]);
   if (!event) return res.status(404).json({ error: 'Evento não encontrado' });
   if (!(await hasAccess(event.calendar_id, userId, true))) return res.status(403).json({ error: 'Sem permissão' });
   if (await isTaskDeadlineEvent(id)) return res.status(409).json({ error: 'O prazo desta tarefa só pode ser removido pelo card no Kanban' });
   await db.transaction(async tx => {
-    await tx.run(`DELETE FROM attachments WHERE owner_type = 'event' AND owner_id = ?`, [id]);
-    await tx.run('DELETE FROM events WHERE id = ?', [id]);
+    await tx.run(`DELETE FROM attachments WHERE owner_type = 'event' AND owner_id = $1`, [id]);
+    await tx.run('DELETE FROM events WHERE id = $1', [id]);
   });
   req.broadcast({ type: 'event_deleted', calendarId: event.calendar_id, eventId: id });
   res.json({ success: true });

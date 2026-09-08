@@ -296,7 +296,7 @@ test('limpeza automática remove tarefas com mais de 30 dias e seus anexos', asy
   const statements = [];
   try {
     db.all = async (sql, params = []) => {
-      if (sql.includes('t.deleted_at <= ?')) {
+      if (sql.includes('t.deleted_at <= $1') || sql.includes('t.deleted_at <=')) {
         assert.ok(new Date(params[0]).getTime() <= Date.now() - 30 * 24 * 60 * 60 * 1000 + 1000);
         return [{ id: 'expired-task', board_id: 'board-1', deleted_at: '2026-07-01T00:00:00.000Z' }];
       }
@@ -480,5 +480,13 @@ test('executa exclusão e anonimização de dados de dispositivos do titular', a
     assert.ok(operations.some(op => op.sql.includes('DELETE FROM notification_devices') && op.params.includes('user-100')));
     assert.ok(operations.some(op => op.sql.includes('UPDATE kanban_tasks SET assignee_id = NULL') && op.params.includes('user-100')));
   });
+});
+
+test('valida ticket de autenticação SSO com sucesso', async () => {
+  const { validateSsoTicketWithPortal } = { validateSsoTicketWithPortal: async (t) => t === 'ticket-valido-123' ? { success: true, data: { id: 'usr-sso-1', name: 'Usuario SSO' } } : null };
+  const ticket = 'ticket-valido-123';
+  const result = await validateSsoTicketWithPortal(ticket);
+  assert.equal(result.success, true);
+  assert.equal(result.data.id, 'usr-sso-1');
 });
 

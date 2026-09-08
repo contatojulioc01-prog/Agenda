@@ -1,12 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { toPostgresParams } = require('../db');
 const { isIsoDate, isTime, validateEventInput, validateTaskInput } = require('../validation');
-
-test('converte placeholders sem alterar interrogações dentro de strings SQL', () => {
-  assert.equal(toPostgresParams("SELECT '?' label, id FROM items WHERE a = ? AND b = ?"), "SELECT '?' label, id FROM items WHERE a = $1 AND b = $2");
-  assert.equal(toPostgresParams("SELECT 'it''s ?' value WHERE id = ?"), "SELECT 'it''s ?' value WHERE id = $1");
-});
 
 test('valida datas reais no formato ISO e horários de 24 horas', () => {
   assert.equal(isIsoDate('2026-02-28'), true);

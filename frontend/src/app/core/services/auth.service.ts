@@ -26,19 +26,21 @@ export class AuthService {
   isAuthenticated = signal<boolean>(!!this.initialToken);
 
   constructor() {
-    if (this.token()) {
-      this.loadUserData();
+    const currentToken = this.token();
+    if (currentToken) {
+      this.validateSsoTicket(currentToken).subscribe();
     }
   }
 
-  /** Captura o token da URL (?token=...) ou do localStorage */
+  /** Captura o ticket ou token da URL (?ticket=... ou ?token=...) ou do localStorage */
   private getInitialToken(): string | null {
     if (typeof window !== 'undefined') {
       try {
         const urlParams = new URLSearchParams(window.location.search);
-        const urlToken = urlParams.get('token');
-        if (urlToken && urlToken.trim().length > 0) {
-          const cleanToken = urlToken.trim();
+        const urlTicket = urlParams.get('ticket') || urlParams.get('token');
+        if (urlTicket && urlTicket.trim().length > 0) {
+          const cleanToken = urlTicket.trim();
+          urlParams.delete('ticket');
           urlParams.delete('token');
           const remainingQuery = urlParams.toString();
           const cleanUrl = `${window.location.pathname}${remainingQuery ? `?${remainingQuery}` : ''}${window.location.hash}`;
@@ -63,6 +65,45 @@ export class AuthService {
     return null;
   }
 
+  /** Valida o ticket de handoff SSO enviando ao backend da Agenda */
+  validateSsoTicket(ticket: string): Observable<any> {
+    const proxyUrl = `${getApiBase()}/auth/sso-login`;
+    return this.http.post<any>(proxyUrl, { ticket }).pipe(
+      map(res => {
+        if (res && (res.success || res.token || res.data || res.user)) {
+          const sessionToken = res.token || ticket;
+          localStorage.setItem(this.TOKEN_KEY, sessionToken);
+          this.token.set(sessionToken);
+          this.isAuthenticated.set(true);
+
+          const meData = res.data || res.user;
+          if (meData && (meData.id || meData.email)) {
+            const profile: UserProfile = {
+              id: meData.id || meData.userId || '',
+              email: meData.email || '',
+              roles: meData.roles || [],
+              permissions: meData.permissions || [],
+              name: meData.name || meData.email?.split('@')[0] || 'Usuário',
+              avatar: meData.avatar || DEFAULT_AVATAR,
+              departamentName: meData.departamentName || meData.departament?.name || 'Geral',
+            };
+            if (profile.id) {
+              this.currentUser.set(profile);
+            }
+          }
+          this.loadUserData();
+          return res;
+        }
+        throw new Error(res?.error || 'Validação de ticket falhou');
+      }),
+      catchError(err => {
+        console.warn('[AuthService] Falha na validação de ticket SSO:', err.message);
+        this.loadUserData();
+        return of(null);
+      })
+    );
+  }
+
   /** Define um novo token manualmente ou vindo de navegação */
   setToken(token: string): boolean {
     const cleanToken = token.trim();
@@ -71,7 +112,9 @@ export class AuthService {
       localStorage.setItem(this.TOKEN_KEY, cleanToken);
       this.token.set(cleanToken);
       this.isAuthenticated.set(true);
-      this.loadUserData();
+
+      // Tenta validar como ticket SSO
+      this.validateSsoTicket(cleanToken).subscribe();
       return true;
     }
     this.clearSession();

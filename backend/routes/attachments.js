@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
@@ -12,26 +13,26 @@ const attachmentDto = row => ({ id: row.id, fileName: row.file_name, mimeType: r
 
 async function listAttachments(ownerType, ownerId, store = db) {
   const rows = await store.all(`SELECT id, file_name, mime_type, byte_size, created_at FROM attachments
-    WHERE owner_type = ? AND owner_id = ? ORDER BY created_at, id`, [ownerType, ownerId]);
+    WHERE owner_type = $1 AND owner_id = $2 ORDER BY created_at, id`, [ownerType, ownerId]);
   return rows.map(attachmentDto);
 }
 
 async function ownerAccess(ownerType, ownerId, uid, write = false) {
   if (ownerType === 'event') {
-    const event = await db.get('SELECT * FROM events WHERE id = ?', [ownerId]);
-    if (!event || await db.get('SELECT 1 FROM kanban_task_events WHERE event_id = ?', [ownerId])) return false;
-    const calendar = await db.get('SELECT * FROM calendars WHERE id = ?', [event.calendar_id]);
+    const event = await db.get('SELECT * FROM events WHERE id = $1', [ownerId]);
+    if (!event || await db.get('SELECT 1 FROM kanban_task_events WHERE event_id = $1', [ownerId])) return false;
+    const calendar = await db.get('SELECT * FROM calendars WHERE id = $1', [event.calendar_id]);
     if (!calendar) return false;
     if (calendar.owner_id === uid) return true;
-    const member = await db.get('SELECT permission FROM calendar_members WHERE calendar_id = ? AND user_id = ?', [calendar.id, uid]);
+    const member = await db.get('SELECT permission FROM calendar_members WHERE calendar_id = $1 AND user_id = $2', [calendar.id, uid]);
     return !!member && (!write || ['owner', 'editor'].includes(member.permission));
   }
   if (ownerType === 'task') {
-    const task = await db.get('SELECT * FROM kanban_tasks WHERE id = ?', [ownerId]);
-    const board = task && await db.get('SELECT * FROM kanban_boards WHERE id = ?', [task.board_id]);
+    const task = await db.get('SELECT * FROM kanban_tasks WHERE id = $1', [ownerId]);
+    const board = task && await db.get('SELECT * FROM kanban_boards WHERE id = $1', [task.board_id]);
     if (!board) return false;
     if (board.scope_type !== 'team') return board.owner_id === uid;
-    const member = await db.get('SELECT role FROM kanban_team_members WHERE team_id = ? AND user_id = ?', [board.team_id, uid]);
+    const member = await db.get('SELECT role FROM kanban_team_members WHERE team_id = $1 AND user_id = $2', [board.team_id, uid]);
     return !!member && (!write || ['admin', 'member'].includes(member.role));
   }
   return false;
@@ -40,11 +41,11 @@ async function ownerAccess(ownerType, ownerId, uid, write = false) {
 function safeFileName(value) {
   let decoded = '';
   try { decoded = decodeURIComponent(String(value || '')); } catch {}
-  return decoded.replace(/[\u0000-\u001f\u007f]/g, '').replace(/[\\/]/g, '_').trim().slice(0, 240);
+  return decoded.replace(/[\u0000-\u001f\u007f]/g, '').replace(/[\\\/]/g, '_').trim().slice(0, 240);
 }
 
 router.get('/:attachmentId/content', asyncRoute(async (req, res) => {
-  const item = await db.get('SELECT * FROM attachments WHERE id = ?', [req.params.attachmentId]);
+  const item = await db.get('SELECT * FROM attachments WHERE id = $1', [req.params.attachmentId]);
   if (!item) return res.status(404).json({ error: 'Anexo não encontrado' });
   if (!(await ownerAccess(item.owner_type, item.owner_id, userId(req)))) return res.status(403).json({ error: 'Sem acesso ao anexo' });
   const inline = isPreviewable(item.mime_type);
@@ -66,21 +67,23 @@ router.post('/:ownerType/:ownerId', express.raw({ type: 'application/octet-strea
   if (!fileName) return res.status(400).json({ error: 'Nome do arquivo não informado' });
   if (!Buffer.isBuffer(req.body) || !req.body.length) return res.status(400).json({ error: 'Arquivo vazio' });
   const usage = await db.get(`SELECT COUNT(*) attachment_count, COALESCE(SUM(byte_size), 0) total_bytes
-    FROM attachments WHERE owner_type = ? AND owner_id = ?`, [ownerType, ownerId]);
+    FROM attachments WHERE owner_type = $1 AND owner_id = $2`, [ownerType, ownerId]);
   if (Number(usage.attachment_count) >= 10) return res.status(409).json({ error: 'Limite de 10 anexos atingido' });
   if (Number(usage.total_bytes) + req.body.length > 50 * 1024 * 1024) return res.status(413).json({ error: 'Limite total de 50 MB excedido' });
-  const attachmentId = `att-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+
+  // F-10 FIX: usar crypto.randomUUID() para IDs criptograficamente seguros (não enumeráveis)
+  const attachmentId = `att-${crypto.randomUUID()}`;
   const now = new Date().toISOString();
   await db.run(`INSERT INTO attachments (id, owner_type, owner_id, file_name, mime_type, byte_size, content, created_by, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, [attachmentId, ownerType, ownerId, fileName, mimeType, req.body.length, req.body, userId(req), now]);
-  res.status(201).json(attachmentDto(await db.get('SELECT * FROM attachments WHERE id = ?', [attachmentId])));
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`, [attachmentId, ownerType, ownerId, fileName, mimeType, req.body.length, req.body, userId(req), now]);
+  res.status(201).json(attachmentDto(await db.get('SELECT * FROM attachments WHERE id = $1', [attachmentId])));
 }));
 
 router.delete('/:attachmentId', asyncRoute(async (req, res) => {
-  const item = await db.get('SELECT * FROM attachments WHERE id = ?', [req.params.attachmentId]);
+  const item = await db.get('SELECT * FROM attachments WHERE id = $1', [req.params.attachmentId]);
   if (!item) return res.status(404).json({ error: 'Anexo não encontrado' });
   if (!(await ownerAccess(item.owner_type, item.owner_id, userId(req), true))) return res.status(403).json({ error: 'Sem permissão para excluir o anexo' });
-  await db.run('DELETE FROM attachments WHERE id = ?', [item.id]);
+  await db.run('DELETE FROM attachments WHERE id = $1', [item.id]);
   res.json({ success: true });
 }));
 

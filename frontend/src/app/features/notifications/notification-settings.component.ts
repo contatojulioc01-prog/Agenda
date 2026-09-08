@@ -3,7 +3,6 @@ import { Component, EventEmitter, OnInit, Output, inject, signal } from '@angula
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { NotificationsService } from '../../core/services/notifications.service';
-import { NotificationPreferences } from '../../core/models/notification.model';
 import { AuthService } from '../../core/services/auth.service';
 
 @Component({
@@ -18,16 +17,8 @@ export class NotificationSettingsComponent implements OnInit {
   readonly service = inject(NotificationsService);
   private readonly auth = inject(AuthService);
   readonly copied = signal(false);
-  readonly saved = signal(false);
   deviceName = 'Meu computador';
   activationCode = '';
-  draft: NotificationPreferences = {
-    enabled: true,
-    taskEnabled: true,
-    eventEnabled: true,
-    taskTime: '08:30',
-    eventMinutesBefore: 15,
-  };
 
   get downloadUrl(): string {
     return new URL('downloads/Agenda.Notifier.exe?v=3', document.baseURI).toString();
@@ -35,19 +26,6 @@ export class NotificationSettingsComponent implements OnInit {
 
   ngOnInit(): void {
     this.service.load();
-    const wait = window.setInterval(() => {
-      if (this.service.loading()) return;
-      window.clearInterval(wait);
-      this.draft = { ...this.service.preferences() };
-    }, 50);
-    window.setTimeout(() => window.clearInterval(wait), 5000);
-  }
-
-  save(): void {
-    this.service.save({ ...this.draft, eventMinutesBefore: Number(this.draft.eventMinutesBefore) }, success => {
-      this.saved.set(success);
-      if (success) window.setTimeout(() => this.saved.set(false), 2500);
-    });
   }
 
   generateCode(): void {

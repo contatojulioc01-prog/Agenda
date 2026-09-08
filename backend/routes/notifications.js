@@ -50,18 +50,18 @@ function minutes(time) {
 }
 
 async function getPreferences(userId) {
-  return preferencesDto(await db.get('SELECT * FROM notification_preferences WHERE user_id = ?', [userId]));
+  return preferencesDto(await db.get('SELECT * FROM notification_preferences WHERE user_id = $1', [userId]));
 }
 
 async function authenticateDevice(req, res, next) {
   const authorization = String(req.headers.authorization || '');
   const deviceKey = String(req.headers['x-device-key'] || req.headers['x-device-token'] || authorization.replace(/^Bearer\s+/i, '')).trim();
   if (!deviceKey) return res.status(401).json({ error: 'Chave do dispositivo obrigatória' });
-  const device = await db.get('SELECT * FROM notification_devices WHERE token_hash = ? AND enabled = 1', [tokenHash(deviceKey)]);
+  const device = await db.get('SELECT * FROM notification_devices WHERE token_hash = $1 AND enabled = 1', [tokenHash(deviceKey)]);
   if (!device) return res.status(401).json({ error: 'Chave do dispositivo inválida ou revogada' });
   req.notificationDevice = device;
   req.headers['x-user-id'] = device.user_id;
-  await db.run('UPDATE notification_devices SET last_seen_at = ? WHERE id = ?', [new Date().toISOString(), device.id]);
+  await db.run('UPDATE notification_devices SET last_seen_at = $1 WHERE id = $2', [new Date().toISOString(), device.id]);
   next();
 }
 
@@ -69,7 +69,7 @@ router.get('/', asyncRoute(async (req, res) => {
   const userId = req.headers['x-user-id'];
   const [preferences, devices] = await Promise.all([
     getPreferences(userId),
-    db.all('SELECT * FROM notification_devices WHERE user_id = ? ORDER BY created_at DESC', [userId]),
+    db.all('SELECT * FROM notification_devices WHERE user_id = $1 ORDER BY created_at DESC', [userId]),
   ]);
   res.json({ preferences, devices: devices.map(deviceDto) });
 }));
@@ -94,7 +94,7 @@ router.put('/preferences', asyncRoute(async (req, res) => {
   const now = new Date().toISOString();
   await db.run(`INSERT INTO notification_preferences
     (user_id, enabled, task_enabled, event_enabled, task_time, event_minutes_before, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
     ON CONFLICT (user_id) DO UPDATE SET enabled = EXCLUDED.enabled, task_enabled = EXCLUDED.task_enabled,
       event_enabled = EXCLUDED.event_enabled, task_time = EXCLUDED.task_time,
       event_minutes_before = EXCLUDED.event_minutes_before, updated_at = EXCLUDED.updated_at`,
@@ -110,14 +110,14 @@ router.post('/devices', asyncRoute(async (req, res) => {
   const now = new Date().toISOString();
   const deviceId = id('ndv');
   await db.run(`INSERT INTO notification_devices
-    (id, user_id, name, token_hash, enabled, created_at) VALUES (?, ?, ?, ?, 1, ?)`,
+    (id, user_id, name, token_hash, enabled, created_at) VALUES ($1, $2, $3, $4, 1, $5)`,
     [deviceId, userId, name, tokenHash(deviceKey), now]);
   res.status(201).json({ device: deviceDto({ id: deviceId, name, enabled: 1, created_at: now, last_seen_at: null }), deviceKey });
 }));
 
 router.delete('/devices/:deviceId', asyncRoute(async (req, res) => {
   const userId = req.headers['x-user-id'];
-  const result = await db.run('DELETE FROM notification_devices WHERE id = ? AND user_id = ?', [req.params.deviceId, userId]);
+  const result = await db.run('DELETE FROM notification_devices WHERE id = $1 AND user_id = $2', [req.params.deviceId, userId]);
   if (!result.rowCount) return res.status(404).json({ error: 'Dispositivo não encontrado' });
   res.json({ success: true });
 }));
@@ -136,7 +136,7 @@ deviceRouter.get('/pending', asyncRoute(async (req, res) => {
   const preferences = await getPreferences(userId);
   if (!preferences.enabled) return res.json({ notifications: [], pollSeconds: 60, preferences });
   const deliveredRows = await db.all(
-    'SELECT delivery_key FROM notification_deliveries WHERE device_id = ? AND occurrence_date = ?',
+    'SELECT delivery_key FROM notification_deliveries WHERE device_id = $1 AND occurrence_date = $2',
     [device.id, localDate]
   );
   const delivered = new Set(deliveredRows.map(row => row.delivery_key));
@@ -147,9 +147,9 @@ deviceRouter.get('/pending', asyncRoute(async (req, res) => {
     const tasks = await db.all(`SELECT DISTINCT kt.*, kb.name AS board_name
       FROM kanban_tasks kt
       JOIN kanban_boards kb ON kb.id = kt.board_id
-      LEFT JOIN kanban_team_members ktm ON ktm.team_id = kb.team_id AND ktm.user_id = ?
-      WHERE kt.due_date = ? AND kt.archived = 0 AND kt.deleted_at IS NULL
-        AND (kb.owner_id = ? OR ktm.user_id = ?)`,
+      LEFT JOIN kanban_team_members ktm ON ktm.team_id = kb.team_id AND ktm.user_id = $1
+      WHERE kt.due_date = $2 AND kt.archived = 0 AND kt.deleted_at IS NULL
+        AND (kb.owner_id = $3 OR ktm.user_id = $4)`,
       [userId, localDate, userId, userId]);
     for (const task of tasks) {
       const assignees = parseJson(task.assignee_ids, []);
@@ -174,10 +174,10 @@ deviceRouter.get('/pending', asyncRoute(async (req, res) => {
     const events = await db.all(`SELECT DISTINCT e.*, c.name AS calendar_name
       FROM events e
       JOIN calendars c ON c.id = e.calendar_id
-      LEFT JOIN calendar_members cm ON cm.calendar_id = c.id AND cm.user_id = ?
+      LEFT JOIN calendar_members cm ON cm.calendar_id = c.id AND cm.user_id = $1
       LEFT JOIN kanban_task_events kte ON kte.event_id = e.id
-      WHERE kte.event_id IS NULL AND e.date <= ? AND COALESCE(e.end_date, e.date) >= ?
-        AND (c.owner_id = ? OR cm.user_id = ?)`,
+      WHERE kte.event_id IS NULL AND e.date <= $2 AND COALESCE(e.end_date, e.date) >= $3
+        AND (c.owner_id = $4 OR cm.user_id = $5)`,
       [userId, localDate, localDate, userId, userId]);
     for (const event of events) {
       const dayTimes = parseJson(event.day_times, {});
@@ -227,7 +227,7 @@ deviceRouter.post('/delivered', asyncRoute(async (req, res) => {
     for (const entry of valid) {
       await tx.run(`INSERT INTO notification_deliveries
         (id, device_id, user_id, delivery_key, source_type, source_id, occurrence_date, scheduled_for, delivered_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         ON CONFLICT (device_id, delivery_key) DO NOTHING`,
         [id('ndl'), device.id, device.user_id, entry.key, entry.type, entry.sourceId,
           entry.occurrenceDate, entry.scheduledFor, now]);

@@ -17,17 +17,17 @@ import { AuthService } from '../../core/services/auth.service';
         </div>
         <h1>Acesso Corporativo Restrito</h1>
         <p class="auth-desc">
-          Esta agenda é restrita aos colaboradores autorizados. O acesso deve ser realizado através do portal corporativo com o token de autenticação na URL.
+          Esta agenda é restrita aos colaboradores autorizados. O acesso deve ser realizado através do portal corporativo SSO com o ticket de autenticação na URL.
         </p>
 
         <div class="token-input-box">
-          <label for="manual-token">Inserir Token JWT Manualmente:</label>
+          <label for="manual-token">Inserir Ticket / Token Manualmente:</label>
           <div class="input-row">
             <input
               id="manual-token"
               type="text"
               [(ngModel)]="manualToken"
-              placeholder="Cole o token recebido no portal..."
+              placeholder="Cole o ticket recebido no portal..."
             />
             <button class="btn-submit" (click)="applyToken()" [disabled]="!manualToken.trim()">
               Acessar
@@ -37,7 +37,7 @@ import { AuthService } from '../../core/services/auth.service';
 
         <div class="auth-footer-help">
           <p>Exemplo de rota esperada:</p>
-          <code>http://192.168.13.244:5079/?token=eyJhbGciOi...</code>
+          <code>http://192.168.13.244:7000/?ticket=eyJhbGciOi...</code>
         </div>
       </div>
     </div>

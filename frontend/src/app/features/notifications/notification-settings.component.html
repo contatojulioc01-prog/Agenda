@@ -7,17 +7,6 @@
     </header>
 
     <div class="notification-body" *ngIf="!service.loading(); else loading">
-      <section class="settings-card">
-        <div class="section-title"><div><strong>Preferências</strong><span>Defina quando deseja receber os avisos.</span></div><label class="switch"><input type="checkbox" [(ngModel)]="draft.enabled"><span></span></label></div>
-        <div class="settings-grid" [class.disabled]="!draft.enabled">
-          <label class="check-setting"><input type="checkbox" [(ngModel)]="draft.taskEnabled"><span><strong>Tarefas</strong><small>Avisar no dia do prazo</small></span></label>
-          <label><span>Horário das tarefas</span><input type="time" [(ngModel)]="draft.taskTime" [disabled]="!draft.enabled || !draft.taskEnabled"></label>
-          <label class="check-setting"><input type="checkbox" [(ngModel)]="draft.eventEnabled"><span><strong>Eventos</strong><small>Avisar antes do início</small></span></label>
-          <label><span>Antecedência</span><select [(ngModel)]="draft.eventMinutesBefore" [disabled]="!draft.enabled || !draft.eventEnabled"><option [ngValue]="0">Na hora</option><option [ngValue]="5">5 minutos</option><option [ngValue]="10">10 minutos</option><option [ngValue]="15">15 minutos</option><option [ngValue]="30">30 minutos</option><option [ngValue]="60">1 hora</option><option [ngValue]="1440">1 dia</option></select></label>
-        </div>
-        <button type="button" class="primary-action" [disabled]="service.saving()" (click)="save()"><mat-icon>{{ saved() ? 'check' : 'save' }}</mat-icon>{{ saved() ? 'Preferências salvas' : 'Salvar preferências' }}</button>
-      </section>
-
       <section class="settings-card setup-card">
         <div class="section-title"><div><strong>Aplicativo para Windows</strong><span>Baixe uma vez e conecte este computador.</span></div><a class="download-button" [href]="downloadUrl" download><mat-icon>download</mat-icon>Baixar EXE</a></div>
         <ol><li>Baixe e abra o <strong>Agenda.Notifier.exe</strong>.</li><li>Gere e copie o código abaixo.</li><li>Cole o código no aplicativo e clique em Ativar.</li></ol>

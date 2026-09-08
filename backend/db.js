@@ -13,9 +13,19 @@ function connectionConfig() {
   if (process.env.DATABASE_URL && !hasDiscreteConfig) {
     return {
       connectionString: process.env.DATABASE_URL,
-      ssl: sslEnabled ? { rejectUnauthorized: false } : false,
+      ssl: sslEnabled ? { rejectUnauthorized: true } : false,
     };
   }
+
+  const sslConfig = sslEnabled
+    ? {
+        rejectUnauthorized: true,
+        // Defina PGSSL_CA=/caminho/para/ca.crt no .env para verificar o certificado do servidor
+        ...(process.env.PGSSL_CA
+          ? { ca: require('fs').readFileSync(process.env.PGSSL_CA) }
+          : { rejectUnauthorized: false }), // fallback sem CA: ainda criptografa mas sem verificação
+      }
+    : false;
 
   return {
     host: process.env.PGHOST || '127.0.0.1',
@@ -23,31 +33,12 @@ function connectionConfig() {
     database: process.env.PGDATABASE || 'agenda',
     user: process.env.PGUSER || 'postgres',
     password: String(process.env.PGPASSWORD || ''),
-    ssl: sslEnabled ? { rejectUnauthorized: false } : false,
+    ssl: sslConfig,
   };
 }
 
-function toPostgresParams(sql) {
-  let index = 0;
-  let quoted = false;
-  let result = '';
-  for (let i = 0; i < sql.length; i++) {
-    const char = sql[i];
-    if (char === "'") {
-      result += char;
-      if (quoted && sql[i + 1] === "'") {
-        result += sql[++i];
-      } else {
-        quoted = !quoted;
-      }
-    } else if (char === '?' && !quoted) {
-      result += `$${++index}`;
-    } else {
-      result += char;
-    }
-  }
-  return result;
-}
+// NOTA DE SEGURANÇA: toPostgresParams() foi REMOVIDA (F-01 / CWE-89).
+// Todas as queries devem usar placeholders nativos $1, $2... do driver pg.
 
 async function initDb() {
   if (pool) return pool;
@@ -290,7 +281,7 @@ function requirePool() {
 }
 
 async function all(sql, params = [], client = null) {
-  const result = await (client || requirePool()).query(toPostgresParams(sql), params);
+  const result = await (client || requirePool()).query(sql, params);
   return result.rows;
 }
 
@@ -300,7 +291,7 @@ async function get(sql, params = [], client = null) {
 }
 
 async function run(sql, params = [], client = null) {
-  return (client || requirePool()).query(toPostgresParams(sql), params);
+  return (client || requirePool()).query(sql, params);
 }
 
 async function transaction(callback) {
@@ -329,4 +320,4 @@ async function closeDb() {
   pool = null;
 }
 
-module.exports = { initDb, all, get, run, transaction, closeDb, connectionConfig, toPostgresParams };
+module.exports = { initDb, all, get, run, transaction, closeDb, connectionConfig };

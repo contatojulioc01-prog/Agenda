@@ -6,10 +6,13 @@ const envPaths = [path.join(__dirname, '..', '.env'), path.join(__dirname, '.env
 for (const envPath of envPaths) {
   if (fs.existsSync(envPath)) dotenv.config({ path: envPath, override: false, quiet: true });
 }
+
 const express = require('express');
 const http = require('http');
 const { WebSocketServer } = require('ws');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const { initDb, closeDb } = require('./db');
 
 const PORT = process.env.PORT || 9900;
@@ -53,12 +56,14 @@ function broadcast(data) {
 wss.on('connection', async (ws, req) => {
   const ip = req.socket.remoteAddress;
   let token = '';
-  try {
-    const url = new URL(req.url, 'http://localhost');
-    token = url.searchParams.get('token') || '';
-  } catch {}
+
+  // Suporte a token via header Authorization ou query string fallback
+  token = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
   if (!token) {
-    token = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
+    try {
+      const url = new URL(req.url, 'http://localhost');
+      token = url.searchParams.get('token') || '';
+    } catch {}
   }
 
   if (token) {
@@ -87,13 +92,68 @@ wss.on('connection', async (ws, req) => {
 });
 
 // ── Middlewares ──────────────────────────────────────────────────────────────
-app.use((_req, res, next) => {
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
-  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  next();
+
+// Helmet: headers de segurança configurados para compatibilidade com Angular e proxies internos
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginResourcePolicy: false,
+  crossOriginEmbedderPolicy: false,
+  hsts: { maxAge: 31536000, includeSubDomains: true },
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+}));
+app.disable('x-powered-by');
+
+// CORS: validação de origens seguras e rede interna
+const rawOrigins = process.env.CORS_ORIGINS || '';
+const allowedOrigins = rawOrigins
+  ? rawOrigins.split(',').map(o => o.trim()).filter(Boolean)
+  : [];
+
+function isAllowedOrigin(origin) {
+  if (!origin) return true;
+  if (allowedOrigins.length === 0 || allowedOrigins.includes(origin) || allowedOrigins.includes('*')) return true;
+  try {
+    const url = new URL(origin);
+    const host = url.hostname.toLowerCase();
+    if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return true;
+    if (host.endsWith('.local') || host === 'docebrinquedo.local') return true;
+    if (/^192\.168\.\d+\.\d+$/.test(host) || /^10\.\d+\.\d+\.\d+$/.test(host) || /^172\.(1[6-9]|2\d|3[01])\.\d+\.\d+$/.test(host)) return true;
+  } catch {}
+  return false;
+}
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (isAllowedOrigin(origin)) {
+      return callback(null, true);
+    }
+    return callback(null, false);
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id', 'x-device-key', 'x-file-name', 'x-file-type'],
+  credentials: true,
+}));
+
+// Rate limiting global — 300 req/min por IP
+const globalLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Muitas requisições. Tente novamente em instantes.' },
+  skip: (req) => req.path === '/health' || !req.path.startsWith('/api'), // static files e health não limitados
 });
-app.use(cors({ origin: '*', methods: ['GET','POST','PUT','DELETE','OPTIONS'], allowedHeaders: ['Content-Type','Authorization','x-user-id','x-device-key','x-file-name','x-file-type'] }));
+app.use(globalLimiter);
+
+// Rate limiting para proxy externo
+const proxyLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Limite de consultas externas atingido. Tente em 1 minuto.' },
+});
+
 // Aceita tanto o acesso direto http://servidor:9900/agenda quanto o proxy IIS,
 // que remove /agenda antes de encaminhar a requisicao para o Node.
 app.use((req, _res, next) => {
@@ -107,13 +167,43 @@ app.use((req, _res, next) => {
 app.use(express.json());
 app.use((req, _res, next) => { req.broadcast = broadcast; next(); });
 
-// Proxy transparente para a API corporativa (elimina problemas de CORS e rede do browser)
+// Proxy transparente para a API corporativa (SSO Portal Doce Brinquedo)
 const PORTAL_API = process.env.PORTAL_API || 'http://192.168.13.244:7000';
+const SSO_API_KEY = process.env.SSO_API_KEY || process.env.PORTAL_API_KEY || '';
 const authCache = new Map();
 
 function extractAuthenticatedUserId(payload) {
   const value = payload?.data?.user || payload?.data || payload?.user || payload;
   return value?.id ? String(value.id) : '';
+}
+
+async function validateSsoTicketWithPortal(ticket) {
+  if (!ticket) return null;
+  const cleanTicket = String(ticket).replace(/^Bearer\s+/i, '').trim();
+  if (!cleanTicket) return null;
+
+  const headers = { 'Content-Type': 'application/json' };
+  if (SSO_API_KEY) {
+    headers['X-Api-Key'] = SSO_API_KEY;
+  }
+
+  try {
+    const response = await fetch(`${PORTAL_API}/api/apikey/validate-token`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ token: cleanTicket })
+    });
+
+    if (response.ok) {
+      const payload = await response.json();
+      if (payload && (payload.success === true || payload.data)) {
+        return payload;
+      }
+    }
+  } catch (error) {
+    console.error('[SSO] Erro ao validar ticket via apikey/validate-token:', error.message);
+  }
+  return null;
 }
 
 async function validateUserToken(token) {
@@ -124,11 +214,32 @@ async function validateUserToken(token) {
   let cached = authCache.get(cleanToken);
   if (!cached || cached.expiresAt <= Date.now()) {
     try {
-      const response = await fetch(`${PORTAL_API}/api/auth/me`, { headers: { Authorization: `Bearer ${cleanToken}` } });
-      if (!response.ok) return null;
-      const authenticatedUserId = extractAuthenticatedUserId(await response.json());
+      // 1. Tenta validar via POST /api/apikey/validate-token
+      const ssoValidation = await validateSsoTicketWithPortal(cleanToken);
+      let authenticatedUserId = extractAuthenticatedUserId(ssoValidation);
+
+      // 2. Se não retornou via validate-token, tenta /api/apikey/me ou /api/auth/me
+      if (!authenticatedUserId) {
+        const headers = { Authorization: `Bearer ${cleanToken}` };
+        if (SSO_API_KEY) headers['X-Api-Key'] = SSO_API_KEY;
+
+        let response = null;
+        if (SSO_API_KEY) {
+          try {
+            response = await fetch(`${PORTAL_API}/api/apikey/me`, { headers });
+          } catch {}
+        }
+        if (!response || !response.ok) {
+          response = await fetch(`${PORTAL_API}/api/auth/me`, { headers: { Authorization: `Bearer ${cleanToken}` } });
+        }
+
+        if (response && response.ok) {
+          authenticatedUserId = extractAuthenticatedUserId(await response.json());
+        }
+      }
+
       if (!authenticatedUserId) return null;
-      cached = { userId: authenticatedUserId, expiresAt: Date.now() + 30000 };
+      cached = { userId: authenticatedUserId, expiresAt: Date.now() + 300000 };
       if (authCache.size >= 500) authCache.delete(authCache.keys().next().value);
       authCache.set(cleanToken, cached);
     } catch (error) {
@@ -141,7 +252,7 @@ async function validateUserToken(token) {
 
 async function authenticateAgendaRequest(req, res, next) {
   const authorization = String(req.headers.authorization || '');
-  const token = authorization.replace(/^Bearer\s+/i, '').trim() || String(req.query.token || '').trim();
+  const token = authorization.replace(/^Bearer\s+/i, '').trim() || String(req.query.token || '').trim() || String(req.query.ticket || '').trim();
   if (!token) return res.status(401).json({ error: 'Autenticação obrigatória' });
 
   try {
@@ -159,12 +270,15 @@ async function authenticateAgendaRequest(req, res, next) {
 }
 
 // ── Rotas ────────────────────────────────────────────────────────────────────
-app.get('/health', (_req, res) => res.json({
-  status: 'ok',
-  clients: Math.max(wss.clients.size, realtimeClients.size),
-  transports: { websocket: wss.clients.size, eventStream: realtimeClients.size },
-  ts: new Date().toISOString(),
-}));
+
+app.get('/health', (_req, res) => {
+  res.json({
+    status: 'ok',
+    clients: Math.max(wss.clients.size, realtimeClients.size),
+    transports: { websocket: wss.clients.size, eventStream: realtimeClients.size },
+    ts: new Date().toISOString(),
+  });
+});
 
 // Canal HTTP contínuo usado como redundância quando proxies não encaminham WebSocket.
 app.get('/api/realtime', authenticateAgendaRequest, (req, res) => {
@@ -184,15 +298,76 @@ app.get('/api/realtime', authenticateAgendaRequest, (req, res) => {
   });
 });
 
+// Rota de login/validação do ticket SSO
+app.post('/api/auth/sso-login', async (req, res) => {
+  const ticket = req.body?.ticket || req.body?.token;
+  if (!ticket) {
+    return res.status(400).json({ error: 'Ticket de autenticação não fornecido' });
+  }
+
+  try {
+    const ssoResult = await validateSsoTicketWithPortal(ticket);
+    if (ssoResult && (ssoResult.success || ssoResult.data)) {
+      const userData = ssoResult.data || ssoResult;
+      const userId = extractAuthenticatedUserId(ssoResult);
+      if (userId) {
+        authCache.set(ticket, { userId, expiresAt: Date.now() + 300000 });
+      }
+      return res.json({
+        success: true,
+        message: ssoResult.message || 'Token validado com sucesso',
+        token: ticket,
+        data: userData,
+        user: userData
+      });
+    }
+
+    // Fallback: tenta validar se o ticket fornecido for um token JWT direto
+    const userId = await validateUserToken(ticket);
+    if (userId) {
+      return res.json({
+        success: true,
+        message: 'Token validado com sucesso',
+        token: ticket,
+        data: { id: userId },
+        user: { id: userId }
+      });
+    }
+
+    return res.status(401).json({ error: 'Ticket de autenticação inválido ou expirado' });
+  } catch (error) {
+    console.error('[SSO] Erro na validação sso-login:', error.message);
+    return res.status(500).json({ error: 'Falha ao conectar com o SSO' });
+  }
+});
+
 const handleUsersProxy = async (req, res) => {
   try {
     const authHeader = req.headers['authorization'] || '';
-    const response = await fetch(`${PORTAL_API}/api/users/all`, {
-      headers: authHeader ? { 'Authorization': authHeader } : {}
-    });
+    const headers = {};
+    if (authHeader) headers['Authorization'] = authHeader;
+    if (SSO_API_KEY) headers['X-Api-Key'] = SSO_API_KEY;
+
+    let response = null;
+
+    // Tenta primeiro o endpoint de API Key (/api/apikey/users) se a chave existir
+    if (SSO_API_KEY) {
+      try {
+        response = await fetch(`${PORTAL_API}/api/apikey/users`, { headers });
+      } catch (err) {
+        console.warn('[PROXY] Falha ao consultar /api/apikey/users:', err.message);
+      }
+    }
+
+    // Fallback para o endpoint legado /api/users/all
+    if (!response || !response.ok) {
+      response = await fetch(`${PORTAL_API}/api/users/all`, {
+        headers: authHeader ? { 'Authorization': authHeader } : {}
+      });
+    }
 
     if (!response.ok) {
-      console.warn(`[PROXY] API corporativa retornou HTTP ${response.status} para /users/all`);
+      console.warn(`[PROXY] API corporativa retornou HTTP ${response.status} para usuários`);
       const text = await response.text();
       let errorBody = null;
       try { errorBody = JSON.parse(text); } catch { errorBody = { message: text || `HTTP ${response.status}` }; }
@@ -214,20 +389,33 @@ const handleUsersProxy = async (req, res) => {
 
     res.json(data);
   } catch (err) {
-    console.error('[PROXY] Erro ao buscar /users/all da API corporativa:', err.message);
+    console.error('[PROXY] Erro ao buscar colaboradores da API corporativa:', err.message);
     res.status(502).json({ error: err.message, fallback: true });
   }
 };
 
-app.get('/api/users/all', authenticateAgendaRequest, handleUsersProxy);
-app.get('/api/users', authenticateAgendaRequest, handleUsersProxy);
+app.get('/api/users/all', authenticateAgendaRequest, proxyLimiter, handleUsersProxy);
+app.get('/api/users', authenticateAgendaRequest, proxyLimiter, handleUsersProxy);
 
 app.get('/api/auth/me', async (req, res) => {
   try {
     const authHeader = req.headers['authorization'] || '';
-    const response = await fetch(`${PORTAL_API}/api/auth/me`, {
-      headers: authHeader ? { 'Authorization': authHeader } : {}
-    });
+    const headers = {};
+    if (authHeader) headers['Authorization'] = authHeader;
+    if (SSO_API_KEY) headers['X-Api-Key'] = SSO_API_KEY;
+
+    let response = null;
+    if (SSO_API_KEY && authHeader) {
+      try {
+        response = await fetch(`${PORTAL_API}/api/apikey/me`, { headers });
+      } catch {}
+    }
+
+    if (!response || !response.ok) {
+      response = await fetch(`${PORTAL_API}/api/auth/me`, {
+        headers: authHeader ? { 'Authorization': authHeader } : {}
+      });
+    }
 
     if (!response.ok) {
       console.warn(`[PROXY] API corporativa retornou HTTP ${response.status} para /auth/me`);
@@ -245,10 +433,14 @@ app.get('/api/auth/me', async (req, res) => {
   }
 });
 
+
+// Validação estrita do parâmetro :year para prevenir SSRF
 app.get('/api/holidays/:year', async (req, res) => {
+  const year = parseInt(req.params.year, 10);
+  if (!Number.isInteger(year) || year < 2000 || year > 2100) {
+    return res.status(400).json({ error: 'Ano inválido. Informe um ano entre 2000 e 2100.' });
+  }
   try {
-    const year = req.params.year;
-    // O Node nativo >= 18 tem fetch global, caso seja antigo usaríamos node-fetch (mas assumimos que suporta fetch como nas rotas acima)
     const response = await fetch(`https://brasilapi.com.br/api/feriados/v1/${year}`);
     if (!response.ok) {
       return res.status(response.status).json({ error: `Erro HTTP ${response.status} na BrasilAPI` });
@@ -320,7 +512,7 @@ initDb().then(async () => {
     });
   }
 
-  app.use((err, req, res, next) => {
+  app.use((err, _req, res, next) => {
     console.error('[API]', err);
     if (res.headersSent) return next(err);
     res.status(500).json({ error: 'Erro interno no servidor' });

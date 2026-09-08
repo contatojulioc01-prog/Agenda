@@ -23,14 +23,14 @@ router.get('/export-my-data', asyncRoute(async (req, res) => {
     notificationPrefs,
     devices
   ] = await Promise.all([
-    db.all('SELECT id, name, color, is_private, is_default, created_at FROM calendars WHERE owner_id = ?', [uid]),
-    db.all('SELECT calendar_id, permission FROM calendar_members WHERE user_id = ?', [uid]),
-    db.all('SELECT id, calendar_id, title, description, date, end_date, start_time, end_time, color, category, all_day, created_at FROM events WHERE created_by = ?', [uid]),
-    db.all('SELECT id, name, description, color, scope_type, team_id, created_at FROM kanban_boards WHERE owner_id = ?', [uid]),
-    db.all('SELECT id, board_id, column_id, title, description, due_date, priority, labels, checklist, created_at FROM kanban_tasks WHERE created_by = ?', [uid]),
-    db.all('SELECT id, board_id, column_id, title, description, due_date, priority FROM kanban_tasks WHERE assignee_id = ? AND created_by != ?', [uid, uid]),
-    db.all('SELECT enabled, task_enabled, event_enabled, task_time, event_minutes_before, updated_at FROM notification_preferences WHERE user_id = ?', [uid]),
-    db.all('SELECT id, name, enabled, created_at, last_seen_at FROM notification_devices WHERE user_id = ?', [uid]),
+    db.all('SELECT id, name, color, is_private, is_default, created_at FROM calendars WHERE owner_id = $1', [uid]),
+    db.all('SELECT calendar_id, permission FROM calendar_members WHERE user_id = $1', [uid]),
+    db.all('SELECT id, calendar_id, title, description, date, end_date, start_time, end_time, color, category, all_day, created_at FROM events WHERE created_by = $1', [uid]),
+    db.all('SELECT id, name, description, color, scope_type, team_id, created_at FROM kanban_boards WHERE owner_id = $1', [uid]),
+    db.all('SELECT id, board_id, column_id, title, description, due_date, priority, labels, checklist, created_at FROM kanban_tasks WHERE created_by = $1', [uid]),
+    db.all('SELECT id, board_id, column_id, title, description, due_date, priority FROM kanban_tasks WHERE assignee_id = $1 AND created_by != $2', [uid, uid]),
+    db.all('SELECT enabled, task_enabled, event_enabled, task_time, event_minutes_before, updated_at FROM notification_preferences WHERE user_id = $1', [uid]),
+    db.all('SELECT id, name, enabled, created_at, last_seen_at FROM notification_devices WHERE user_id = $1', [uid]),
   ]);
 
   const exportPayload = {
@@ -74,14 +74,14 @@ router.post('/anonymize-my-data', asyncRoute(async (req, res) => {
 
   await db.transaction(async tx => {
     // 1. Revogar e excluir tokens e dispositivos
-    await tx.run('DELETE FROM notification_devices WHERE user_id = ?', [uid]);
-    await tx.run('DELETE FROM notification_preferences WHERE user_id = ?', [uid]);
+    await tx.run('DELETE FROM notification_devices WHERE user_id = $1', [uid]);
+    await tx.run('DELETE FROM notification_preferences WHERE user_id = $1', [uid]);
 
     // 2. Limpar convites pendentes
-    await tx.run('DELETE FROM calendar_invitations WHERE user_id = ?', [uid]);
+    await tx.run('DELETE FROM calendar_invitations WHERE user_id = $1', [uid]);
 
     // 3. Anonimizar identificação em tarefas desvinculadas (se o usuário for desligado)
-    await tx.run("UPDATE kanban_tasks SET assignee_id = NULL WHERE assignee_id = ?", [uid]);
+    await tx.run("UPDATE kanban_tasks SET assignee_id = NULL WHERE assignee_id = $1", [uid]);
   });
 
   res.json({
@@ -92,4 +92,3 @@ router.post('/anonymize-my-data', asyncRoute(async (req, res) => {
 }));
 
 module.exports = router;
-

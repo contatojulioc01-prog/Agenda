@@ -1,0 +1,36 @@
+# =============================================================================
+# Agenda Corporativa — Arquivo de Exemplo de Configuração de Ambiente (.env)
+# =============================================================================
+
+# Configuração do PostgreSQL
+PGHOST=127.0.0.1
+PGPORT=5432
+PGDATABASE=agenda_db
+PGUSER=agenda_app
+PGPASSWORD=sua_senha_forte_aqui
+PGPOOL_MAX=10
+
+# TLS/SSL para PostgreSQL
+# Defina PGSSL=true para conexões seguras. Em produção com certificado autoassinado ou CA privada,
+# especifique o caminho do arquivo CA:
+PGSSL=false
+# PGSSL_CA=C:/caminho/para/ca.crt
+
+# Credenciais administrativas (usadas apenas para scripts/setup-postgres.js)
+PGADMINDB=postgres
+PGADMINUSER=postgres
+PGADMINPASSWORD=sua_senha_admin_aqui
+
+# Alternativa: DATABASE_URL única
+# DATABASE_URL=postgresql://agenda_app:senha@127.0.0.1:5432/agenda_db
+
+# Porta do servidor HTTP
+PORT=9900
+HOST=0.0.0.0
+
+# CORS — Lista de origens autorizadas separadas por vírgula (Obrigatório em produção!)
+# Exemplo: CORS_ORIGINS=http://localhost:4200,http://192.168.13.244,http://servidor-agenda
+CORS_ORIGINS=http://localhost:4200,http://127.0.0.1:9900
+
+# Integração com Portal Corporativo
+PORTAL_API=http://192.168.13.244:7000
