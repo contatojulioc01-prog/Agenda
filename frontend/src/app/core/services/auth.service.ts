@@ -231,8 +231,10 @@ export class AuthService {
   }
 
   private invalidateSession(): void {
+    const destination = this.router.url;
     this.clearSession();
-    void this.router.navigate(['/unauthorized']);
+    if (destination.startsWith('/unauthorized')) return;
+    void this.router.navigate(['/unauthorized'], { queryParams: { retorno: destination } });
   }
 
   private clearSession(): void {

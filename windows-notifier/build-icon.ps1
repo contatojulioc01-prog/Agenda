@@ -65,4 +65,4 @@ try {
   $file.Dispose()
 }
 
-Write-Host "Ícone criado em $targetPath"
+Write-Host "Icon: $targetPath"

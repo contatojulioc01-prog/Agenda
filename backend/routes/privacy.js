@@ -29,7 +29,7 @@ router.get('/export-my-data', asyncRoute(async (req, res) => {
     db.all('SELECT id, name, description, color, scope_type, team_id, created_at FROM kanban_boards WHERE owner_id = $1', [uid]),
     db.all('SELECT id, board_id, column_id, title, description, due_date, priority, labels, checklist, created_at FROM kanban_tasks WHERE created_by = $1', [uid]),
     db.all('SELECT id, board_id, column_id, title, description, due_date, priority FROM kanban_tasks WHERE assignee_id = $1 AND created_by != $2', [uid, uid]),
-    db.all('SELECT enabled, task_enabled, event_enabled, task_time, event_minutes_before, updated_at FROM notification_preferences WHERE user_id = $1', [uid]),
+    db.all('SELECT enabled, task_enabled, event_enabled, task_time, task_days_before, event_minutes_before, updated_at FROM notification_preferences WHERE user_id = $1', [uid]),
     db.all('SELECT id, name, enabled, created_at, last_seen_at FROM notification_devices WHERE user_id = $1', [uid]),
   ]);
 

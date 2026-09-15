@@ -10,7 +10,10 @@ export const authGuard: CanActivateFn = (route, state) => {
   const queryToken = route.queryParamMap.get('ticket') || route.queryParamMap.get('token');
   if (queryToken && queryToken.trim().length > 0) {
     if (!authService.setToken(queryToken.trim())) {
-      return router.createUrlTree(['/unauthorized']);
+      const destination = router.parseUrl(state.url);
+      delete destination.queryParams['ticket'];
+      delete destination.queryParams['token'];
+      return router.createUrlTree(['/unauthorized'], { queryParams: { retorno: destination.toString() } });
     }
 
     // O AuthService já retirou o token da barra de endereço. Retornamos também
@@ -28,5 +31,5 @@ export const authGuard: CanActivateFn = (route, state) => {
   }
 
   // Se não houver token, redireciona para a página informativa de autenticação
-  return router.createUrlTree(['/unauthorized']);
+  return router.createUrlTree(['/unauthorized'], { queryParams: { retorno: state.url } });
 };

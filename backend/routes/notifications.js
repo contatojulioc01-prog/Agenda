@@ -26,6 +26,7 @@ function preferencesDto(row) {
     taskEnabled: row ? row.task_enabled === 1 : true,
     eventEnabled: row ? row.event_enabled === 1 : true,
     taskTime: row?.task_time || '08:30',
+    taskDaysBefore: Number(row?.task_days_before ?? 1),
     eventMinutesBefore: Number(row?.event_minutes_before ?? 15),
   };
 }
@@ -81,9 +82,12 @@ router.put('/preferences', asyncRoute(async (req, res) => {
     taskEnabled = true,
     eventEnabled = true,
     taskTime = '08:30',
+    taskDaysBefore = 1,
     eventMinutesBefore = 15,
   } = req.body || {};
   const lead = Number(eventMinutesBefore);
+  const taskLead = Number(taskDaysBefore);
+  if (!Number.isInteger(taskLead) || taskLead < 0 || taskLead > 30) return res.status(400).json({ error: 'A antecedência das tarefas deve estar entre 0 e 30 dias' });
   if (![enabled, taskEnabled, eventEnabled].every(value => typeof value === 'boolean')) {
     return res.status(400).json({ error: 'Preferências de ativação inválidas' });
   }
@@ -93,12 +97,13 @@ router.put('/preferences', asyncRoute(async (req, res) => {
   }
   const now = new Date().toISOString();
   await db.run(`INSERT INTO notification_preferences
-    (user_id, enabled, task_enabled, event_enabled, task_time, event_minutes_before, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7)
+    (user_id, enabled, task_enabled, event_enabled, task_time, event_minutes_before, updated_at, task_days_before)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     ON CONFLICT (user_id) DO UPDATE SET enabled = EXCLUDED.enabled, task_enabled = EXCLUDED.task_enabled,
       event_enabled = EXCLUDED.event_enabled, task_time = EXCLUDED.task_time,
-      event_minutes_before = EXCLUDED.event_minutes_before, updated_at = EXCLUDED.updated_at`,
-    [userId, enabled ? 1 : 0, taskEnabled ? 1 : 0, eventEnabled ? 1 : 0, taskTime, lead, now]);
+      event_minutes_before = EXCLUDED.event_minutes_before, updated_at = EXCLUDED.updated_at,
+      task_days_before = EXCLUDED.task_days_before`,
+    [userId, enabled ? 1 : 0, taskEnabled ? 1 : 0, eventEnabled ? 1 : 0, taskTime, lead, now, taskLead]);
   res.json(await getPreferences(userId));
 }));
 
@@ -124,20 +129,50 @@ router.delete('/devices/:deviceId', asyncRoute(async (req, res) => {
 
 deviceRouter.use(asyncRoute(authenticateDevice));
 
+function shiftDate(date, days) {
+  const value = new Date(`${date}T00:00:00Z`);
+  value.setUTCDate(value.getUTCDate() + days);
+  return value.toISOString().slice(0, 10);
+}
+
+function taskUrl(task) {
+  return `/tarefas/${encodeURIComponent(task.board_id)}?tarefa=${encodeURIComponent(task.id)}${task.parent_task_id ? `&ramificacao=${encodeURIComponent(task.parent_task_id)}` : ''}`;
+}
+
+// Device keys only expose boards the connected user can access in the web app.
+deviceRouter.get('/kanban', asyncRoute(async (req, res) => {
+  const uid = req.notificationDevice.user_id;
+  const boards = await db.all(`SELECT DISTINCT kb.* FROM kanban_boards kb
+    LEFT JOIN kanban_team_members ktm ON ktm.team_id = kb.team_id AND ktm.user_id = $1
+    WHERE (COALESCE(kb.scope_type, 'personal') <> 'team' AND kb.owner_id = $1)
+      OR (kb.scope_type = 'team' AND ktm.user_id = $1) ORDER BY kb.name`, [uid]);
+  const result = [];
+  for (const board of boards) {
+    const columns = await db.all('SELECT id, title, color FROM kanban_columns WHERE board_id = $1 ORDER BY position, created_at', [board.id]);
+    const tasks = await db.all(`SELECT id, board_id, column_id, parent_task_id, title, due_date FROM kanban_tasks
+      WHERE board_id = $1 AND archived = 0 AND deleted_at IS NULL ORDER BY position, created_at`, [board.id]);
+    result.push({ id: board.id, name: board.name, columns: columns.map(column => ({ ...column,
+      tasks: tasks.filter(task => task.column_id === column.id).map(task => ({ id: task.id,
+        title: task.title, dueDate: task.due_date, url: taskUrl(task) })) })) });
+  }
+  res.json({ boards: result });
+}));
+
 deviceRouter.get('/pending', asyncRoute(async (req, res) => {
   const device = req.notificationDevice;
   const userId = device.user_id;
   const localDate = String(req.query.date || '');
   const localTime = String(req.query.time || '');
-  if (!DATE_PATTERN.test(localDate) || !TIME_PATTERN.test(localTime)) {
+  if (!DATE_PATTERN.test(localDate) || !TIME_PATTERN.test(localTime) ||
+      !Number.isFinite(Date.parse(`${localDate}T00:00:00Z`)) || shiftDate(localDate, 0) !== localDate) {
     return res.status(400).json({ error: 'Data ou horário local inválido' });
   }
 
   const preferences = await getPreferences(userId);
   if (!preferences.enabled) return res.json({ notifications: [], pollSeconds: 60, preferences });
   const deliveredRows = await db.all(
-    'SELECT delivery_key FROM notification_deliveries WHERE device_id = $1 AND occurrence_date = $2',
-    [device.id, localDate]
+    'SELECT delivery_key FROM notification_deliveries WHERE device_id = $1 AND occurrence_date >= $2 AND occurrence_date <= $3',
+    [device.id, localDate, shiftDate(localDate, 1)]
   );
   const delivered = new Set(deliveredRows.map(row => row.delivery_key));
   const currentMinute = minutes(localTime);
@@ -148,11 +183,13 @@ deviceRouter.get('/pending', asyncRoute(async (req, res) => {
       FROM kanban_tasks kt
       JOIN kanban_boards kb ON kb.id = kt.board_id
       LEFT JOIN kanban_team_members ktm ON ktm.team_id = kb.team_id AND ktm.user_id = $1
-      WHERE kt.due_date = $2 AND kt.archived = 0 AND kt.deleted_at IS NULL
-        AND (kb.owner_id = $3 OR ktm.user_id = $4)`,
-      [userId, localDate, userId, userId]);
+      WHERE kt.due_date >= $2 AND kt.due_date <= $3 AND kt.archived = 0 AND kt.deleted_at IS NULL
+        AND ((COALESCE(kb.scope_type, 'personal') <> 'team' AND kb.owner_id = $1)
+          OR (kb.scope_type = 'team' AND ktm.user_id = $1))`,
+      [userId, localDate, shiftDate(localDate, preferences.taskDaysBefore)]);
     for (const task of tasks) {
       const assignees = parseJson(task.assignee_ids, []);
+      if (!assignees.length && task.assignee_id) assignees.push(task.assignee_id);
       if (assignees.length && !assignees.includes(userId)) continue;
       const scheduledFor = `${localDate}T${preferences.taskTime}:00`;
       const key = deliveryKey('task', task.id, localDate, scheduledFor);
@@ -163,9 +200,9 @@ deviceRouter.get('/pending', asyncRoute(async (req, res) => {
         sourceId: task.id,
         occurrenceDate: localDate,
         scheduledFor,
-        title: 'Tarefa com prazo hoje',
-        body: `${task.title} · ${task.board_name}`,
-        url: `/tarefas/${encodeURIComponent(task.board_id)}?tarefa=${encodeURIComponent(task.id)}${task.parent_task_id ? `&ramificacao=${encodeURIComponent(task.parent_task_id)}` : ''}`,
+        title: task.due_date === localDate ? 'Tarefa com prazo hoje' : 'Tarefa com prazo próximo',
+        body: `${task.title} · ${task.board_name} · Prazo: ${task.due_date.split('-').reverse().join('/')}`,
+        url: taskUrl(task),
       });
     }
   }
@@ -178,30 +215,36 @@ deviceRouter.get('/pending', asyncRoute(async (req, res) => {
       LEFT JOIN kanban_task_events kte ON kte.event_id = e.id
       WHERE kte.event_id IS NULL AND e.date <= $2 AND COALESCE(e.end_date, e.date) >= $3
         AND (c.owner_id = $4 OR cm.user_id = $5)`,
-      [userId, localDate, localDate, userId, userId]);
+      [userId, shiftDate(localDate, 1), localDate, userId, userId]);
     for (const event of events) {
+      for (const occurrenceDate of [localDate, shiftDate(localDate, 1)]) {
+      if (event.date > occurrenceDate || (event.end_date || event.date) < occurrenceDate) continue;
       const dayTimes = parseJson(event.day_times, {});
       const occurrenceTime = event.all_day === 1
         ? preferences.taskTime
-        : (dayTimes[localDate]?.startTime || (event.date === localDate ? event.start_time : preferences.taskTime));
-      const scheduledMinute = event.all_day === 1
-        ? minutes(occurrenceTime)
-        : Math.max(0, minutes(occurrenceTime) - preferences.eventMinutesBefore);
-      if (currentMinute < scheduledMinute) continue;
-      const scheduledTime = `${String(Math.floor(scheduledMinute / 60)).padStart(2, '0')}:${String(scheduledMinute % 60).padStart(2, '0')}`;
-      const scheduledFor = `${localDate}T${scheduledTime}:00`;
-      const key = deliveryKey('event', event.id, localDate, scheduledFor);
+        : (dayTimes[occurrenceDate]?.startTime || (event.date === occurrenceDate ? event.start_time : preferences.taskTime));
+      if (!TIME_PATTERN.test(occurrenceTime)) continue;
+      const start = Date.parse(`${occurrenceDate}T${occurrenceTime}:00Z`);
+      const scheduled = start - (event.all_day === 1 ? 0 : preferences.eventMinutesBefore) * 60000;
+      const now = Date.parse(`${localDate}T${localTime}:00Z`);
+      if (now < scheduled) continue;
+      // Do not send a backlog of events that have already ended.
+      const endTime = dayTimes[occurrenceDate]?.endTime || event.end_time || occurrenceTime;
+      if (event.all_day !== 1 && now > Date.parse(`${occurrenceDate}T${endTime}:00Z`)) continue;
+      const scheduledFor = new Date(scheduled).toISOString().slice(0, 19);
+      const key = deliveryKey('event', event.id, occurrenceDate, scheduledFor);
       if (delivered.has(key)) continue;
       notifications.push({
         key,
         type: 'event',
         sourceId: event.id,
-        occurrenceDate: localDate,
+        occurrenceDate,
         scheduledFor,
         title: event.all_day === 1 ? 'Evento para hoje' : `Evento às ${occurrenceTime}`,
-        body: `${event.title} · ${event.calendar_name}`,
-        url: `/calendario/day/${localDate}?evento=${encodeURIComponent(event.id)}`,
+        body: `${event.title} · ${event.calendar_name} · ${occurrenceDate.split('-').reverse().join('/')}`,
+        url: `/calendario/dia/${occurrenceDate}?agenda=${encodeURIComponent(event.calendar_id)}&evento=${encodeURIComponent(event.id)}`,
       });
+      }
     }
   }
 

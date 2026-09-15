@@ -1,22 +1,35 @@
 <div class="notification-backdrop" (mousedown)="closed.emit()">
   <section class="notification-modal" role="dialog" aria-modal="true" aria-labelledby="notification-title" (mousedown)="$event.stopPropagation()">
-    <header>
+    <header class="notification-header">
       <span class="notification-icon"><mat-icon>notifications_active</mat-icon></span>
-      <div><h2 id="notification-title">Notificações do Windows</h2><p>Receba lembretes mesmo com a Agenda fechada.</p></div>
+      <div><h2 id="notification-title">Notificações do Windows</h2><p>Configure seus lembretes e acompanhe o Kanban sem manter a Agenda aberta.</p></div>
       <button type="button" class="close-button" (click)="closed.emit()" aria-label="Fechar"><mat-icon>close</mat-icon></button>
     </header>
 
     <div class="notification-body" *ngIf="!service.loading(); else loading">
       <section class="settings-card setup-card">
-        <div class="section-title"><div><strong>Aplicativo para Windows</strong><span>Baixe uma vez e conecte este computador.</span></div><a class="download-button" [href]="downloadUrl" download><mat-icon>download</mat-icon>Baixar EXE</a></div>
-        <ol><li>Baixe e abra o <strong>Agenda.Notifier.exe</strong>.</li><li>Gere e copie o código abaixo.</li><li>Cole o código no aplicativo e clique em Ativar.</li></ol>
-        <div class="activation-row"><input [(ngModel)]="deviceName" maxlength="80" placeholder="Nome deste computador"><button type="button" (click)="generateCode()" [disabled]="service.saving() || !deviceName.trim()"><mat-icon>key</mat-icon>Gerar código</button></div>
+        <div class="section-heading"><span class="section-icon"><mat-icon>laptop_windows</mat-icon></span><div><strong>Aplicativo para Windows</strong><span>Baixe uma vez e conecte este computador.</span></div><a class="download-button" [href]="downloadUrl" download><mat-icon>download</mat-icon>Baixar EXE</a></div>
+        <div class="setup-steps"><span><b>1</b><small>Baixe e abra o<br><strong>Agenda.Notifier.exe</strong></small></span><i></i><span><b>2</b><small>Gere seu<br><strong>código de ativação</strong></small></span><i></i><span><b>3</b><small>Cole o código<br><strong>no aplicativo</strong></small></span></div>
+        <div class="activation-row"><label><span>Nome deste computador</span><input [(ngModel)]="deviceName" maxlength="80" placeholder="Ex.: Meu computador"></label><button type="button" (click)="generateCode()" [disabled]="service.saving() || !deviceName.trim()"><mat-icon>key</mat-icon>Gerar código</button></div>
         <div class="activation-code" *ngIf="activationCode"><code>{{ activationCode }}</code><button type="button" (click)="copyCode()"><mat-icon>{{ copied() ? 'check' : 'content_copy' }}</mat-icon>{{ copied() ? 'Copiado' : 'Copiar' }}</button><p>Use somente este código iniciado por AGENDA1-. Não cole o token do portal.</p></div>
       </section>
 
+      <section class="settings-card">
+        <div class="section-heading"><span class="section-icon accent-green"><mat-icon>schedule</mat-icon></span><div><strong>Lembretes de prazos</strong><span>Escolha quando deseja receber cada tipo de aviso.</span></div></div>
+        <form #preferencesForm="ngForm" (ngSubmit)="savePreferences()" (change)="saved.set(false)">
+          <label class="master-toggle"><input type="checkbox" name="enabled" [(ngModel)]="service.preferences().enabled"><span class="toggle-track"><i></i></span><span><strong>Ativar notificações</strong><small>Receba avisos no Windows para prazos próximos.</small></span></label>
+          <div class="preference-grid" [class.disabled]="!service.preferences().enabled">
+            <div class="preference-group"><label class="check-setting"><input type="checkbox" name="tasks" [(ngModel)]="service.preferences().taskEnabled"><span><strong>Avisar sobre tarefas</strong><small>Notificação diária até o vencimento.</small></span></label><div class="field-row"><label><span>Antecedência</span><div class="input-with-suffix"><input type="number" name="days" min="0" max="30" required [(ngModel)]="service.preferences().taskDaysBefore"><em>dias</em></div></label><label><span>Horário</span><input type="time" name="time" required [(ngModel)]="service.preferences().taskTime"></label></div></div>
+            <div class="preference-group"><label class="check-setting"><input type="checkbox" name="events" [(ngModel)]="service.preferences().eventEnabled"><span><strong>Avisar sobre eventos</strong><small>Receba o aviso antes do início.</small></span></label><div class="field-row single"><label><span>Antecedência</span><div class="input-with-suffix"><input type="number" name="minutes" min="0" max="1440" required [(ngModel)]="service.preferences().eventMinutesBefore"><em>minutos</em></div></label></div></div>
+          </div>
+          <div class="preferences-footer"><span role="status" class="saved-message" *ngIf="saved()"><mat-icon>check_circle</mat-icon>Preferências salvas</span><button class="primary-action" type="submit" [disabled]="service.saving() || preferencesForm.invalid"><mat-icon>{{ service.saving() ? 'hourglass_top' : 'save' }}</mat-icon>{{ service.saving() ? 'Salvando…' : 'Salvar lembretes' }}</button></div>
+        </form>
+        <div class="kanban-tip"><mat-icon>view_kanban</mat-icon><span>No ícone do aplicativo na bandeja, escolha <strong>Kanban na área de trabalho</strong> para abrir um painel transparente e clicar diretamente nos cartões.</span></div>
+      </section>
+
       <section class="settings-card" *ngIf="service.devices().length">
-        <div class="section-title"><div><strong>Computadores conectados</strong><span>Revogue dispositivos que você não utiliza mais.</span></div></div>
-        <div class="device-row" *ngFor="let device of service.devices()"><span class="device-icon"><mat-icon>computer</mat-icon></span><div><strong>{{ device.name }}</strong><small>{{ formatLastSeen(device.lastSeenAt) }}</small></div><button type="button" (click)="service.revokeDevice(device.id)" title="Revogar acesso"><mat-icon>delete_outline</mat-icon></button></div>
+        <div class="section-heading"><span class="section-icon accent-blue"><mat-icon>devices</mat-icon></span><div><strong>Computadores conectados</strong><span>Revogue dispositivos que você não utiliza mais.</span></div></div>
+        <div class="device-row" *ngFor="let device of service.devices()"><span class="device-icon"><mat-icon>computer</mat-icon></span><div><strong>{{ device.name }}</strong><small>{{ formatLastSeen(device.lastSeenAt) }}</small></div><span class="device-status"><i></i>Ativo</span><button type="button" (click)="service.revokeDevice(device.id)" title="Revogar acesso"><mat-icon>delete_outline</mat-icon></button></div>
       </section>
 
       <p class="error-message" *ngIf="service.error()"><mat-icon>error_outline</mat-icon>{{ service.error() }}</p>

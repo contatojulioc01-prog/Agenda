@@ -1,7 +1,7 @@
 import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { AuthService } from '../../core/services/auth.service';
 
@@ -186,12 +186,14 @@ import { AuthService } from '../../core/services/auth.service';
 export class UnauthorizedPageComponent {
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   manualToken = '';
 
   applyToken(): void {
     if (this.manualToken.trim() && this.authService.setToken(this.manualToken.trim())) {
-      this.router.navigate(['/']);
+      const destination = this.route.snapshot.queryParamMap.get('retorno') || '/';
+      void this.router.navigateByUrl(/^\/(?:calendario|tarefas)(?:\/|\?|$)/.test(destination) ? destination : '/');
     }
   }
 }

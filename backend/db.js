@@ -244,6 +244,7 @@ async function initDb() {
     ALTER TABLE kanban_tasks ADD COLUMN IF NOT EXISTS assignee_ids TEXT NOT NULL DEFAULT '[]';
     ALTER TABLE kanban_tasks ADD COLUMN IF NOT EXISTS deleted_at TEXT;
     ALTER TABLE kanban_tasks ADD COLUMN IF NOT EXISTS deleted_by TEXT;
+    ALTER TABLE notification_preferences ADD COLUMN IF NOT EXISTS task_days_before INTEGER NOT NULL DEFAULT 1;
     ALTER TABLE notification_preferences ALTER COLUMN task_time SET DEFAULT '08:30';
     WITH applied AS (
       INSERT INTO agenda_migrations (id) VALUES ('notification-task-time-0830-v1')

@@ -3,6 +3,7 @@ export interface NotificationPreferences {
   taskEnabled: boolean;
   eventEnabled: boolean;
   taskTime: string;
+  taskDaysBefore: number;
   eventMinutesBefore: number;
 }
 

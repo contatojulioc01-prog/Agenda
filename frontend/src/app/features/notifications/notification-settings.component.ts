@@ -17,15 +17,21 @@ export class NotificationSettingsComponent implements OnInit {
   readonly service = inject(NotificationsService);
   private readonly auth = inject(AuthService);
   readonly copied = signal(false);
+  readonly saved = signal(false);
   deviceName = 'Meu computador';
   activationCode = '';
 
   get downloadUrl(): string {
-    return new URL('downloads/Agenda.Notifier.exe?v=3', document.baseURI).toString();
+    return new URL('downloads/Agenda.Notifier.exe?v=4', document.baseURI).toString();
   }
 
   ngOnInit(): void {
     this.service.load();
+  }
+
+  savePreferences(): void {
+    this.saved.set(false);
+    this.service.save(this.service.preferences(), success => this.saved.set(success));
   }
 
   generateCode(): void {

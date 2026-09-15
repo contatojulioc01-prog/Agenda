@@ -11,6 +11,7 @@ export class NotificationsService {
     taskEnabled: true,
     eventEnabled: true,
     taskTime: '08:30',
+    taskDaysBefore: 1,
     eventMinutesBefore: 15,
   });
   readonly devices = signal<NotificationDevice[]>([]);

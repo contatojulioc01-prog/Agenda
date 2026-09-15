@@ -92,7 +92,7 @@ export class SyncService implements OnDestroy {
             clearTimeout(this.reconnectTimer);
             this.reconnectTimer = null;
           }
-          console.log('[SyncService] WebSocket conectado com sucesso em', url);
+          console.log('[SyncService] WebSocket conectado com sucesso');
 
           // Ao conectar, atualiza agendas e eventos
           this.calendarsService.loadAll();

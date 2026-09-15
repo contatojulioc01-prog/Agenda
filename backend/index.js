@@ -14,6 +14,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { initDb, closeDb } = require('./db');
+const { authenticateSocket } = require('./realtime-auth');
 
 const PORT = process.env.PORT || 9900;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -45,7 +46,7 @@ function broadcast(data) {
   const message = { ...data, messageId: `${Date.now()}-${++realtimeSequence}` };
   const payload = JSON.stringify(message);
   wss.clients.forEach(client => {
-    if (client.readyState === 1) client.send(payload);
+    if (client.readyState === 1 && client.userId) client.send(payload);
   });
   realtimeClients.forEach(response => {
     try { response.write(`data: ${payload}\n\n`); }
@@ -55,26 +56,7 @@ function broadcast(data) {
 
 wss.on('connection', async (ws, req) => {
   const ip = req.socket.remoteAddress;
-  let token = '';
-
-  // Suporte a token via header Authorization ou query string fallback
-  token = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
-  if (!token) {
-    try {
-      const url = new URL(req.url, 'http://localhost');
-      token = url.searchParams.get('token') || '';
-    } catch {}
-  }
-
-  if (token) {
-    const uid = await validateUserToken(token);
-    if (!uid) {
-      console.warn(`[WS] Conexão recusada (${ip}): token inválido`);
-      ws.close(4003, 'Sessão inválida ou expirada');
-      return;
-    }
-    ws.userId = uid;
-  }
+  if (!(await authenticateSocket(ws, req, validateUserToken))) return;
 
   console.log(`[WS] +1 cliente (${ip}) | Total: ${wss.clients.size}`);
   ws.isAlive = true;

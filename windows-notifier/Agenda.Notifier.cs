@@ -15,6 +15,11 @@ using System.Web.Script.Serialization;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
+[assembly: System.Reflection.AssemblyVersion("4.0.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("4.0.0.0")]
+[assembly: System.Reflection.AssemblyProduct("Agenda Notifier")]
+[assembly: System.Reflection.AssemblyTitle("Agenda - Prazos e Kanban")]
+
 namespace AgendaNotifier
 {
     internal static class Program
@@ -44,7 +49,7 @@ namespace AgendaNotifier
             catch (Exception error)
             {
                 CrashLog.Write(error);
-                MessageBox.Show("O Agenda Notifier não conseguiu iniciar.\\n\\nDetalhes: " + error.Message + "\\n\\nLog: " + CrashLog.Path, "Agenda Notifier", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("O Agenda Notifier não conseguiu iniciar.\n\nDetalhes: " + error.Message + "\n\nLog: " + CrashLog.Path, "Agenda Notifier", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
     }
@@ -52,7 +57,7 @@ namespace AgendaNotifier
     internal static class Installation
     {
         internal static readonly string DirectoryPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AgendaNotifier");
-        internal static readonly string ExePath = Path.Combine(DirectoryPath, "Agenda.Notifier.v3.exe");
+        internal static readonly string ExePath = Path.Combine(DirectoryPath, "Agenda.Notifier.v4.exe");
         internal static readonly string ConfigPath = Path.Combine(DirectoryPath, "config.json");
         private static readonly string RunKey = string.Join(((char)92).ToString(), new[] { "Software", "Microsoft", "Windows", "CurrentVersion", "Run" });
         private const string RunName = "AgendaNotifier";
@@ -64,15 +69,31 @@ namespace AgendaNotifier
             try
             {
                 Directory.CreateDirectory(DirectoryPath);
+                // Stop only this user's installed copies, so upgrading releases the old mutex/file.
+                foreach (var process in Process.GetProcesses().Where(p => p.ProcessName.StartsWith("Agenda.Notifier", StringComparison.OrdinalIgnoreCase)))
+                {
+                    using (process)
+                    {
+                        if (process.Id == Process.GetCurrentProcess().Id) continue;
+                        try
+                        {
+                            var path = process.MainModule.FileName;
+                            if (!string.Equals(Path.GetDirectoryName(path), DirectoryPath, StringComparison.OrdinalIgnoreCase)) continue;
+                            process.Kill();
+                            if (!process.WaitForExit(10000)) throw new IOException("Feche o Agenda Notifier anterior e tente novamente.");
+                        }
+                        catch (System.ComponentModel.Win32Exception) { }
+                    }
+                }
                 File.Copy(current, ExePath, true);
                 var info = new ProcessStartInfo(ExePath) { UseShellExecute = true };
-                if (args != null && args.Length > 0) info.Arguments = string.Join(" ", args);
+                if (args != null && Array.IndexOf(args, "--startup") >= 0) info.Arguments = "--startup";
                 Process.Start(info);
                 return false;
             }
             catch (Exception error)
             {
-                MessageBox.Show("Não foi possível instalar o Agenda Notifier.\\n\\n" + error.Message, "Agenda Notifier", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Não foi possível instalar o Agenda Notifier.\n\n" + error.Message, "Agenda Notifier", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return false;
             }
         }
@@ -81,7 +102,7 @@ namespace AgendaNotifier
         {
             try
             {
-                var legacyFiles = new[] { "Agenda.Notifier.exe", "Agenda.Notifier.v2.exe" };
+                var legacyFiles = new[] { "Agenda.Notifier.exe", "Agenda.Notifier.v2.exe", "Agenda.Notifier.v3.exe" };
                 foreach (var fileName in legacyFiles)
                 {
                     var legacy = Path.Combine(DirectoryPath, fileName);
@@ -142,6 +163,14 @@ namespace AgendaNotifier
     {
         public string serverUrl { get; set; }
         public string protectedToken { get; set; }
+        public bool showKanban { get; set; }
+        public string boardId { get; set; }
+        public int opacity { get; set; }
+        public bool alwaysOnTop { get; set; }
+        public int left { get; set; }
+        public int top { get; set; }
+        public int width { get; set; }
+        public int height { get; set; }
 
         public string GetToken()
         {
@@ -216,6 +245,12 @@ namespace AgendaNotifier
         private AppConfig config;
         private PendingNotification visibleNotification;
         private bool polling;
+        private bool displaying;
+        private bool exiting;
+        private readonly HashSet<string> shown = new HashSet<string>();
+        private readonly Dictionary<string, PendingNotification> pendingAcks = new Dictionary<string, PendingNotification>();
+        private KanbanForm kanban;
+        private int generation;
 
         internal NotifierContext(string[] args)
         {
@@ -228,6 +263,7 @@ namespace AgendaNotifier
             menu.Items.Add(statusItem);
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("Abrir Agenda", null, delegate { OpenAgenda(); });
+            menu.Items.Add("Kanban na área de trabalho", null, delegate { ToggleKanban(); });
             menu.Items.Add("Verificar agora", null, delegate { PollAsync(); });
             menu.Items.Add("Testar notificação", null, delegate { ShowTest(); });
             menu.Items.Add("Configurar", null, delegate { ShowConfiguration(); });
@@ -236,12 +272,12 @@ namespace AgendaNotifier
             menu.Items.Add("Sair", null, delegate { ExitApp(); });
             tray = new NotifyIcon { Icon = AppIcon.Current, Text = "Agenda - Notificações", Visible = true, ContextMenuStrip = menu };
             tray.DoubleClick += delegate { OpenAgenda(); };
-            tray.BalloonTipClicked += delegate { if (visibleNotification != null) OpenUrl(visibleNotification.url); else OpenAgenda(); };
             pollTimer = new System.Windows.Forms.Timer { Interval = 60000 };
             pollTimer.Tick += delegate { PollAsync(); };
             displayTimer = new System.Windows.Forms.Timer { Interval = 4500 };
             displayTimer.Tick += delegate { DisplayNext(); };
             ConfigureClient();
+            if (config.showKanban) ShowKanban();
             pollTimer.Start();
             if (string.IsNullOrWhiteSpace(config.GetToken()))
             {
@@ -251,7 +287,7 @@ namespace AgendaNotifier
             {
                 PollAsync();
                 if (args == null || Array.IndexOf(args, "--startup") < 0)
-                    MessageBox.Show("O Agenda Notifier está funcionando em segundo plano.\\n\\nVocê pode acessá-lo pelo ícone na bandeja do Windows.", "Agenda Notifier", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show("O Agenda Notifier está funcionando em segundo plano.\n\nVocê pode acessá-lo pelo ícone na bandeja do Windows.", "Agenda Notifier", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
 
@@ -267,19 +303,30 @@ namespace AgendaNotifier
         {
             if (polling || string.IsNullOrWhiteSpace(config.serverUrl) || string.IsNullOrWhiteSpace(config.GetToken())) return;
             polling = true;
+            var currentGeneration = generation;
             try
             {
                 var now = DateTime.Now;
                 var url = ApiUrl("/api/notifications/device/pending?date=" + Uri.EscapeDataString(now.ToString("yyyy-MM-dd")) + "&time=" + Uri.EscapeDataString(now.ToString("HH:mm")));
                 var response = await client.GetAsync(url);
-                if (response.StatusCode == HttpStatusCode.Unauthorized) { statusItem.Text = "Chave revogada — configure novamente"; return; }
+                if (currentGeneration != generation || exiting) return;
+                if (response.StatusCode == HttpStatusCode.Unauthorized) {
+                    statusItem.Text = "Chave revogada — configure novamente";
+                    queue.Clear(); pendingAcks.Clear();
+                    if (kanban != null) kanban.SetError("Acesso revogado. Configure novamente.", true);
+                    return;
+                }
                 response.EnsureSuccessStatusCode();
                 var payload = json.Deserialize<PendingResponse>(await response.Content.ReadAsStringAsync());
                 var incoming = payload != null && payload.notifications != null ? payload.notifications : new List<PendingNotification>();
-                foreach (var item in incoming) if (!ContainsKey(item.key)) queue.Enqueue(item);
+                if (currentGeneration != generation || exiting) return;
+                queue.Clear();
+                foreach (var item in incoming) if (!ContainsKey(item.key) && !shown.Contains(item.key)) queue.Enqueue(item);
+                foreach (var item in pendingAcks.Values.ToList()) await Acknowledge(item);
                 statusItem.Text = "Conectado · verificado às " + now.ToString("HH:mm");
                 if (payload != null && payload.pollSeconds >= 30 && payload.pollSeconds <= 900) pollTimer.Interval = payload.pollSeconds * 1000;
                 if (queue.Count > 0 && !displayTimer.Enabled) DisplayNext();
+                if (kanban != null && kanban.Visible) await RefreshKanban();
             }
             catch (Exception error) { statusItem.Text = "Sem conexão · " + ShortMessage(error); }
             finally { polling = false; }
@@ -295,14 +342,25 @@ namespace AgendaNotifier
         private async void DisplayNext()
         {
             displayTimer.Stop();
-            if (queue.Count == 0) return;
+            if (displaying || exiting || queue.Count == 0) return;
+            displaying = true;
             visibleNotification = queue.Dequeue();
-            tray.BalloonTipIcon = visibleNotification.type == "task" ? ToolTipIcon.Warning : ToolTipIcon.Info;
-            tray.BalloonTipTitle = visibleNotification.title;
-            tray.BalloonTipText = visibleNotification.body;
-            tray.ShowBalloonTip(12000);
-            await Acknowledge(visibleNotification);
-            if (queue.Count > 0) displayTimer.Start();
+            var item = visibleNotification;
+            var currentGeneration = generation;
+            try
+            {
+                await NativeToast.Show(item.title, item.body, ResolveUrl(item.url), item.key);
+                if (generation != currentGeneration || exiting) return;
+                shown.Add(item.key);
+                pendingAcks[item.key] = item;
+                await Acknowledge(item);
+            }
+            catch (Exception error) { CrashLog.Write(error); statusItem.Text = "Falha na notificação · " + ShortMessage(error); }
+            finally {
+                visibleNotification = null;
+                displaying = false;
+                if (!exiting && queue.Count > 0) displayTimer.Start();
+            }
         }
 
         private async Task Acknowledge(PendingNotification notification)
@@ -312,17 +370,15 @@ namespace AgendaNotifier
                 var body = json.Serialize(new AckRequest { notifications = new List<PendingNotification> { notification } });
                 var response = await client.PostAsync(ApiUrl("/api/notifications/device/delivered"), new StringContent(body, Encoding.UTF8, "application/json"));
                 response.EnsureSuccessStatusCode();
+                pendingAcks.Remove(notification.key);
             }
             catch { }
         }
 
-        private void ShowTest()
+        private async void ShowTest()
         {
-            visibleNotification = null;
-            tray.BalloonTipIcon = ToolTipIcon.Info;
-            tray.BalloonTipTitle = "Agenda conectada";
-            tray.BalloonTipText = "As notificações do Windows estão funcionando.";
-            tray.ShowBalloonTip(10000);
+            try { await NativeToast.Show("Agenda conectada", "Clique para abrir a Agenda no navegador.", ResolveUrl("/"), "test"); }
+            catch (Exception error) { CrashLog.Write(error); MessageBox.Show(error.Message, "Não foi possível notificar"); }
         }
 
         private void ShowConfiguration()
@@ -331,28 +387,60 @@ namespace AgendaNotifier
             {
                 if (form.ShowDialog() != DialogResult.OK) return;
                 config = form.Result;
+                generation++;
+                queue.Clear(); shown.Clear(); pendingAcks.Clear();
+                if (kanban != null) { kanban.Dispose(); kanban = null; }
                 ConfigStore.Save(config);
                 Installation.StartsWithWindows = true;
                 startupItem.Checked = true;
                 ConfigureClient();
+                if (config.showKanban) ShowKanban();
                 statusItem.Text = "Configuração salva";
                 PollAsync();
             }
         }
 
         private string ApiUrl(string path) { return (config.serverUrl ?? "").TrimEnd('/') + path; }
+        private string ResolveUrl(string relative)
+        {
+            return AgendaLinks.Resolve(config.serverUrl, relative);
+        }
         private void OpenAgenda() { if (!string.IsNullOrWhiteSpace(config.serverUrl)) OpenUrl("/"); else ShowConfiguration(); }
         private void OpenUrl(string relative)
         {
             try
             {
-                var target = relative != null && relative.StartsWith("http", StringComparison.OrdinalIgnoreCase) ? relative : (config.serverUrl ?? "").TrimEnd('/') + "/" + (relative ?? "").TrimStart('/');
+                var target = ResolveUrl(relative);
                 Process.Start(new ProcessStartInfo(target) { UseShellExecute = true });
             }
             catch { }
         }
         private static string ShortMessage(Exception error) { var message = error.Message ?? "erro de conexão"; return message.Length > 42 ? message.Substring(0, 42) + "…" : message; }
-        private void ExitApp() { pollTimer.Stop(); displayTimer.Stop(); tray.Visible = false; tray.Dispose(); client.Dispose(); ExitThread(); }
+        private void ToggleKanban() {
+            if (kanban != null && kanban.Visible) { kanban.Hide(); config.showKanban = false; ConfigStore.Save(config); }
+            else ShowKanban();
+        }
+        private async void ShowKanban() {
+            if (string.IsNullOrWhiteSpace(config.GetToken())) { ShowConfiguration(); return; }
+            if (kanban == null || kanban.IsDisposed) kanban = new KanbanForm(config, OpenUrl);
+            config.showKanban = true; ConfigStore.Save(config);
+            kanban.Show();
+            await RefreshKanban();
+        }
+        private async Task RefreshKanban() {
+            var form = kanban;
+            var currentGeneration = generation;
+            try {
+                using (var response = await client.GetAsync(ApiUrl("/api/notifications/device/kanban"))) {
+                    if (exiting || currentGeneration != generation || form == null || form.IsDisposed) return;
+                    if (response.StatusCode == HttpStatusCode.Unauthorized) { form.SetError("Acesso revogado. Configure novamente.", true); return; }
+                    response.EnsureSuccessStatusCode();
+                    var payload = json.Deserialize<KanbanResponse>(await response.Content.ReadAsStringAsync());
+                    if (!exiting && generation == currentGeneration && !form.IsDisposed) form.UpdateBoards(payload.boards ?? new List<DesktopBoard>());
+                }
+            } catch (Exception error) { if (form != null && !form.IsDisposed) form.SetError("Sem conexão · " + ShortMessage(error), false); }
+        }
+        private void ExitApp() { exiting = true; pollTimer.Stop(); displayTimer.Stop(); if (kanban != null) kanban.Dispose(); tray.Visible = false; tray.Dispose(); client.Dispose(); ExitThread(); }
     }
 
     internal sealed class ConfigurationForm : Form
@@ -362,11 +450,13 @@ namespace AgendaNotifier
         private readonly Button activateButton;
         private readonly JavaScriptSerializer json = new JavaScriptSerializer();
         private readonly CheckBox startupBox;
+        private readonly AppConfig previous;
         internal AppConfig Result { get; private set; }
         internal bool StartWithWindows { get { return true; } }
 
         internal ConfigurationForm(AppConfig current)
         {
+            previous = current;
             Text = "Agenda - Notificações do Windows";
             Icon = AppIcon.Current;
             StartPosition = FormStartPosition.CenterScreen;
@@ -407,6 +497,11 @@ namespace AgendaNotifier
                 var payload = json.Deserialize<ActivationPayload>(raw);
                 if (payload == null || string.IsNullOrWhiteSpace(payload.serverUrl) || string.IsNullOrWhiteSpace(payload.Key)) throw new InvalidOperationException("Código incompleto.");
                 payload.serverUrl = payload.serverUrl.TrimEnd('/');
+                Uri server;
+                if (!Uri.TryCreate(payload.serverUrl, UriKind.Absolute, out server) ||
+                    (server.Scheme != "http" && server.Scheme != "https") || !string.IsNullOrEmpty(server.UserInfo) ||
+                    !string.IsNullOrEmpty(server.Query) || !string.IsNullOrEmpty(server.Fragment))
+                    throw new InvalidOperationException("Endereço da Agenda inválido.");
                 using (var testClient = new HttpClient { Timeout = TimeSpan.FromSeconds(20) })
                 {
                     testClient.DefaultRequestHeaders.Add("X-Device-Key", payload.Key);
@@ -415,7 +510,9 @@ namespace AgendaNotifier
                     if (response.StatusCode == HttpStatusCode.Unauthorized) throw new InvalidOperationException("Código inválido ou revogado.");
                     response.EnsureSuccessStatusCode();
                 }
-                Result = new AppConfig { serverUrl = payload.serverUrl };
+                Result = new AppConfig { serverUrl = payload.serverUrl, showKanban = previous.showKanban,
+                    opacity = previous.opacity, alwaysOnTop = previous.alwaysOnTop, width = previous.width,
+                    height = previous.height, left = previous.left, top = previous.top };
                 Result.SetToken(payload.Key);
                 DialogResult = DialogResult.OK;
                 Close();

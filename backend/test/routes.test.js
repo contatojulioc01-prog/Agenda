@@ -400,10 +400,10 @@ test('entrega lembretes de tarefa e evento acessíveis ao dispositivo', async ()
       if (sql.includes('notification_deliveries')) return [];
       if (sql.includes('FROM kanban_tasks')) return [{
         id: 'task-1', title: 'Enviar relatório', board_id: 'board-1', board_name: 'Financeiro',
-        parent_task_id: null, assignee_ids: '["user-1"]',
+        parent_task_id: null, assignee_ids: '["user-1"]', due_date: '2026-09-03',
       }];
       if (sql.includes('FROM events')) return [{
-        id: 'event-1', title: 'Reunião', calendar_name: 'Minha Agenda', date: '2026-09-03',
+        id: 'event-1', title: 'Reunião', calendar_id: 'calendar-1', calendar_name: 'Minha Agenda', date: '2026-09-03',
         end_date: '2026-09-03', start_time: '14:00', day_times: '{}', all_day: 0,
       }];
       return [];
@@ -423,7 +423,7 @@ test('entrega lembretes de tarefa e evento acessíveis ao dispositivo', async ()
       const result = await response.json();
       assert.deepEqual(result.notifications.map(item => item.type).sort(), ['event', 'task']);
       assert.ok(result.notifications.find(item => item.type === 'task').url.includes('/tarefas/board-1?tarefa=task-1'));
-      assert.ok(result.notifications.find(item => item.type === 'event').url.includes('/calendario/day/2026-09-03?evento=event-1'));
+      assert.equal(result.notifications.find(item => item.type === 'event').url, '/calendario/dia/2026-09-03?agenda=calendar-1&evento=event-1');
     } finally {
       await new Promise(resolve => server.close(resolve));
     }

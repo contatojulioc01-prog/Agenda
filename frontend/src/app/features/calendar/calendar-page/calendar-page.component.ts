@@ -1,4 +1,5 @@
-import { Component, OnInit, OnDestroy, ViewChild, inject, computed, signal, effect } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, inject, computed, signal, effect, untracked } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
@@ -55,6 +56,22 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
   public kanbanService = inject(KanbanService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
+  private readonly queryState = toSignal(this.route.queryParamMap, { initialValue: this.route.snapshot.queryParamMap });
+  private openedEventId = '';
+  private readonly notificationLink = effect(() => {
+    const query = this.queryState();
+    const eventId = query.get('evento');
+    const calendarId = query.get('agenda');
+    const calendars = this.calendarsService.calendars();
+    const events = this.eventsService.events();
+    if (!eventId) { this.openedEventId = ''; return; }
+    untracked(() => {
+      if (calendarId && calendars.some(calendar => calendar.id === calendarId) &&
+          !this.calendarsService.visibleCalendarIds().has(calendarId)) this.selectOnlyCalendar(calendarId);
+      const event = events.find(item => item.id === eventId);
+      if (event && this.openedEventId !== event.id) this.openEditModal(event);
+    });
+  });
   readonly themeService = inject(ThemeService);
   private readonly userPreferences = inject(UserPreferencesService);
   private readonly appLoading = inject(AppLoadingService);
@@ -451,6 +468,8 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
       return;
     }
     if (event.isSystem) return;
+    if (this.openedEventId === event.id && this.dialog.openDialogs.length) return;
+    this.openedEventId = event.id;
     void this.router.navigate([], {
       relativeTo: this.route,
       queryParams: { evento: event.id, acao: null, data: null },
