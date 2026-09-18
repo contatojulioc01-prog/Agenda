@@ -1,0 +1,19 @@
+<div
+  #editor
+  class="markdown-editor"
+  [id]="editorId"
+  contenteditable="true"
+  role="textbox"
+  aria-multiline="true"
+  spellcheck="true"
+  [attr.aria-label]="ariaLabel"
+  [attr.data-placeholder]="placeholder"
+  (input)="onInput($event)"
+  (paste)="onPaste($event)"
+  (compositionstart)="onCompositionStart()"
+  (compositionend)="onCompositionEnd($event)"
+></div>
+<div class="markdown-editor-footer">
+  <span>Formatação aplicada enquanto você digita</span>
+  <span>{{ text.length }}/{{ maxLength }}</span>
+</div>

@@ -1,0 +1,18 @@
+<div class="ai-text-btn-wrap">
+  <button type="button" class="ai-trigger-btn" id="btn-ai-text-action" [class.loading]="isLoading()" [disabled]="isLoading() || !text.trim()" (click)="toggleMenu()" [attr.aria-expanded]="isMenuOpen()" matTooltip="Assistente de escrita IA">
+    @if (isLoading()) { <mat-progress-spinner mode="indeterminate" [diameter]="16" /> }
+    @else { <mat-icon>auto_awesome</mat-icon> }
+    <span>IA</span>
+  </button>
+  @if (isMenuOpen()) {
+    <div class="ai-menu-backdrop" (click)="isMenuOpen.set(false)"></div>
+    <div class="ai-actions-menu" role="menu">
+      @for (action of actions; track action.id) {
+        <button type="button" class="ai-action-item" role="menuitem" [class.active]="activeAction() === action.id" (click)="runAction(action.id)" [id]="'btn-ai-action-' + action.id">
+          <mat-icon>{{ action.icon }}</mat-icon><span>{{ action.label }}</span>
+        </button>
+      }
+    </div>
+  }
+  @if (errorMessage()) { <span class="ai-action-error" role="alert" [matTooltip]="errorMessage()">!</span> }
+</div>

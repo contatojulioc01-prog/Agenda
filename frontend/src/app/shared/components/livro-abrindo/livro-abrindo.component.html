@@ -1,0 +1,22 @@
+<button
+  type="button"
+  class="livro-assistente"
+  [class.opening]="opening"
+  [disabled]="opening"
+  [attr.aria-busy]="opening"
+  (pointerdown)="onPointerDown($event)"
+  (pointermove)="onPointerMove($event)"
+  (pointerup)="onPointerUp($event)"
+  (pointercancel)="onPointerCancel($event)"
+  (click)="onClick($event)"
+  aria-label="Abrir Assistente IA"
+  title="Abrir Assistente IA"
+>
+  <span class="livro-glow" aria-hidden="true"></span>
+  @if (opening) {
+    <img class="livro-svg" [src]="src" width="320" alt="Livro Doce Brinquedo abrindo" />
+  } @else {
+    <img class="livro-static" src="assets/header-transparent.png" alt="Abrir Assistente IA da Doce Brinquedo" />
+  }
+  <span class="livro-label">Assistente IA</span>
+</button>

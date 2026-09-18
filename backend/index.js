@@ -18,12 +18,37 @@ const { authenticateSocket } = require('./realtime-auth');
 
 const PORT = process.env.PORT || 9900;
 const HOST = process.env.HOST || '0.0.0.0';
+const DEV_AUTH_REQUESTED = process.env.NODE_ENV === 'development' && process.env.DEV_AUTH_BYPASS === 'true';
+const DEV_AUTH_ENABLED = DEV_AUTH_REQUESTED && ['127.0.0.1', 'localhost', '::1'].includes(HOST);
+const DEV_AUTH_TOKEN = process.env.DEV_AUTH_TOKEN || 'agenda-dev-local';
+const DEV_USER = {
+  id: 'dev-local-user',
+  name: 'Usuário de Desenvolvimento',
+  email: 'dev@agenda.local',
+  avatar: '',
+  isActive: true,
+  departamentId: 'dev-local',
+  departamentName: 'Desenvolvimento',
+  departament: { id: 'dev-local', name: 'Desenvolvimento' },
+  roles: ['admin'],
+  permissions: ['*'],
+};
+
+if (DEV_AUTH_REQUESTED && !DEV_AUTH_ENABLED) {
+  console.warn('[DEV AUTH] Bypass recusado: use HOST=127.0.0.1 para habilitá-lo.');
+}
+
+function isDevToken(token) {
+  if (!DEV_AUTH_ENABLED || !token) return false;
+  return String(token).replace(/^Bearer\s+/i, '').trim() === DEV_AUTH_TOKEN;
+}
 
 const app = express();
 const server = http.createServer(app);
 const realtimeClients = new Set();
 let realtimeSequence = 0;
 let shuttingDown = false;
+let closeMcp = async () => {};
 
 async function shutdown(signal) {
   if (shuttingDown) return;
@@ -32,6 +57,7 @@ async function shutdown(signal) {
   realtimeClients.forEach(response => response.end());
   wss.clients.forEach(client => client.close(1001, 'Servidor reiniciando'));
   await new Promise(resolve => server.close(resolve));
+  await closeMcp();
   await closeDb();
   process.exit(0);
 }
@@ -112,7 +138,8 @@ app.use(cors({
     return callback(null, false);
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id', 'x-device-key', 'x-file-name', 'x-file-type'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id', 'x-device-key', 'x-file-name', 'x-file-type', 'MCP-Protocol-Version', 'Mcp-Session-Id', 'Last-Event-ID'],
+  exposedHeaders: ['MCP-Protocol-Version', 'Mcp-Session-Id'],
   credentials: true,
 }));
 
@@ -192,6 +219,7 @@ async function validateUserToken(token) {
   if (!token) return null;
   const cleanToken = String(token).replace(/^Bearer\s+/i, '').trim();
   if (!cleanToken) return null;
+  if (isDevToken(cleanToken)) return DEV_USER.id;
 
   let cached = authCache.get(cleanToken);
   if (!cached || cached.expiresAt <= Date.now()) {
@@ -244,6 +272,12 @@ async function authenticateAgendaRequest(req, res, next) {
     const requestedUserId = String(req.headers['x-user-id'] || '');
     if (requestedUserId && requestedUserId !== authenticatedUserId) return res.status(403).json({ error: 'Identidade da requisição não corresponde à sessão' });
     req.headers['x-user-id'] = authenticatedUserId;
+    req.auth = {
+      token: 'validated-by-agenda',
+      clientId: authenticatedUserId,
+      scopes: ['agenda:read', 'agenda:write'],
+      extra: { userId: authenticatedUserId },
+    };
     next();
   } catch (error) {
     console.error('[AUTH] Falha ao validar requisição:', error.message);
@@ -287,6 +321,16 @@ app.post('/api/auth/sso-login', async (req, res) => {
     return res.status(400).json({ error: 'Ticket de autenticação não fornecido' });
   }
 
+  if (isDevToken(ticket)) {
+    return res.json({
+      success: true,
+      message: 'Sessão local de desenvolvimento iniciada',
+      token: DEV_AUTH_TOKEN,
+      data: DEV_USER,
+      user: DEV_USER,
+    });
+  }
+
   try {
     const ssoResult = await validateSsoTicketWithPortal(ticket);
     if (ssoResult && (ssoResult.success || ssoResult.data)) {
@@ -324,6 +368,7 @@ app.post('/api/auth/sso-login', async (req, res) => {
 });
 
 const handleUsersProxy = async (req, res) => {
+  if (isDevToken(req.headers.authorization)) return res.json([DEV_USER]);
   try {
     const authHeader = req.headers['authorization'] || '';
     const headers = {};
@@ -380,6 +425,9 @@ app.get('/api/users/all', authenticateAgendaRequest, proxyLimiter, handleUsersPr
 app.get('/api/users', authenticateAgendaRequest, proxyLimiter, handleUsersProxy);
 
 app.get('/api/auth/me', async (req, res) => {
+  if (isDevToken(req.headers.authorization)) {
+    return res.json({ success: true, data: DEV_USER, user: DEV_USER });
+  }
   try {
     const authHeader = req.headers['authorization'] || '';
     const headers = {};
@@ -444,6 +492,8 @@ initDb().then(async () => {
   const attachmentsRouter = require('./routes/attachments').router;
   const notifications = require('./routes/notifications');
   const privacyRouter = require('./routes/privacy');
+  const aiRouter = require('./routes/ai');
+  const { createAgendaMcpHttpHandler } = require('./mcp/http-handler');
 
   try {
     await kanbanRouter.purgeExpiredTrash(broadcast);
@@ -464,6 +514,25 @@ initDb().then(async () => {
   app.use('/api/notifications/device', notifications.deviceRouter);
   app.use('/api/notifications', authenticateAgendaRequest, notifications.router);
   app.use('/api/privacy', authenticateAgendaRequest, privacyRouter);
+  app.use('/api/ai', authenticateAgendaRequest, aiRouter);
+
+  const mcpHttp = await createAgendaMcpHttpHandler(broadcast);
+  closeMcp = mcpHttp.close;
+  const configuredMcpHosts = String(process.env.MCP_ALLOWED_HOSTS || '')
+    .split(',').map(value => value.trim().toLowerCase()).filter(Boolean);
+  const isAllowedMcpHost = host => {
+    const normalized = String(host || '').toLowerCase();
+    if (configuredMcpHosts.length) return configuredMcpHosts.includes(normalized);
+    return normalized === 'localhost' || normalized === '127.0.0.1' || normalized === '::1' ||
+      normalized === 'docebrinquedo.local' || normalized.endsWith('.local') ||
+      /^10\.\d+\.\d+\.\d+$/.test(normalized) || /^192\.168\.\d+\.\d+$/.test(normalized) ||
+      /^172\.(1[6-9]|2\d|3[01])\.\d+\.\d+$/.test(normalized);
+  };
+  app.all('/api/mcp', authenticateAgendaRequest, (req, res, next) => {
+    if (!isAllowedMcpHost(req.hostname)) return res.status(403).json({ error: 'Host MCP não permitido' });
+    if (!isAllowedOrigin(req.headers.origin)) return res.status(403).json({ error: 'Origem MCP não permitida' });
+    return mcpHttp.middleware(req, res, next);
+  });
 
   // Em producao, o mesmo processo entrega Angular, API e WebSocket.
   const frontendCandidates = [
@@ -506,6 +575,8 @@ initDb().then(async () => {
     console.log('║       Agenda Corporativa — Backend v1.0         ║');
     console.log('╠══════════════════════════════════════════════════╣');
     console.log(`║  REST → http://${HOST}:${PORT}/api`);
+    console.log(`║  MCP  → http://${HOST}:${PORT}/api/mcp`);
+    if (DEV_AUTH_ENABLED) console.log('║  DEV  → sessão local sem SSO ativa                ║');
     console.log(`║  WS   → ws://${HOST}:${PORT}`);
     if (frontendPath) console.log(`║  WEB  → ${frontendPath}`);
     console.log('╚══════════════════════════════════════════════════╝');

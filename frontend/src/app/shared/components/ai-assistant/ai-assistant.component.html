@@ -1,0 +1,39 @@
+<div class="ai-backdrop" [class.minimized]="minimized()" (mousedown)="close()">
+  <section class="ai-panel" [class.minimized]="minimized()" role="dialog" aria-modal="true" aria-labelledby="ai-assistant-title" (mousedown)="$event.stopPropagation()">
+    <header class="ai-header">
+      <div class="ai-heading">
+        <span class="ai-logo"><img src="assets/header.jfif" alt="" /></span>
+        <div><h2 id="ai-assistant-title">Assistente IA</h2><span>Agenda inteligente</span></div>
+      </div>
+      <div class="ai-header-actions">
+        <button type="button" class="new-chat" (click)="newConversation()" [disabled]="isLoading()"><mat-icon>add_comment</mat-icon><span>Nova conversa</span></button>
+        <button type="button" class="icon-button" (click)="minimized.set(!minimized())" [attr.aria-label]="minimized() ? 'Restaurar assistente' : 'Minimizar assistente'"><mat-icon>{{ minimized() ? 'open_in_full' : 'minimize' }}</mat-icon></button>
+        <button type="button" class="icon-button" (click)="close()" aria-label="Fechar assistente"><mat-icon>close</mat-icon></button>
+      </div>
+    </header>
+
+    @if (!minimized()) {
+      <div class="ai-messages" #messageList aria-live="polite">
+        @if (messages().length === 0) {
+          <div class="ai-welcome">
+            <span><img src="assets/header.jfif" alt="" /></span>
+            <h3>Como posso ajudar?</h3>
+            <p>Organize compromissos, refine textos ou pense comigo sobre qualquer assunto.</p>
+          </div>
+        }
+        @for (message of messages(); track message.id) {
+          <article class="message" [class.user]="message.role === 'user'" [class.assistant]="message.role === 'assistant'" [class.error]="message.error">
+            <div class="message-label">{{ message.role === 'user' ? 'Você' : 'Assistente IA' }}</div>
+            @if (message.content) { <div class="message-content" [innerHTML]="formatMessage(message.content)"></div> }
+            @if (!message.content && isLoading()) { <div class="typing" aria-label="IA digitando"><i></i><i></i><i></i></div> }
+          </article>
+        }
+      </div>
+      <footer class="ai-composer">
+        <textarea [(ngModel)]="draft" (keydown)="onKeydown($event)" [disabled]="isLoading()" rows="1" maxlength="12000" placeholder="Pergunte alguma coisa..." aria-label="Mensagem para o assistente"></textarea>
+        <button type="button" class="send-button" (click)="send()" [disabled]="isLoading() || !draft.trim()" aria-label="Enviar mensagem"><mat-icon>{{ isLoading() ? 'hourglass_top' : 'arrow_upward' }}</mat-icon></button>
+        <small>Enter envia · Shift+Enter quebra a linha</small>
+      </footer>
+    }
+  </section>
+</div>

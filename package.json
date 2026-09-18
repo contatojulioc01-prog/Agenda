@@ -5,6 +5,7 @@
   "description": "Agenda Corporativa - inicializador de producao",
   "scripts": {
     "start": "node production-start.js",
+    "dev": "node scripts/dev-start.cjs",
     "build": "npm --prefix backend run build",
     "test": "npm --prefix frontend test"
   },

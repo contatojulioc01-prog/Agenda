@@ -80,16 +80,20 @@
           </div>
 
           <!-- Descrição -->
-          <div class="form-field col-span-2">
-            <label for="ev-desc">Descrição</label>
-            <textarea
-              id="ev-desc"
-              [(ngModel)]="formData.description"
-              name="description"
-              rows="3"
-              class="custom-textarea"
+          <div class="form-field col-span-2 description-field">
+            <div class="description-header">
+              <label for="ev-desc">Descrição</label>
+              <app-ai-text-button *ngIf="!isReadOnly" [text]="formData.description" (textChange)="formData.description = $event" />
+            </div>
+            <app-markdown-editor *ngIf="!isReadOnly"
+              [text]="formData.description"
+              (textChange)="formData.description = $event"
+              [maxLength]="5000"
               placeholder="Descrição opcional do evento..."
-            ></textarea>
+              ariaLabel="Descrição do evento"
+              editorId="ev-desc"
+            />
+            <app-markdown-text *ngIf="isReadOnly && formData.description" [text]="formData.description" />
           </div>
         </div>
       </div>

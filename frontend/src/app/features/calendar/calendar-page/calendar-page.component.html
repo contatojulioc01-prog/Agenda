@@ -396,6 +396,14 @@
   </div>
 </div>
 
+@if (!aiService.isAssistantOpen()) {
+  <app-livro-abrindo (opened)="openAiAssistant()" />
+}
+
+@if (aiService.isAssistantOpen()) {
+  <app-ai-assistant />
+}
+
 <div class="agenda-context-menu" *ngIf="calendarContextMenu() as menu" [style.left.px]="menu.x" [style.top.px]="menu.y" (click)="$event.stopPropagation()">
   <button type="button" (click)="selectCalendarFromContext(menu.calendar)"><mat-icon>filter_center_focus</mat-icon>Exibir esta agenda</button>
   <button type="button" *ngIf="calendarsService.canEdit(menu.calendar.id)" (click)="editCalendarFromContext(menu.calendar)"><mat-icon>edit</mat-icon>Editar agenda</button>

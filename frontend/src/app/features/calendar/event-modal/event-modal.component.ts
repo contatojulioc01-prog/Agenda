@@ -15,6 +15,9 @@ import { Attachment } from '../../../core/models/attachment.model';
 import { AttachmentsService } from '../../../core/services/attachments.service';
 import { forkJoin } from 'rxjs';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
+import { AiTextButtonComponent } from '../../../shared/components/ai-text-button/ai-text-button.component';
+import { MarkdownTextComponent } from '../../../shared/components/markdown-text/markdown-text.component';
+import { MarkdownEditorComponent } from '../../../shared/components/markdown-editor/markdown-editor.component';
 
 export interface EventModalData {
   event?: CalendarEvent;
@@ -33,6 +36,9 @@ export interface EventModalData {
     MatIconModule,
     MatProgressSpinnerModule,
     MatTooltipModule,
+    AiTextButtonComponent,
+    MarkdownTextComponent,
+    MarkdownEditorComponent,
   ],
   templateUrl: './event-modal.component.html',
   styleUrl: './event-modal.component.scss'

@@ -689,3 +689,11 @@ router.delete('/tasks/:taskId', asyncRoute(async (req, res) => {
 
 module.exports = router;
 module.exports.purgeExpiredTrash = purgeExpiredTrash;
+module.exports.boardAccess = boardAccess;
+module.exports.validAssignees = validAssignees;
+module.exports.taskDto = taskDto;
+module.exports.syncTaskCalendarEvents = syncTaskCalendarEvents;
+module.exports.deleteTaskCalendarEvents = deleteTaskCalendarEvents;
+module.exports.taskDescendants = taskDescendants;
+module.exports.createDefaultPersonalBoard = createDefaultPersonalBoard;
+module.exports.ensureDefaultCalendar = ensureDefaultCalendar;

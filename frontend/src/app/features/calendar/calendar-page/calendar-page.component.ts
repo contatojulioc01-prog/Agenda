@@ -30,6 +30,9 @@ import { KanbanService } from '../../../core/services/kanban.service';
 import { NotificationSettingsComponent } from '../../notifications/notification-settings.component';
 import { UserPreferencesService } from '../../../core/services/user-preferences.service';
 import { AppLoadingService } from '../../../core/services/app-loading.service';
+import { AiService } from '../../../core/services/ai.service';
+import { AiAssistantComponent } from '../../../shared/components/ai-assistant/ai-assistant.component';
+import { LivroAbrindoComponent } from '../../../shared/components/livro-abrindo/livro-abrindo.component';
 
 export type CalendarView = 'month' | 'week' | 'day';
 
@@ -39,7 +42,7 @@ export type CalendarView = 'month' | 'week' | 'day';
   imports: [
     CommonModule, MatDialogModule, MatIconModule, MatTooltipModule,
     MonthViewComponent, WeekViewComponent, DayViewComponent,
-    MiniCalendarComponent, ThemeToggleComponent, CalendarManagerComponent, KanbanBoardComponent, NotificationSettingsComponent,
+    MiniCalendarComponent, ThemeToggleComponent, CalendarManagerComponent, KanbanBoardComponent, NotificationSettingsComponent, AiAssistantComponent, LivroAbrindoComponent,
   ],
   templateUrl: './calendar-page.component.html',
   styleUrl: './calendar-page.component.scss',
@@ -54,6 +57,7 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
   public syncService = inject(SyncService);
   public invitationsService = inject(InvitationsService);
   public kanbanService = inject(KanbanService);
+  public aiService = inject(AiService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private readonly queryState = toSignal(this.route.queryParamMap, { initialValue: this.route.snapshot.queryParamMap });
@@ -94,6 +98,8 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
   });
 
   readonly defaultAvatar = DEFAULT_AVATAR;
+
+  openAiAssistant(): void { this.aiService.openAssistant(); }
 
   // ── Estado ──
   currentView: CalendarView = this.userPreferences.calendarView();

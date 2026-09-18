@@ -1,0 +1,138 @@
+:host {
+  position: fixed;
+  right: clamp(14px, 2vw, 26px);
+  bottom: clamp(14px, 2vw, 26px);
+  z-index: 1400;
+  display: block;
+  width: max-content;
+  height: max-content;
+  transform: translate(0, 0);
+  transition: left 320ms cubic-bezier(.65, 0, .35, 1), top 320ms cubic-bezier(.65, 0, .35, 1), transform 320ms cubic-bezier(.65, 0, .35, 1);
+}
+
+:host.positioned {
+  right: auto;
+  bottom: auto;
+}
+
+:host.opening {
+  z-index: 2100;
+  transform: scale(1.72);
+  pointer-events: none;
+}
+
+.livro-assistente {
+  position: relative;
+  display: grid;
+  width: 170px;
+  min-height: 132px;
+  place-items: center;
+  padding: 0 4px 5px;
+  overflow: visible;
+  border: 0;
+  color: var(--text-primary);
+  background: transparent;
+  cursor: grab;
+  isolation: isolate;
+  touch-action: none;
+  transition: transform 180ms ease, filter 180ms ease;
+
+  &:hover,
+  &:focus-visible {
+    transform: translateY(-5px) scale(1.04);
+    filter: drop-shadow(0 12px 16px color-mix(in srgb, var(--brand-500) 28%, transparent));
+  }
+
+  &:focus-visible {
+    border-radius: 18px;
+    outline: 3px solid color-mix(in srgb, var(--brand-500) 58%, transparent);
+    outline-offset: 3px;
+  }
+
+  &.opening { transform: translateY(-2px) scale(.96); }
+  &:disabled { opacity: 1; cursor: default; }
+}
+
+:host.dragging {
+  transition: none;
+
+  .livro-assistente {
+    cursor: grabbing;
+    transform: scale(1.03);
+    filter: drop-shadow(0 12px 16px color-mix(in srgb, var(--brand-500) 28%, transparent));
+  }
+}
+
+.livro-svg {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 138px;
+  height: auto;
+  margin: -9px 0 -13px;
+  pointer-events: none;
+  user-select: none;
+}
+
+.livro-static {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 101px;
+  height: 101px;
+  margin: 0 0 -5px;
+  object-fit: contain;
+  filter: drop-shadow(0 10px 16px rgba(47, 155, 216, .2));
+  pointer-events: none;
+  user-select: none;
+}
+
+.livro-label {
+  position: relative;
+  z-index: 2;
+  padding: 5px 11px;
+  border: 1px solid color-mix(in srgb, var(--brand-500) 28%, transparent);
+  border-radius: 999px;
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--bg-surface) 92%, transparent);
+  box-shadow: 0 6px 18px color-mix(in srgb, #000 16%, transparent);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: .01em;
+  white-space: nowrap;
+  backdrop-filter: blur(10px);
+}
+
+.livro-glow {
+  position: absolute;
+  inset: 18px 13px 14px;
+  z-index: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--brand-500) 18%, transparent);
+  filter: blur(18px);
+  animation: livro-glow 2.6s ease-in-out infinite;
+}
+
+.livro-assistente:not(.opening) .livro-glow {
+  opacity: 0;
+}
+
+@keyframes livro-glow {
+  50% { opacity: .55; transform: scale(1.1); }
+}
+
+@media (max-width: 600px) {
+  :host { right: 10px; bottom: 10px; }
+  :host.positioned { right: auto; bottom: auto; }
+  :host.opening { transform: scale(1.35); }
+  .livro-assistente { width: 142px; min-height: 110px; }
+  .livro-svg { width: 112px; }
+  .livro-static { width: 85px; height: 85px; }
+  .livro-label { padding: 4px 9px; font-size: 10px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .livro-assistente,
+  .livro-glow,
+  :host { animation: none; transition-duration: 1ms; }
+}

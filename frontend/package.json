@@ -5,6 +5,7 @@
     "ng": "ng",
     "start": "node ../production-start.js",
     "dev": "ng serve --host 0.0.0.0 --port 9990",
+    "dev:local": "ng serve --host 127.0.0.1 --port 9990",
     "backend": "npm --prefix ../backend start",
     "backend:install": "npm --prefix ../backend install",
     "db:setup": "npm --prefix ../backend run db:setup",

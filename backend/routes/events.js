@@ -143,3 +143,6 @@ router.delete('/:id', asyncRoute(async (req, res) => {
 }));
 
 module.exports = router;
+module.exports.hasAccess = hasAccess;
+module.exports.isTaskDeadlineEvent = isTaskDeadlineEvent;
+module.exports.eventDto = eventDto;

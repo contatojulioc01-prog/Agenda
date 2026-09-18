@@ -13,11 +13,14 @@ import { Attachment } from '../../../core/models/attachment.model';
 import { AttachmentsService } from '../../../core/services/attachments.service';
 import { forkJoin } from 'rxjs';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
+import { AiTextButtonComponent } from '../../../shared/components/ai-text-button/ai-text-button.component';
+import { MarkdownTextComponent } from '../../../shared/components/markdown-text/markdown-text.component';
+import { MarkdownEditorComponent } from '../../../shared/components/markdown-editor/markdown-editor.component';
 
 @Component({
   selector: 'app-kanban-board',
   standalone: true,
-  imports: [CommonModule, FormsModule, DragDropModule, MatIconModule, MatTooltipModule],
+  imports: [CommonModule, FormsModule, DragDropModule, MatIconModule, MatTooltipModule, AiTextButtonComponent, MarkdownTextComponent, MarkdownEditorComponent],
   templateUrl: './kanban-board.component.html',
   styleUrl: './kanban-board.component.scss',
 })

@@ -80,7 +80,7 @@
           <div class="drag-placeholder" *cdkDragPlaceholder></div>
           <div class="card-labels" *ngIf="task.labels.length"><span *ngFor="let label of task.labels | slice:0:4">{{ label }}</span></div>
           <div class="card-title-row"><h3>{{ task.title }}</h3><button class="child-board-btn" (click)="openChildBoard(task, $event)" [matTooltip]="branchHasContent(task) ? childCount(task) + ' subtarefas ativas' : 'Criar ramificação de subtarefas'"><mat-icon>account_tree</mat-icon><small *ngIf="childCount(task)">{{ childCount(task) }}</small></button><mat-icon class="edit-hint">edit</mat-icon></div>
-          <p class="card-description" *ngIf="task.description">{{ task.description }}</p>
+          <app-markdown-text class="card-description" *ngIf="task.description" [text]="task.description" />
           <div class="check-progress" *ngIf="task.checklist.length"><span [style.width.%]="checklistProgress(task)"></span></div>
           <button class="card-checklist-toggle" *ngIf="task.checklist.length" type="button" (mousedown)="$event.stopPropagation()" (click)="toggleCardChecklist(task.id, $event)" [attr.aria-expanded]="isChecklistExpanded(task.id)">
             <mat-icon>{{ isChecklistExpanded(task.id) ? 'keyboard_arrow_up' : 'keyboard_arrow_down' }}</mat-icon>
@@ -259,7 +259,7 @@
     <header><div class="modal-icon"><mat-icon>{{ editingId() ? 'edit_note' : 'add_task' }}</mat-icon></div><div><h2 id="task-modal-title">{{ editingId() ? 'Detalhes da tarefa' : 'Nova tarefa' }}</h2><p>Organize informações e acompanhe o progresso.</p></div><button class="icon-btn" (click)="closeTaskModal()"><mat-icon>close</mat-icon></button></header>
     <div class="modal-body">
       <label class="field full"><span>Título *</span><input [(ngModel)]="draft.title" maxlength="160" placeholder="O que precisa ser feito?" autofocus></label>
-      <label class="field full"><span>Descrição</span><textarea [(ngModel)]="draft.description" rows="4" maxlength="3000" placeholder="Adicione contexto, links ou critérios de aceite..."></textarea></label>
+      <div class="field full"><div class="description-header"><span>Descrição</span><app-ai-text-button [text]="draft.description" (textChange)="draft.description = $event" /></div><app-markdown-editor [text]="draft.description" (textChange)="draft.description = $event" [maxLength]="5000" placeholder="Adicione contexto, links ou critérios de aceite..." ariaLabel="Descrição da tarefa" /></div>
       <label class="field"><span>Lista</span><select [(ngModel)]="draft.columnId"><option *ngFor="let column of board()?.columns" [value]="column.id">{{ column.title }}</option></select></label>
       <label class="field"><span>Prioridade</span><select [(ngModel)]="draft.priority"><option value="low">Baixa</option><option value="medium">Média</option><option value="high">Alta</option><option value="urgent">Urgente</option></select></label>
       <label class="field"><span>Prazo</span><input type="date" [(ngModel)]="draft.dueDate"></label>
@@ -311,7 +311,7 @@
 
     <form class="team-create-form" *ngIf="creatingTeam()" (ngSubmit)="saveBoard()">
       <label><span>Nome do time *</span><input [(ngModel)]="newBoardName" name="teamName" maxlength="80" placeholder="Ex.: Produto, Marketing, Operações" autofocus></label>
-      <label><span>Descrição</span><textarea [(ngModel)]="newTeamDescription" name="teamDescription" rows="3" placeholder="Objetivo deste time"></textarea></label>
+      <div class="team-description-field"><div class="description-header"><span>Descrição</span><app-ai-text-button [text]="newTeamDescription" (textChange)="newTeamDescription = $event" /></div><app-markdown-editor [text]="newTeamDescription" (textChange)="newTeamDescription = $event" [maxLength]="1000" placeholder="Objetivo deste time" ariaLabel="Descrição do time" /></div>
       <label><span>Cor</span><input [(ngModel)]="newTeamColor" name="teamColor" type="color"></label>
       <div class="team-form-actions"><button type="button" class="cancel-btn" (click)="creatingTeam.set(false)" *ngIf="teams().length">Voltar</button><button class="primary-btn" type="submit" [disabled]="!newBoardName.trim()">Criar time</button></div>
     </form>

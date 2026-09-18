@@ -23,6 +23,9 @@ for (const file of new Set(files)) {
     if (file === 'backend/scripts/generate-security-report.js' && line.trim().startsWith('<!--')) {
       for (const word of ['GESTÃO', 'AUTENTICAÇÃO', 'MITIGAÇÃO']) checked = checked.replaceAll(word, 'PORTUGUESE_HEADING');
     }
+    if (file === 'docs/PROMPT_IA_AGENDA.md' && line.startsWith('## ')) {
+      for (const word of ['ARQUITETURA DA IMPLEMENTAÇÃO', 'CONFIGURAÇÃO DE API', 'CHECKLIST DE IMPLEMENTAÇÃO']) checked = checked.replaceAll(word, 'PORTUGUESE_HEADING');
+    }
     if (file === 'scripts/check_utf8.mjs') return;
     if (/\u00c3|\u00c2|\u00e2\u20ac\u2122|\u00e2\u20ac\u0153|\u00e2\u20ac\u201d|\ufffd/u.test(checked)) {
       // Report only location: environment files or documentation might contain secrets.

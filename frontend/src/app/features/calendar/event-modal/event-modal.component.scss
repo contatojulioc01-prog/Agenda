@@ -216,3 +216,5 @@
 .duplicate-dot { width: 9px; height: 9px; border-radius: 50%; }
 .btn-duplicate-confirm { justify-content: center; color: #fff; background: var(--brand-500); border-color: var(--brand-500); }
 .btn-duplicate-confirm:disabled { opacity: .5; cursor: not-allowed; }
+.description-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.preview-label { display: block; margin-bottom: 7px; color: var(--text-muted); font-size: 9px; font-weight: 750; text-transform: uppercase; letter-spacing: .06em; }
