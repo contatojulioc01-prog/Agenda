@@ -103,6 +103,23 @@ export class EventModalComponent implements OnInit, OnDestroy {
     );
   });
 
+  // ── Recorrência Mensal ──
+  monthlyRecurring = false;
+  recurringPreset: number | 'custom' = 12;
+  customMonths: number = 12;
+
+  get effectiveRecurringMonths(): number {
+    if (this.recurringPreset === 'custom') {
+      const val = Math.floor(Number(this.customMonths));
+      return Number.isFinite(val) && val > 0 ? Math.min(val, 120) : 1;
+    }
+    return Number(this.recurringPreset) || 12;
+  }
+
+  get recurringDay(): string {
+    return this.formData.date ? this.formData.date.slice(8, 10) : '01';
+  }
+
   get hasTargetCalendars(): boolean {
     return this.isEdit || (this.data.targetCalendarIds?.length ?? 0) > 0;
   }
@@ -262,6 +279,49 @@ export class EventModalComponent implements OnInit, OnDestroy {
     return effectiveEndDate > this.formData.date || this.formData.endTime > this.formData.startTime;
   }
 
+  /**
+   * Computa as ocorrências mensais para o número de meses selecionado.
+   * Ajusta o dia se o mês de destino tiver menos dias (ex: dia 31 em fev/abr).
+   */
+  computeMonthlyOccurrences(startDateStr: string, endDateStr: string, count: number): Array<{ date: string; endDate: string }> {
+    if (!startDateStr || count <= 0) return [];
+    const [startYear, startMonth, startDay] = startDateStr.split('-').map(Number);
+    const [endYear, endMonth, endDay] = (endDateStr || startDateStr).split('-').map(Number);
+
+    const startDt = new Date(Date.UTC(startYear, startMonth - 1, startDay));
+    const endDt = new Date(Date.UTC(endYear, endMonth - 1, endDay));
+    const durationDays = Math.max(0, Math.round((endDt.getTime() - startDt.getTime()) / (1000 * 60 * 60 * 24)));
+
+    const occurrences: Array<{ date: string; endDate: string }> = [];
+
+    for (let i = 0; i < count; i++) {
+      const totalMonths = (startMonth - 1) + i;
+      const targetYear = startYear + Math.floor(totalMonths / 12);
+      const targetMonth = totalMonths % 12; // 0-indexed
+
+      // Último dia do mês alvo
+      const daysInTargetMonth = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+      const actualDay = Math.min(startDay, daysInTargetMonth);
+
+      const occStartDate = new Date(Date.UTC(targetYear, targetMonth, actualDay));
+      const occEndDate = new Date(Date.UTC(targetYear, targetMonth, actualDay + durationDays));
+
+      occurrences.push({
+        date: this.formatIsoDate(occStartDate),
+        endDate: this.formatIsoDate(occEndDate),
+      });
+    }
+
+    return occurrences;
+  }
+
+  private formatIsoDate(d: Date): string {
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(d.getUTCDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
   // ── Skill: Button HTTP Loading — finalize() garante reset do loading ──
   salvar(): void {
     if (this.isReadOnly) return;
@@ -280,6 +340,8 @@ export class EventModalComponent implements OnInit, OnDestroy {
       title: this.formData.title.trim(),
     };
 
+    const count = this.effectiveRecurringMonths;
+
     const completed = (saved: CalendarEvent | CalendarEvent[] | null) => {
       if (!saved) { this.loadingSalvar = false; return; }
       this.uploadPending(Array.isArray(saved) ? saved : [saved], success => {
@@ -287,8 +349,35 @@ export class EventModalComponent implements OnInit, OnDestroy {
         if (success) this.dialogRef.close(true);
       });
     };
-    if (this.isEdit && this.data.event) this.eventsService.update(this.data.event.id, payload, completed);
-    else this.eventsService.createInCalendars(payload, this.data.targetCalendarIds || [], completed);
+
+    if (this.isEdit && this.data.event) {
+      if (this.monthlyRecurring && count > 1) {
+        // Atualiza o evento atual e cria as ocorrências para os meses subsequentes
+        this.eventsService.update(this.data.event.id, payload, updated => {
+          if (!updated) { this.loadingSalvar = false; return; }
+          const remainingOccurrences = this.computeMonthlyOccurrences(this.formData.date, finalEndDate, count).slice(1);
+          if (remainingOccurrences.length > 0) {
+            this.eventsService.createRecurringSeries(
+              { ...payload, copyGroupId: this.data.event!.copyGroupId || this.data.event!.id },
+              [this.data.event!.calendarId],
+              remainingOccurrences,
+              () => completed(updated)
+            );
+          } else {
+            completed(updated);
+          }
+        });
+      } else {
+        this.eventsService.update(this.data.event.id, payload, completed);
+      }
+    } else {
+      if (this.monthlyRecurring && count > 1) {
+        const occurrences = this.computeMonthlyOccurrences(this.formData.date, finalEndDate, count);
+        this.eventsService.createRecurringSeries(payload, this.data.targetCalendarIds || [], occurrences, completed);
+      } else {
+        this.eventsService.createInCalendars(payload, this.data.targetCalendarIds || [], completed);
+      }
+    }
   }
 
   excluir(): void {

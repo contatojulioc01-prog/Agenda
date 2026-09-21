@@ -1,5 +1,4 @@
 import { CommonModule } from '@angular/common';
-import { Component, ElementRef, HostListener, ViewChild, inject, signal } from '@angular/core';
 import { AfterViewInit, Component, ElementRef, HostListener, ViewChild, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
@@ -15,7 +14,6 @@ import { renderBasicMarkdown } from '../../../core/utils/markdown.util';
   templateUrl: './ai-assistant.component.html',
   styleUrl: './ai-assistant.component.scss',
 })
-export class AiAssistantComponent {
 export class AiAssistantComponent implements AfterViewInit {
   @ViewChild('messageList') private messageList?: ElementRef<HTMLElement>;
   readonly aiService = inject(AiService);

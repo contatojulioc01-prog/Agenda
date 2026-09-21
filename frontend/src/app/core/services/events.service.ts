@@ -145,6 +145,42 @@ export class EventsService {
     }));
   }
 
+  /** Cria uma série de ocorrências (ex: recorrência mensal) nas agendas selecionadas. */
+  createRecurringSeries(
+    baseEvent: Omit<CalendarEvent, 'id'>,
+    calendarIds: string[],
+    occurrences: Array<{ date: string; endDate: string }>,
+    onComplete?: (created: CalendarEvent[] | null) => void
+  ): void {
+    const copyGroupId = baseEvent.copyGroupId || generateUniqueId();
+    const targets = [...new Set(calendarIds)];
+    if (!targets.length || !occurrences.length) { onComplete?.(null); return; }
+
+    const totalToCreate = targets.length * occurrences.length;
+    let pending = totalToCreate;
+    const createdEvents: CalendarEvent[] = [];
+
+    targets.forEach(calendarId => {
+      occurrences.forEach(occ => {
+        this.create(
+          {
+            ...baseEvent,
+            calendarId,
+            copyGroupId,
+            date: occ.date,
+            endDate: occ.endDate,
+          },
+          created => {
+            if (created) createdEvents.push(created);
+            if (--pending === 0) {
+              onComplete?.(createdEvents.length > 0 ? createdEvents : null);
+            }
+          }
+        );
+      });
+    });
+  }
+
   /** Atualiza evento existente no backend */
   update(id: string, changes: Partial<Omit<CalendarEvent, 'id'>>, onComplete?: (updated: CalendarEvent | null) => void): void {
     if (this.events().find(event => event.id === id)?.isSystem) { onComplete?.(null); return; }

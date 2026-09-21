@@ -193,6 +193,57 @@
               [disabled]="formData.allDay"
             />
           </div>
+
+          <!-- Recorrência Mensal -->
+          <div class="form-field col-span-2 recurrence-card" *ngIf="!isReadOnly">
+            <div class="recurrence-toggle-box">
+              <label class="checkbox-label" for="ev-recurring">
+                <input
+                  type="checkbox"
+                  [(ngModel)]="monthlyRecurring"
+                  name="monthlyRecurring"
+                  id="ev-recurring"
+                />
+                <span class="recurrence-title">
+                  <mat-icon class="inline-icon">event_repeat</mat-icon>
+                  <strong>Recorrência mensal (repetir todo mês)</strong>
+                </span>
+              </label>
+            </div>
+
+            <div class="recurrence-config-panel" *ngIf="monthlyRecurring">
+              <div class="recurrence-duration-row">
+                <label for="ev-recurring-preset">Duração da repetição:</label>
+                <select id="ev-recurring-preset" [(ngModel)]="recurringPreset" name="recurringPreset" class="custom-select recurrence-select">
+                  <option [ngValue]="3">3 meses</option>
+                  <option [ngValue]="6">6 meses</option>
+                  <option [ngValue]="12">12 meses (1 ano)</option>
+                  <option [ngValue]="24">24 meses (2 anos)</option>
+                  <option [ngValue]="36">36 meses (3 anos)</option>
+                  <option value="custom">Personalizado...</option>
+                </select>
+
+                <div class="custom-duration-input-box" *ngIf="recurringPreset === 'custom'">
+                  <input
+                    type="number"
+                    [(ngModel)]="customMonths"
+                    name="customMonths"
+                    id="ev-custom-months"
+                    min="1"
+                    max="120"
+                    placeholder="Ex: 5"
+                    class="custom-number-input"
+                  />
+                  <span class="input-suffix">meses</span>
+                </div>
+              </div>
+
+              <div class="recurrence-preview-pill" *ngIf="formData.date">
+                <mat-icon>info</mat-icon>
+                <span>O evento será criado para <strong>todo dia {{ formData.date.slice(8, 10) }}</strong> durante <strong>{{ effectiveRecurringMonths }} {{ effectiveRecurringMonths === 1 ? 'mês' : 'meses' }}</strong>.</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
