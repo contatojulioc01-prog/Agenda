@@ -21,23 +21,44 @@ export class MarkdownEditorComponent implements AfterViewInit {
   private value = '';
   private viewReady = false;
   private composing = false;
+  private isUserFocused = false;
 
   @Input()
   set text(nextValue: string | null | undefined) {
     const normalized = String(nextValue || '');
     if (normalized === this.value) return;
     this.value = normalized;
-    if (this.viewReady) this.renderValue(false);
+    if (this.viewReady && !this.isUserFocused) {
+      this.renderValue(false);
+    }
   }
 
-  get text(): string { return this.value; }
+  get text(): string {
+    return this.value;
+  }
 
   ngAfterViewInit(): void {
     this.viewReady = true;
     this.renderValue(false);
   }
 
-  onCompositionStart(): void { this.composing = true; }
+  onFocus(): void {
+    this.isUserFocused = true;
+  }
+
+  onBlur(): void {
+    this.isUserFocused = false;
+    const editor = this.editorRef?.nativeElement;
+    if (editor) {
+      this.value = this.toMarkdown(editor);
+      this.renderValue(false);
+      this.textChange.emit(this.value);
+    }
+  }
+
+  onCompositionStart(): void {
+    this.composing = true;
+  }
 
   onCompositionEnd(event: CompositionEvent): void {
     this.composing = false;
@@ -47,11 +68,11 @@ export class MarkdownEditorComponent implements AfterViewInit {
   onInput(event: Event): void {
     if (this.composing) return;
     const editor = event.currentTarget as HTMLDivElement;
-    const caretOffset = this.getCaretOffset(editor);
     let markdown = this.toMarkdown(editor);
-    if (markdown.length > this.maxLength) markdown = markdown.slice(0, this.maxLength);
+    if (markdown.length > this.maxLength) {
+      markdown = markdown.slice(0, this.maxLength);
+    }
     this.value = markdown;
-    this.renderValue(true, caretOffset);
     this.textChange.emit(markdown);
   }
 
@@ -65,8 +86,12 @@ export class MarkdownEditorComponent implements AfterViewInit {
     const editor = this.editorRef?.nativeElement;
     if (!editor) return;
     const nextHtml = renderBasicMarkdown(this.value);
-    if (editor.innerHTML !== nextHtml) editor.innerHTML = nextHtml;
-    if (restoreCaret) this.restoreCaret(editor, caretOffset);
+    if (editor.innerHTML !== nextHtml) {
+      editor.innerHTML = nextHtml;
+    }
+    if (restoreCaret) {
+      this.restoreCaret(editor, caretOffset);
+    }
   }
 
   private getCaretOffset(root: HTMLElement): number {

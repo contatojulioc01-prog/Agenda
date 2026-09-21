@@ -32,6 +32,159 @@ function parseJson(value, fallback) {
   try { return JSON.parse(value); } catch { return fallback; }
 }
 
+
+function getEasterDate(year) {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(year, month - 1, day);
+}
+
+function toIsoDate(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function getNationalHolidays(year) {
+  const easter = getEasterDate(year);
+  const addDays = (base, days) => {
+    const res = new Date(base);
+    res.setDate(res.getDate() + days);
+    return res;
+  };
+
+  const holidays = [
+    { date: `${year}-01-01`, title: 'Confraternização Universal' },
+    { date: toIsoDate(addDays(easter, -47)), title: 'Carnaval' },
+    { date: toIsoDate(addDays(easter, -2)), title: 'Sexta-feira Santa (Paixão de Cristo)' },
+    { date: toIsoDate(easter), title: 'Páscoa' },
+    { date: `${year}-04-21`, title: 'Tiradentes' },
+    { date: `${year}-05-01`, title: 'Dia do Trabalho' },
+    { date: toIsoDate(addDays(easter, 60)), title: 'Corpus Christi' },
+    { date: `${year}-09-07`, title: 'Independência do Brasil' },
+    { date: `${year}-10-12`, title: 'Nossa Senhora Aparecida' },
+    { date: `${year}-11-02`, title: 'Finados' },
+    { date: `${year}-11-15`, title: 'Proclamação da República' },
+    { date: `${year}-11-20`, title: 'Dia Nacional de Zumbi e da Consciência Negra' },
+    { date: `${year}-12-25`, title: 'Natal' },
+  ];
+  return holidays.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function getSystemEventsForYear(year, defaultCalendar) {
+  if (!defaultCalendar) return [];
+  const holidays = getNationalHolidays(year);
+  const holidayDates = new Set(holidays.map(h => h.date));
+  const isHoliday = (d) => holidayDates.has(toIsoDate(d));
+  const isBankingDay = (d) => d.getDay() !== 0 && d.getDay() !== 6 && !isHoliday(d);
+  const isWorkdayForCount = (d) => d.getDay() !== 0 && !isHoliday(d);
+
+  const fifthBusinessDay = (month) => {
+    let businessDays = 0;
+    let targetDate = new Date(year, month, 1);
+    for (let day = 1; ; day++) {
+      const date = new Date(year, month, day);
+      if (isWorkdayForCount(date)) {
+        businessDays++;
+        if (businessDays === 5) {
+          targetDate = date;
+          break;
+        }
+      }
+    }
+    while (!isBankingDay(targetDate)) {
+      targetDate.setDate(targetDate.getDate() - 1);
+    }
+    return targetDate;
+  };
+
+  const salaryAdvanceDay = (month) => {
+    const date = new Date(year, month, 20);
+    while (!isBankingDay(date)) {
+      date.setDate(date.getDate() - 1);
+    }
+    return date;
+  };
+
+  const events = [];
+
+  for (const h of holidays) {
+    events.push({
+      id: `system-holiday-${h.date}`,
+      calendarId: defaultCalendar.id,
+      calendarName: defaultCalendar.name || 'Minha Agenda',
+      title: `Feriado: ${h.title}`,
+      description: `Feriado Nacional: ${h.title}`,
+      date: h.date,
+      endDate: h.date,
+      startTime: '00:00',
+      endTime: '23:59',
+      dayTimes: {},
+      color: 'rose',
+      category: 'Feriado',
+      allDay: true,
+      isSystem: true,
+      isTaskDeadline: false,
+    });
+  }
+
+  for (let month = 0; month < 12; month++) {
+    const fifthDate = toIsoDate(fifthBusinessDay(month));
+    const advanceDate = toIsoDate(salaryAdvanceDay(month));
+
+    events.push({
+      id: `system-payment-fifth-${year}-${month}`,
+      calendarId: defaultCalendar.id,
+      calendarName: defaultCalendar.name || 'Minha Agenda',
+      title: 'Pagamento, vale alimentação e transporte',
+      description: 'Evento padrão de pagamento salarial (5º dia útil).',
+      date: fifthDate,
+      endDate: fifthDate,
+      startTime: '00:00',
+      endTime: '23:59',
+      dayTimes: {},
+      color: 'emerald',
+      category: 'Financeiro',
+      allDay: true,
+      isSystem: true,
+      isTaskDeadline: false,
+    });
+
+    events.push({
+      id: `system-payment-advance-${year}-${month}`,
+      calendarId: defaultCalendar.id,
+      calendarName: defaultCalendar.name || 'Minha Agenda',
+      title: 'Adiantamento salarial e vale transporte',
+      description: 'Evento padrão de adiantamento salarial (dia 20).',
+      date: advanceDate,
+      endDate: advanceDate,
+      startTime: '00:00',
+      endTime: '23:59',
+      dayTimes: {},
+      color: 'emerald',
+      category: 'Financeiro',
+      allDay: true,
+      isSystem: true,
+      isTaskDeadline: false,
+    });
+  }
+
+  return events;
+}
+
 function eventDto(event) {
   return {
     id: event.id,
@@ -420,13 +573,13 @@ function getAiToolCatalog(names) {
 }
 
 function shouldPlanWithAgendaTools(text) {
-  return /\b(agenda|agendas|evento|eventos|compromisso|compromissos|reuni[aã]o|calend[aá]rio|kanban|quadro|quadros|card|cards|tarefa|tarefas|pend[eê]ncia|pend[eê]ncias|backlog|equipe|equipes|time|times|prazo|prazos|hoje|amanh[aã]|semana|fazer)\b/i.test(String(text || ''));
+  return /\b(agenda|agendas|agendado|agendada|agendados|agendadas|evento|eventos|compromisso|compromissos|reuni[aã]o|reuni[oõ]es|calend[aá]rio|calendarios|kanban|quadro|quadros|coluna|colunas|card|cards|tarefa|tarefas|pend[eê]ncia|pend[eê]ncias|backlog|equipe|equipes|time|times|prazo|prazos|hoje|amanh[aã]|ontem|semana|m[eê]s|fazer|atividade|atividades|membro|membros|convite|convites|anexo|anexos|arquivo|arquivos|notifica|notifica[cç][aã]o|notifica[cç][oõ]es|lembrete|lembretes|alerta|alertas|dispositivo|dispositivos|lgpd|meus dados|privacidade|lixeira|restaurar|excluir|criar|listar|organizar|planejar|horario|horarios|hor[aá]rio|hor[aá]rios|periodo|período|turno|turnos|dia|dias|data|datas|segunda|ter[cç]a|quarta|quinta|sexta|s[aá]bado|domingo|jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez|janeiro|fevereiro|mar[cç]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\b/i.test(String(text || ''));
 }
 
 async function createAgendaMcpServer(userId, broadcast) {
   const { McpServer } = await import('@modelcontextprotocol/server');
   const server = new McpServer({ name: 'doce-agenda-mcp', version: '2.0.0' }, {
-    instructions: `Servidor MCP completo da Agenda Corporativa. Todas as operações são limitadas ao usuário autenticado. O fuso padrão é ${TIME_ZONE}. Use obter_contexto_completo para descobrir IDs, permissões, convites e configurações. Descrições aceitam Markdown. Nunca invente registros. Ferramentas destrutivas exigem confirmar=true.`,
+    instructions: `Servidor MCP corporativo da Agenda Doce Brinquedo. Contexto autenticado do usuário (${userId}). Fuso horário corporativo: ${TIME_ZONE}. Todas as operações de leitura e escrita refletem a base de dados em tempo real. Consulte recursos (agenda://manual, agenda://schema, agenda://contexto) e ferramentas de contexto para obter IDs e permissões antes de executar mutações. Descrições suportam Markdown. Operações destrutivas exigem confirmar=true.`,
   });
 
   for (const tool of toolDefinitions) {

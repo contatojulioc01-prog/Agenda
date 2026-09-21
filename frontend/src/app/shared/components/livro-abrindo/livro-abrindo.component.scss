@@ -1,4 +1,6 @@
 :host {
+  --move-x: 0px;
+  --move-y: 0px;
   position: fixed;
   right: clamp(14px, 2vw, 26px);
   bottom: clamp(14px, 2vw, 26px);
@@ -7,7 +9,12 @@
   width: max-content;
   height: max-content;
   transform: translate(0, 0);
-  transition: left 320ms cubic-bezier(.65, 0, .35, 1), top 320ms cubic-bezier(.65, 0, .35, 1), transform 320ms cubic-bezier(.65, 0, .35, 1);
+  transition: left 650ms cubic-bezier(0.2, 0.9, 0.25, 1), top 650ms cubic-bezier(0.2, 0.9, 0.25, 1), transform 650ms cubic-bezier(0.2, 0.9, 0.25, 1);
+  will-change: left, top, transform;
+  transform: translate(0, 0) scale(1);
+  transform-origin: center center;
+  transition: transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
 }
 
 :host.positioned {
@@ -17,7 +24,9 @@
 
 :host.opening {
   z-index: 2100;
-  transform: scale(1.72);
+  transform: scale(1.68);
+  z-index: 2200;
+  transform: translate(var(--move-x), var(--move-y)) scale(1.75);
   pointer-events: none;
 }
 
@@ -49,7 +58,9 @@
     outline-offset: 3px;
   }
 
-  &.opening { transform: translateY(-2px) scale(.96); }
+  &.opening {
+    transform: none;
+  }
   &:disabled { opacity: 1; cursor: default; }
 }
 
@@ -67,11 +78,12 @@
   position: relative;
   z-index: 1;
   display: block;
-  width: 138px;
+  width: 154px;
   height: auto;
-  margin: -9px 0 -13px;
+  margin: -10px 0 -14px;
   pointer-events: none;
   user-select: none;
+  filter: drop-shadow(0 14px 28px rgba(238, 116, 32, .32));
 }
 
 .livro-static {
@@ -101,24 +113,33 @@
   letter-spacing: .01em;
   white-space: nowrap;
   backdrop-filter: blur(10px);
+  transition: opacity 220ms ease, transform 220ms ease;
+}
+
+.livro-assistente.opening .livro-label {
+  opacity: 0;
+  transform: translateY(6px) scale(0.85);
 }
 
 .livro-glow {
   position: absolute;
-  inset: 18px 13px 14px;
+  inset: 10px;
   z-index: 0;
   border-radius: 50%;
-  background: color-mix(in srgb, var(--brand-500) 18%, transparent);
+  background: color-mix(in srgb, var(--brand-500) 25%, transparent);
   filter: blur(18px);
-  animation: livro-glow 2.6s ease-in-out infinite;
+  opacity: 0;
+  transition: opacity 300ms ease;
 }
 
-.livro-assistente:not(.opening) .livro-glow {
-  opacity: 0;
+.livro-assistente.opening .livro-glow {
+  opacity: 0.9;
+  transform: scale(1.35);
+  animation: livro-glow 2.4s ease-in-out infinite;
 }
 
 @keyframes livro-glow {
-  50% { opacity: .55; transform: scale(1.1); }
+  50% { opacity: .55; transform: scale(1.45); }
 }
 
 @media (max-width: 600px) {
@@ -126,7 +147,7 @@
   :host.positioned { right: auto; bottom: auto; }
   :host.opening { transform: scale(1.35); }
   .livro-assistente { width: 142px; min-height: 110px; }
-  .livro-svg { width: 112px; }
+  .livro-svg { width: 124px; }
   .livro-static { width: 85px; height: 85px; }
   .livro-label { padding: 4px 9px; font-size: 10px; }
 }

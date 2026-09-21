@@ -18,13 +18,72 @@
           <div class="ai-welcome">
             <span><img src="assets/header.jfif" alt="" /></span>
             <h3>Como posso ajudar?</h3>
-            <p>Organize compromissos, refine textos ou pense comigo sobre qualquer assunto.</p>
+            <p>Organize compromissos, visualize tarefas por equipe ou converse sobre qualquer assunto.</p>
           </div>
         }
         @for (message of messages(); track message.id) {
           <article class="message" [class.user]="message.role === 'user'" [class.assistant]="message.role === 'assistant'" [class.error]="message.error">
             <div class="message-label">{{ message.role === 'user' ? 'Você' : 'Assistente IA' }}</div>
-            @if (message.content) { <div class="message-content" [innerHTML]="formatMessage(message.content)"></div> }
+            
+            @if (message.content) {
+              @let parsed = parseContent(message.content);
+
+              @if (parsed.text) {
+                <div class="message-content" [innerHTML]="formatMessage(parsed.text)"></div>
+              }
+
+              @if (parsed.optionsPrompt && message.role === 'assistant') {
+                <div class="ai-options-card" [class.answered]="!!message.selectedOptions?.length">
+                  @if (parsed.optionsPrompt.question) {
+                    <div class="ai-options-title">
+                      <mat-icon class="title-icon">help_outline</mat-icon>
+                      <span>{{ parsed.optionsPrompt.question }}</span>
+                    </div>
+                  }
+
+                  @if (message.selectedOptions?.length) {
+                    <div class="ai-options-answered-badge">
+                      <mat-icon class="answered-icon">check_circle</mat-icon>
+                      <span>Opção selecionada: <strong>{{ message.selectedOptions?.join(', ') }}</strong></span>
+                    </div>
+                  } @else {
+                    <div class="ai-options-grid" [class.multi]="parsed.optionsPrompt.multiSelect">
+                      @for (option of parsed.optionsPrompt.options; track option) {
+                        <button
+                          type="button"
+                          class="ai-option-chip"
+                          [class.selected]="isOptionPending(message.id, option)"
+                          [disabled]="isLoading()"
+                          (click)="onOptionClick(message, parsed.optionsPrompt, option)">
+                          <span class="chip-label">{{ option }}</span>
+                        </button>
+                      }
+                    </div>
+
+                    @if (parsed.optionsPrompt.multiSelect) {
+                      <div class="ai-options-footer">
+                        <button
+                          type="button"
+                          class="options-select-all-btn"
+                          [disabled]="isLoading()"
+                          (click)="toggleSelectAll(message.id, parsed.optionsPrompt.options)">
+                          {{ isAllPendingSelected(message.id, parsed.optionsPrompt.options) ? 'Desmarcar todos' : 'Marcar todos' }}
+                        </button>
+
+                        <button
+                          type="button"
+                          class="options-confirm-btn"
+                          [disabled]="isLoading() || getPendingCount(message.id) === 0"
+                          (click)="submitPendingSelection(message, parsed.optionsPrompt)">
+                          <mat-icon>send</mat-icon>
+                          <span>Confirmar seleção ({{ getPendingCount(message.id) }})</span>
+                        </button>
+                      </div>
+                    }
+                  }
+                </div>
+              }
+            }
             @if (!message.content && isLoading()) { <div class="typing" aria-label="IA digitando"><i></i><i></i><i></i></div> }
           </article>
         }

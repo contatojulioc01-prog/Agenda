@@ -628,32 +628,112 @@ const systemToolDefinitions = [
   {name:'exportar_meus_dados',title:'Exportar meus dados',description:'Retorna a exportação estruturada do titular conforme a LGPD, sem chaves secretas.',schema:z.object({}),annotations:read},
 ];
 
-const SYSTEM_MANUAL = `# Modelo completo da Agenda Corporativa
+const SYSTEM_MANUAL = `# Manual Operacional e Guia Técnico de QA — Agenda Corporativa Doce Brinquedo
 
-## Entidades e relações
-- Agenda contém eventos, membros e convites. Permissões: owner, editor e viewer.
-- Equipe contém membros e possui automaticamente um quadro compartilhado e uma agenda Tarefas.
-- Quadro contém colunas; colunas contêm tarefas; tarefas podem ter subtarefas, responsáveis, checklist, etiquetas, prazo e anexos.
-- Prazos de tarefas geram eventos de sistema. Altere esses prazos no card, nunca diretamente no evento.
-- Anexos pertencem a um evento ou tarefa. O MCP lista metadados, mas não injeta binários no contexto.
-- Notificações usam preferências do usuário e dispositivos registrados. Chaves e hashes nunca são expostos.
-- O banco da Agenda armazena IDs de usuários, não cópias de nome, e-mail ou avatar. Esses dados são resolvidos pelo diretório corporativo SSO na interface; não invente nomes quando apenas um ID estiver disponível.
-- Cadastro de dispositivo gera uma chave secreta de uso único; upload e download de binários usam a API REST autenticada, não o contexto textual MCP.
-- A anonimização LGPD revoga dispositivos e preferências, limpa convites e atribuições. Por ser uma ação ampla sobre a conta, ela permanece no fluxo explícito da interface/API e não é automatizada por ferramenta de IA.
+## 1. Visão Geral da Arquitetura e Protocolo MCP
+- O sistema é um ecossistema corporativo completo de produtividade integrando Agendas, Eventos, Equipes, Quadros Kanban, Subtarefas, Notificações Desktop e LGPD.
+- Todas as operações MCP são executadas no contexto estrito do usuário autenticado (identificado por ID).
+- O fuso horário de referência é America/Sao_Paulo (ou configurado em AGENDA_TIME_ZONE). Todas as interpretações de datas e horas devem respeitar esse fuso.
+- Toda resposta a consultas deve ser derivada diretamente de dados reais retornados pelas ferramentas MCP ou recursos do sistema. Nunca invente dados.
 
-## Regras de acesso
-- Viewer consulta; editor altera agenda/eventos; owner também gerencia privacidade e membros.
-- Em equipe, admin gerencia estrutura e membros; member trabalha no quadro.
-- Quadros pessoais pertencem ao criador. Quadros de equipe são excluídos somente junto da equipe.
-- Agenda padrão permanece privada e não pode ser excluída.
-- Agenda Tarefas é automática e seus membros vêm da equipe.
-- Exclusões destrutivas exigem confirmar=true. A lixeira de tarefas retém itens por 30 dias.
+## 2. Calendários e Agendas
+- Cada usuário possui automaticamente uma agenda padrão pessoal ("Minha Agenda", privada, is_default = 1), a qual não pode ser excluída e não pode se tornar pública.
+- Agendas personalizadas podem ser criadas com nome (máx 80 caracteres), cor (hexadecimal #RRGGBB) e privacidade (privada ou compartilhada).
+- Papéis e Permissões em Agendas:
+  - 'owner': Criador/proprietário da agenda. Tem controle total, incluindo edição de privacidade, exclusão da agenda, convite e gerenciamento de membros.
+  - 'editor': Pode criar, editar e excluir eventos dentro da agenda.
+  - 'viewer': Apenas consulta de eventos (somente leitura).
+- Convites de Agenda:
+  - Podem ser enviados para outros usuários com permissão 'editor' ou 'viewer'.
+  - Status possíveis: 'pending', 'accepted', 'declined'.
+  - Aceitar o convite insere o usuário como membro na agenda com a permissão atribuída.
+- Agenda do Time ("Tarefas"):
+  - Criada automaticamente junto com a equipe. É vinculada à equipe (is_task_calendar = 1).
+  - Seus membros e permissões são sincronizados automaticamente com os membros da equipe.
+  - Não pode ser excluída ou editada diretamente; seu ciclo de vida segue a equipe.
 
-## Formatos
-- Datas: YYYY-MM-DD. Horas: HH:MM. Fuso padrão configurado no servidor.
-- Cores de agenda/quadro/equipe/coluna: hexadecimal #RRGGBB.
-- Descrições de evento e tarefa aceitam Markdown, incluindo títulos, listas, citações, tabelas e quebras de linha.
-- Nunca invente agendas, equipes, cards, responsáveis ou estados; consulte as ferramentas e informe claramente quando não houver dados.
+## 3. Eventos e Compromissos
+- Campos de Evento:
+  - 'title': Título do evento (1 a 160 caracteres).
+  - 'description': Descrição com suporte completo a Markdown rico (listas, links, formatação).
+  - 'date' / 'endDate': Datas no formato ISO (YYYY-MM-DD).
+  - 'startTime' / 'endTime': Horários no formato 24h (HH:MM).
+  - 'dayTimes': Horários específicos para cada dia em eventos multidiários (ex: {"2026-09-22": {"startTime":"09:00","endTime":"12:00"}}).
+  - 'color': Paleta de cores corporativa ('indigo', 'blue', 'teal', 'emerald', 'amber', 'orange', 'rose', 'purple', 'pink', 'slate').
+  - 'category': Categoria textual sanitizada com caracteres seguros (máx 60 caracteres).
+  - 'allDay': Booleano indicando evento de dia inteiro.
+- Eventos de Prazo Kanban (is_task_deadline = 1):
+  - Criados e sincronizados automaticamente pelo sistema quando uma tarefa possui due_date.
+  - Esses eventos são protegidos: alterações de data, hora ou exclusão devem ser feitas no card do Kanban, nunca pelo endpoint de eventos.
+
+## 4. Equipes (Times) e Quadros Compartilhados
+- Ao criar uma equipe:
+  - Cria-se a equipe com nome, descrição e cor corporativa.
+  - O criador assume o papel de 'admin'.
+  - É criada automaticamente a agenda compartilhada 'Tarefas'.
+  - É criado automaticamente o quadro Kanban da equipe ('Kanban · <Nome do Time>') com 3 colunas padrão ('A fazer', 'Em andamento', 'Concluído').
+- Papéis em Equipes:
+  - 'admin': Gerencia equipe, convites, membros, colunas, e ações avançadas/lixeira.
+  - 'member': Cria e move tarefas dentro do quadro da equipe.
+- Ao remover um membro da equipe:
+  - O membro perde acesso ao quadro e à agenda 'Tarefas'.
+  - Suas atribuições (assignee_ids) em tarefas da equipe são removidas automaticamente.
+- Exclusão de Equipe:
+  - Ação destrutiva em cascata (remove equipe, quadro, colunas, tarefas, anexos, agenda vinculada e convites). Exige confirmar=true.
+
+## 5. Quadros Kanban e Colunas
+- Quadros Pessoais: pertencem ao usuário (scope_type = 'personal') e podem ser criados, renomeados ou excluídos pelo dono.
+- Colunas:
+  - Possuem título, cor hexadecimal (#RRGGBB) e posição inteira (position >= 0).
+  - Regra de Proteção de QA: Uma coluna só pode ser excluída se todas as suas tarefas e subtarefas estiverem arquivadas ou movidas para outra coluna. Exige confirmar=true.
+
+## 6. Tarefas (Cards), Subtarefas, Checklist e Anexos
+- Campos da Tarefa:
+  - 'title': Título do card (1 a 160 caracteres).
+  - 'description': Descrição com suporte a Markdown rico.
+  - 'priority': 'low' (Baixa), 'medium' (Média), 'high' (Alta), 'urgent' (Urgente).
+  - 'dueDate': Data limite no formato ISO (YYYY-MM-DD) ou null. Sincroniza evento na agenda.
+  - 'labels': Array de até 8 etiquetas (strings de até 50 caracteres).
+  - 'assigneeIds': Array de IDs de responsáveis. Todos os IDs devem ser membros válidos do time (ou o dono no quadro pessoal).
+  - 'checklist': Array de itens [{ id, text, done }]. Máximo 200 itens.
+  - 'parentTaskId': ID da tarefa pai para subtarefas hierárquicas.
+- Anexos (Attachments):
+  - Suportados em eventos e tarefas.
+  - Metadados disponíveis via MCP: fileName, mimeType, byteSize, previewable (imagens e PDFs), createdAt.
+  - Limites de segurança: máx 10 MB por arquivo, máx 10 anexos por item, máx 50 MB total por item.
+
+## 7. Lixeira do Kanban e Ciclo de Vida
+- Mover para Lixeira (mover_tarefa_para_lixeira):
+  - Requer perfil 'admin'.
+  - Move a tarefa raiz e todas as suas subtarefas para a lixeira (deleted_at preenchido).
+  - Remove temporariamente os eventos de prazo vinculados na agenda. Exige confirmar=true.
+- Retenção e Expiração: Itens na lixeira permanecem por 30 dias até o expurgo automático.
+- Restaurar Tarefa (restaurar_tarefa):
+  - Restaura a tarefa e todas as suas subtarefas da lixeira, recriando seus prazos na agenda.
+- Exclusão Permanente (excluir_tarefa_permanentemente):
+  - Apaga definitivamente a tarefa da lixeira, subtarefas e todos os anexos. Exige confirmar=true.
+
+## 8. Notificações e Agente Desktop (Agenda Notifier)
+- Preferências do Usuário:
+  - enabled: Ativação global das notificações.
+  - taskEnabled: Ativação de alertas de tarefas.
+  - eventEnabled: Ativação de alertas de eventos.
+  - taskTime: Horário do envio diário de tarefas (HH:MM, padrão 08:30).
+  - taskDaysBefore: Dias de antecedência para alertar tarefas (0 a 30 dias).
+  - eventMinutesBefore: Minutos de antecedência para alertar eventos (0 a 1440 min).
+- Dispositivos Desktop:
+  - Registro gera um token seguro (chave de dispositivo). O backend armazena estritamente o hash SHA-256 do token.
+  - O agente desktop conecta-se autenticado para receber alertas em tempo real.
+
+## 9. Privacidade e LGPD (Lei nº 13.709/2018)
+- Portabilidade (Art. 18, V): A ferramenta exportar_meus_dados gera a exportação completa e estruturada de agendas, eventos, quadros, tarefas, preferências e dispositivos do titular em formato JSON padronizado.
+- Anonimização/Expurgo (Art. 18, VI): Revogação de dispositivos, exclusão de preferências/convites e desvinculação de dados pessoais através da API de privacidade.
+
+## 10. Diretrizes de QA e Execução do MCP
+- Respeite estritamente a idempotência e os efeitos colaterais de cada ferramenta.
+- Ferramentas com destructive=true exigem estritamente o parâmetro confirmar=true.
+- Em consultas sobre atividades do usuário, busque os dados nas ferramentas correspondentes e apresente um resumo claro, organizado e profissional em Markdown.
+- Se nenhuma informação for encontrada para os critérios solicitados, relate com exatidão que nenhum registro foi localizado nos acessos do usuário.
 `;
 
 module.exports = { executeSystemTool, systemToolDefinitions, SYSTEM_MANUAL };

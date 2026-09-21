@@ -1,4 +1,4 @@
-import { AfterViewInit, Component, ElementRef, EventEmitter, HostBinding, HostListener, OnDestroy, Output, inject } from '@angular/core';
+import { AfterViewInit, ChangeDetectorRef, Component, ElementRef, EventEmitter, HostBinding, HostListener, OnDestroy, Output, inject } from '@angular/core';
 
 @Component({
   selector: 'app-livro-abrindo',
@@ -16,6 +16,7 @@ export class LivroAbrindoComponent implements AfterViewInit, OnDestroy {
 
   src = 'assets/livro-doce-brinquedo.svg#db-closed';
   private readonly element = inject(ElementRef<HTMLElement>);
+  private readonly cdr = inject(ChangeDetectorRef);
   private readonly positionStorageKey = 'agenda-ai-assistant-position';
   private openingTimer?: number;
   private activePointerId?: number;
@@ -25,6 +26,10 @@ export class LivroAbrindoComponent implements AfterViewInit, OnDestroy {
   private positionStartY = 0;
   private dragMoved = false;
   private suppressClick = false;
+
+  constructor() {
+    this.restorePosition();
+  }
 
   ngAfterViewInit(): void {
     this.restorePosition();
@@ -36,13 +41,36 @@ export class LivroAbrindoComponent implements AfterViewInit, OnDestroy {
 
   openAssistant(): void {
     if (this.opening) return;
-    const rect = this.element.nativeElement.getBoundingClientRect();
-    this.setPosition(rect.left, rect.top);
-    this.opening = true;
+    const host = this.element.nativeElement;
+    const rect = host.getBoundingClientRect();
+
+    // Salvar a posição atual antes de iniciar a animação
+    if (this.left === null || this.top === null) {
+      this.left = rect.left;
+      this.top = rect.top;
+      this.positioned = true;
+    }
+    this.persistPosition();
+
+    // Calcular o deslocamento exato do centro do livro até o centro do viewport
+    const currentCenterX = rect.left + rect.width / 2;
+    const currentCenterY = rect.top + rect.height / 2;
+    const targetCenterX = window.innerWidth / 2;
+    const targetCenterY = window.innerHeight / 2;
+    const deltaX = Math.round(targetCenterX - currentCenterX);
+    const deltaY = Math.round(targetCenterY - currentCenterY);
+
+    host.style.setProperty('--move-x', `${deltaX}px`);
+    host.style.setProperty('--move-y', `${deltaY}px`);
+
     this.replay();
-    requestAnimationFrame(() => this.moveToViewportCenter());
-    const openingDuration = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 80 : 780;
-    this.openingTimer = window.setTimeout(() => this.opened.emit(), openingDuration);
+    this.opening = true;
+    this.cdr.detectChanges();
+
+    const openingDuration = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 80 : 750;
+    this.openingTimer = window.setTimeout(() => {
+      this.opened.emit();
+    }, openingDuration);
   }
 
   onPointerDown(event: PointerEvent): void {

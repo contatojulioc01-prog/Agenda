@@ -604,16 +604,31 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
     const holidayDates = new Set(this.holidays.map(holiday => holiday.date));
     const toDateString = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
     const isHoliday = (date: Date) => holidayDates.has(toDateString(date));
+    const isBankingDay = (date: Date) => date.getDay() !== 0 && date.getDay() !== 6 && !isHoliday(date);
+    const isWorkdayForCount = (date: Date) => date.getDay() !== 0 && !isHoliday(date);
     const fifthBusinessDay = (month: number) => {
       let businessDays = 0;
+      let targetDate = new Date(year, month, 1);
       for (let day = 1; ; day++) {
         const date = new Date(year, month, day);
-        if (date.getDay() !== 0 && date.getDay() !== 6 && !isHoliday(date) && ++businessDays === 5) return date;
+        if (isWorkdayForCount(date)) {
+          businessDays++;
+          if (businessDays === 5) {
+            targetDate = date;
+            break;
+          }
+        }
       }
+      while (!isBankingDay(targetDate)) {
+        targetDate.setDate(targetDate.getDate() - 1);
+      }
+      return targetDate;
     };
     const salaryAdvanceDay = (month: number) => {
       const date = new Date(year, month, 20);
-      while (date.getDay() === 0 || date.getDay() === 6 || isHoliday(date)) date.setDate(date.getDate() + 1);
+      while (!isBankingDay(date)) {
+        date.setDate(date.getDate() - 1);
+      }
       return date;
     };
 

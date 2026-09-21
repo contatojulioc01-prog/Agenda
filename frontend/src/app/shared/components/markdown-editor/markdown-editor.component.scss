@@ -12,6 +12,7 @@ app-markdown-editor { display: block; min-width: 0; }
   color: var(--text-primary);
   font: inherit;
   line-height: 1.55;
+  white-space: pre-wrap;
   overflow-wrap: anywhere;
   transition: border-color .15s ease, box-shadow .15s ease;
 }

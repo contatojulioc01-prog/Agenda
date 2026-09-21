@@ -103,3 +103,83 @@ test('converte erro enviado pelo gateway em erro SSE visível', async () => {
     if (originalKey === undefined) delete process.env.SSO_LLM_API_KEY; else process.env.SSO_LLM_API_KEY = originalKey;
   }
 });
+
+test('encaminha perguntas de tarefas e equipe para a LLM sem respostas prontas interceptadas', async () => {
+  const originalFetch = global.fetch;
+  const originalKey = process.env.SSO_LLM_API_KEY;
+  process.env.SSO_LLM_API_KEY = 'test-secret';
+  let llmCalls = 0;
+  global.fetch = async (url, options) => {
+    llmCalls++;
+    const isStream = Boolean(JSON.parse(options.body).stream);
+    if (!isStream) {
+      return new Response(JSON.stringify({ choices: [{ message: { content: '{"action":"answer"}' } }] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    return new Response('data: {"choices":[{"delta":{"content":"Análise da LLM: suas tarefas estão em dia."}}]}\n\ndata: [DONE]\n\n', {
+      status: 200,
+      headers: { 'Content-Type': 'text/event-stream' },
+    });
+  };
+
+  try {
+    await withServer(async baseUrl => {
+      const response = await originalFetch(`${baseUrl}/api/ai/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-user-id': 'user-qa' },
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: 'O que eu tenho a fazer na equipe?' }],
+        }),
+      });
+      assert.equal(response.status, 200);
+      const text = await response.text();
+      assert.match(text, /Análise da LLM: suas tarefas estão em dia\./);
+      assert.ok(llmCalls >= 1, 'Deveria ter chamado o provedor LLM');
+    });
+  } finally {
+    global.fetch = originalFetch;
+    if (originalKey === undefined) delete process.env.SSO_LLM_API_KEY; else process.env.SSO_LLM_API_KEY = originalKey;
+  }
+});
+
+test('retorna eventos de pagamento e feriados na listagem de eventos sem perguntar agenda', async () => {
+  const originalFetch = global.fetch;
+  const originalKey = process.env.SSO_LLM_API_KEY;
+  process.env.SSO_LLM_API_KEY = 'test-secret';
+  let llmCalls = 0;
+  global.fetch = async (url, options) => {
+    llmCalls++;
+    const isStream = Boolean(JSON.parse(options.body).stream);
+    if (!isStream) {
+      return new Response(JSON.stringify({ choices: [{ message: { content: '{"action":"call","tool":"listar_eventos","arguments":{"busca":"pagamento"}}' } }] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    return new Response('data: {"choices":[{"delta":{"content":"O pagamento cai no 5º dia útil."}}]}\n\ndata: [DONE]\n\n', {
+      status: 200,
+      headers: { 'Content-Type': 'text/event-stream' },
+    });
+  };
+
+  try {
+    await withServer(async baseUrl => {
+      const response = await originalFetch(`${baseUrl}/api/ai/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-user-id': 'user-qa' },
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: 'Quais são as datas de pagamento e adiantamento salarial?' }],
+        }),
+      });
+      assert.equal(response.status, 200);
+      const text = await response.text();
+      assert.match(text, /O pagamento cai no 5º dia útil./);
+      assert.ok(llmCalls >= 1);
+    });
+  } finally {
+    global.fetch = originalFetch;
+    if (originalKey === undefined) delete process.env.SSO_LLM_API_KEY; else process.env.SSO_LLM_API_KEY = originalKey;
+  }
+});

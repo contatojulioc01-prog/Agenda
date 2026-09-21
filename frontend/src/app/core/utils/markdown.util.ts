@@ -102,7 +102,7 @@ export function renderBasicMarkdown(markdown: string): string {
     }
 
     closeList();
-    output.push(line.trim() ? `<p>${formatInline(line.trim())}</p>` : '<p><br></p>');
+    output.push(line.trim() ? `<p>${formatInline(line)}</p>` : '<p><br></p>');
   }
 
   closeList();

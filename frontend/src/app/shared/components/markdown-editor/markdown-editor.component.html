@@ -8,12 +8,14 @@
   spellcheck="true"
   [attr.aria-label]="ariaLabel"
   [attr.data-placeholder]="placeholder"
+  (focus)="onFocus()"
+  (blur)="onBlur()"
   (input)="onInput($event)"
   (paste)="onPaste($event)"
   (compositionstart)="onCompositionStart()"
   (compositionend)="onCompositionEnd($event)"
 ></div>
 <div class="markdown-editor-footer">
-  <span>Formatação aplicada enquanto você digita</span>
+  <span>Formatação com Markdown</span>
   <span>{{ text.length }}/{{ maxLength }}</span>
 </div>

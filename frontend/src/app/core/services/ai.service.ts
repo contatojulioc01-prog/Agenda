@@ -1,5 +1,7 @@
 import { Injectable, Signal, inject, signal } from '@angular/core';
-import { Observable } from 'rxjs';
+import { HttpClient } from '@angular/common/http';
+import { Observable, throwError } from 'rxjs';
+import { map, catchError } from 'rxjs/operators';
 import { AuthService } from './auth.service';
 
 export type AiTextAction = 'improve' | 'review' | 'explain' | 'reformat';
@@ -14,10 +16,12 @@ export interface AiConversationMessage extends AiChatMessage {
   id: number;
   timestamp: Date;
   error?: boolean;
+  selectedOptions?: string[];
 }
 
 @Injectable({ providedIn: 'root' })
 export class AiService {
+  private readonly http = inject(HttpClient);
   private readonly auth = inject(AuthService);
   private readonly assistantOpenState = signal(false);
   private readonly availabilityState = signal(false);
@@ -56,32 +60,22 @@ export class AiService {
   }
 
   textAction(text: string, action: AiTextAction): Observable<string> {
-    return new Observable<string>(subscriber => {
-      const controller = new AbortController();
-      void fetch('/api/ai/text-action', {
-        method: 'POST',
-        headers: this.headers(),
-        body: JSON.stringify({ text, action }),
-        signal: controller.signal,
-      }).then(async response => {
-        const payload = await this.readJson(response);
-        if (!response.ok) throw new Error(payload?.error || 'Não foi possível processar o texto.');
+    return this.http.post<{ result: string }>('/api/ai/text-action', { text, action }).pipe(
+      map(res => {
         this.availabilityState.set(true);
-        subscriber.next(String(payload.result || ''));
-        subscriber.complete();
-      }).catch(error => {
-        if (error?.name !== 'AbortError') {
-          this.availabilityState.set(false);
-          subscriber.error(error);
-        }
-      });
-      return () => controller.abort();
-    });
+        return String(res?.result || '');
+      }),
+      catchError(error => {
+        this.availabilityState.set(false);
+        return throwError(() => error);
+      })
+    );
   }
 
   private async consumeChatStream(messages: AiChatMessage[], signal: AbortSignal, subscriber: { next: (value: string) => void; error: (error: unknown) => void; complete: () => void }): Promise<void> {
     try {
-      const response = await fetch('/api/ai/chat', {
+      const url = this.getApiUrl('/api/ai/chat');
+      const response = await fetch(url, {
         method: 'POST',
         headers: this.headers(),
         body: JSON.stringify({ messages, sessionId: this.getSessionId() }),
@@ -124,11 +118,26 @@ export class AiService {
     }
   }
 
+  private getApiUrl(endpoint: string): string {
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    if (typeof window !== 'undefined') {
+      try {
+        const appBasePath = new URL(document.baseURI).pathname.replace(/\/$/, '');
+        if (appBasePath && !cleanEndpoint.startsWith(`${appBasePath}/`)) {
+          return `${appBasePath}${cleanEndpoint}`;
+        }
+      } catch {}
+    }
+    return cleanEndpoint;
+  }
+
   private headers(): Record<string, string> {
     const token = this.auth.getToken();
+    const userId = this.auth.currentUser()?.id;
     return {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(userId ? { 'x-user-id': userId } : {}),
     };
   }
 
