@@ -865,9 +865,10 @@ export class KanbanBoardComponent implements OnDestroy {
 
   printSingleTask(): void {
     this.printingSingleTask.set(true);
+    document.body.classList.add('print-single-task-mode');
     setTimeout(() => {
       window.print();
-    }, 120);
+    }, 150);
   }
 
   columnTitle(columnId: string): string {
@@ -887,7 +888,11 @@ export class KanbanBoardComponent implements OnDestroy {
   }
 
   printBoard(): void {
-    window.print();
+    this.printingSingleTask.set(false);
+    document.body.classList.remove('print-single-task-mode');
+    setTimeout(() => {
+      window.print();
+    }, 80);
   }
 
   printDateTime(): string {

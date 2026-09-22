@@ -153,93 +153,67 @@
     </section>
   </main>
   
-  <!-- ══════════════ FICHA INDIVIDUAL DA TAREFA (PRINT ONLY) ══════════════ -->
-  <div class="single-task-print-sheet" *ngIf="printingSingleTask()">
-    <header class="single-task-print-header">
-      <div class="single-task-brand">
-        <img src="sidebar.png" alt="Logo" class="print-logo-img">
-        <div>
-          <h2>Ficha de Tarefa</h2>
-          <p>{{ board()?.name || 'Quadro Kanban' }} · {{ board()?.scopeType === 'team' ? (board()?.teamName || currentTeam()?.name || 'Time') : 'Espaço Pessoal' }}</p>
-        </div>
-      </div>
-      <div class="single-task-meta-top">
-        <span class="single-task-stage-badge">{{ columnTitle(draft.columnId) }}</span>
-        <span class="single-task-date">Impresso em {{ printDateTime() }}</span>
-      </div>
-    </header>
-
-    <main class="single-task-print-body">
-      <div class="single-task-title-box">
-        <div class="single-task-badge-row">
-          <span class="single-task-priority-badge" [attr.data-priority]="draft.priority">
+  <!-- ══════════════ IMPRESSÃO INDIVIDUAL: SOMENTE O CARD (MODO RETRATO) ══════════════ -->
+  <div class="single-card-print-container" *ngIf="printingSingleTask()">
+    <div class="single-card-print-box" [attr.data-priority]="draft.priority">
+      <!-- Top header do card com etapa e prioridade -->
+      <div class="single-card-header-bar">
+        <span class="single-card-stage">{{ columnTitle(draft.columnId) }}</span>
+        <div class="single-card-meta-right">
+          <span class="single-card-priority" [attr.data-priority]="draft.priority">
             Prioridade {{ draft.priority === 'urgent' ? 'Urgente' : draft.priority === 'high' ? 'Alta' : draft.priority === 'low' ? 'Baixa' : 'Média' }}
           </span>
-          <span class="single-task-due" *ngIf="draft.dueDate">Prazo: {{ formatFullDate(draft.dueDate) }}</span>
-        </div>
-        <h1 class="single-task-main-title">{{ draft.title || 'Sem título' }}</h1>
-      </div>
-
-      <div class="single-task-grid-info">
-        <div class="info-card">
-          <span class="info-label">Etapa atual</span>
-          <strong class="info-value">{{ columnTitle(draft.columnId) }}</strong>
-        </div>
-        <div class="info-card">
-          <span class="info-label">Responsáveis</span>
-          <strong class="info-value">{{ draftAssigneeNames() }}</strong>
-        </div>
-        <div class="info-card">
-          <span class="info-label">Prazo de Conclusão</span>
-          <strong class="info-value">{{ draft.dueDate ? formatFullDate(draft.dueDate) : 'Não definido' }}</strong>
-        </div>
-        <div class="info-card">
-          <span class="info-label">Quadro / Time</span>
-          <strong class="info-value">{{ board()?.name || 'Geral' }}</strong>
+          <span class="single-card-due" *ngIf="draft.dueDate">
+            Prazo: {{ formatFullDate(draft.dueDate) }}
+          </span>
         </div>
       </div>
 
-      <div class="single-task-section" *ngIf="draftLabels().length">
-        <span class="section-title">Etiquetas</span>
-        <div class="single-task-labels-list">
-          <span *ngFor="let label of draftLabels()" class="single-task-tag">#{{ label.startsWith('#') ? label.substring(1) : label }}</span>
+      <!-- Título principal do card -->
+      <h1 class="single-card-title">{{ draft.title || 'Sem título' }}</h1>
+
+      <!-- Responsáveis e etiquetas -->
+      <div class="single-card-sub-info">
+        <div class="single-card-assignees" *ngIf="draft.assigneeIds.length">
+          <span class="info-tag">Responsável:</span>
+          <strong>{{ draftAssigneeNames() }}</strong>
+        </div>
+        <div class="single-card-labels" *ngIf="draftLabels().length">
+          <span *ngFor="let label of draftLabels()" class="single-label-pill">#{{ label.startsWith('#') ? label.substring(1) : label }}</span>
         </div>
       </div>
 
-      <div class="single-task-section" *ngIf="draft.description">
-        <span class="section-title">Descrição</span>
-        <div class="single-task-description-box">
+      <!-- Descrição se houver -->
+      <div class="single-card-description" *ngIf="draft.description">
+        <div class="section-label">Descrição:</div>
+        <div class="desc-content">
           <app-markdown-text [text]="draft.description" />
         </div>
       </div>
 
-      <div class="single-task-section" *ngIf="draft.checklist.length">
-        <span class="section-title">Checklist ({{ draft.checklist.filter(item => item.done).length }}/{{ draft.checklist.length }} itens)</span>
-        <div class="single-task-checklist-list">
-          <div class="single-task-check-row" *ngFor="let item of draft.checklist">
-            <span class="check-box" [class.done]="item.done">{{ item.done ? '☑' : '☐' }}</span>
-            <span class="check-text" [class.done]="item.done">{{ item.text }}</span>
-          </div>
+      <!-- Checklist se houver -->
+      <div class="single-card-checklist" *ngIf="draft.checklist.length">
+        <div class="section-label">Checklist ({{ draft.checklist.filter(item => item.done).length }}/{{ draft.checklist.length }}):</div>
+        <div class="single-check-item" *ngFor="let item of draft.checklist">
+          <span class="single-check-box" [class.done]="item.done">{{ item.done ? '☑' : '☐' }}</span>
+          <span class="single-check-text" [class.done]="item.done">{{ item.text }}</span>
         </div>
       </div>
 
-      <div class="single-task-section" *ngIf="taskAttachments.length">
-        <span class="section-title">Anexos Vinculados ({{ taskAttachments.length }})</span>
-        <div class="single-task-attachments-list">
-          <div class="attachment-row" *ngFor="let att of taskAttachments">
-            <span class="att-name">📎 {{ att.fileName }}</span>
-            <span class="att-size">({{ att.byteSize / 1048576 | number:'1.0-2' }} MB)</span>
-          </div>
+      <!-- Anexos se houver -->
+      <div class="single-card-attachments" *ngIf="taskAttachments.length">
+        <div class="section-label">Anexos:</div>
+        <div class="single-att-item" *ngFor="let att of taskAttachments">
+          <span>📎 {{ att.fileName }} ({{ att.byteSize / 1048576 | number:'1.0-2' }} MB)</span>
         </div>
       </div>
-    </main>
 
-    <footer class="single-task-print-footer">
-      <span>Agenda Corporativa • Sistema de Gestão de Tarefas • Ficha de Tarefa Oficial</span>
-      <span>Página 1 de 1</span>
-    </footer>
+      <!-- Rodapé do card -->
+      <div class="single-card-footer">
+        <span>{{ board()?.name || 'Quadro Kanban' }} · Impresso em {{ printDateTime() }}</span>
+      </div>
+    </div>
   </div>
-
   <!-- ══════════════ RODAPÉ DE IMPRESSÃO (PRINT ONLY) ══════════════ -->
   <footer class="kanban-print-footer" [hidden]="printingSingleTask()">
     <span class="print-footer-left">{{ board()?.name || 'Gelelê' }} • Kanban System • Layout otimizado para impressão</span>

@@ -2412,7 +2412,7 @@ body.dragging-active * {
    ══════════════════════════════════════════════════ */
 @page {
   size: landscape;
-  margin: 6mm 8mm;
+  margin: 4mm 5mm;
 }
 
 @media print {
@@ -2430,6 +2430,14 @@ body.dragging-active * {
     color: #0f172a !important;
     margin: 0 !important;
     padding: 0 !important;
+  }
+
+  /* Modo Retrato quando imprimindo card individual */
+  body.print-single-task-mode {
+    @page {
+      size: portrait;
+      margin: 12mm 10mm;
+    }
   }
 
   /* Desativa camadas de temas e efeitos de fundo */
