@@ -6,7 +6,9 @@ export type StoredTheme =
   | 'dark-angel'
   | 'dark-demon'
   | 'light-angel'
-  | 'light-demon';
+  | 'light-demon'
+  | 'dark-cadu'
+  | 'light-cadu';
 
 export type StoredCalendarView = 'month' | 'week' | 'day';
 
@@ -18,7 +20,7 @@ export interface UserPreferences {
 }
 
 const THEMES: StoredTheme[] = [
-  'light', 'dark', 'dark-angel', 'dark-demon', 'light-angel', 'light-demon',
+  'light', 'dark', 'dark-angel', 'dark-demon', 'light-angel', 'light-demon', 'dark-cadu', 'light-cadu',
 ];
 const CALENDAR_VIEWS: StoredCalendarView[] = ['month', 'week', 'day'];
 

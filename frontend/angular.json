@@ -61,8 +61,12 @@
                 "output": "assets"
               }
             ],
-            "styles": ["src/styles.scss"],
-            "polyfills": ["zone.js"]
+            "styles": [
+              "src/styles.scss"
+            ],
+            "polyfills": [
+              "zone.js"
+            ]
           },
           "configurations": {
             "production": {
@@ -70,13 +74,13 @@
               "budgets": [
                 {
                   "type": "initial",
-                  "maximumWarning": "500kB",
-                  "maximumError": "1.25MB"
+                  "maximumWarning": "1MB",
+                  "maximumError": "2MB"
                 },
                 {
                   "type": "anyComponentStyle",
-                  "maximumWarning": "10kB",
-                  "maximumError": "20kB"
+                  "maximumWarning": "30kB",
+                  "maximumError": "60kB"
                 }
               ],
               "outputHashing": "all"

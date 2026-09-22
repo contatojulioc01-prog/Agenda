@@ -1,5 +1,5 @@
 {
-  "lastCommit": "2be1665b-c6da-4e9c-bd63-25309a9cd398",
+  "lastCommit": "7db8f169-6051-4f9a-aec2-1a5cbe595528",
   "commits": [
     {
       "id": "029104f7-7ab2-4d57-b90c-cb17445d7fb0",
@@ -3322,13 +3322,171 @@
       "pushedTo": [
         "prod"
       ]
+    },
+    {
+      "id": "b444eabf-d1b2-4eb1-a957-6322dd3a3172",
+      "date": "2026-09-21T20:40:08.353Z",
+      "message": "LLM",
+      "changes": {
+        "added": [
+          "backend/public/main-7XOSXNCH.js",
+          "backend/public/styles-K6IDXB42.css"
+        ],
+        "modified": [
+          "backend/public/index.html"
+        ],
+        "deleted": [
+          "backend/public/main-HNZACXPR.js",
+          "backend/public/styles-T4IIFYJ6.css"
+        ]
+      },
+      "snapshot": {
+        "backend/.env": "c52a863171b96cc5bcd4dcb02f9007a792f1d2089df7c52bd92a794092cebf77",
+        "backend/.env.example": "17708ae05a54a66af38e7dd6c57e381ca3113b617e27ec11c110a8ae163a59f2",
+        "backend/agenda.db": "17cde3325884d62298688b843141d9acd1af3b913f282c95d88e72dba61da8fd",
+        "backend/async-route.js": "1cecfd2b97b0bcf687cf39f0c1ce2dc2fd451fdc5df6592b1f7397a79bb9d1c6",
+        "backend/db.js": "f36be618cd3effc9e74336d7c751c0f79d321ed38349fedd396affdd231a070a",
+        "backend/ecosystem.config.cjs": "be060f37cd4d8be6bb7af99d30402b5c82bd7fe79baa32d2d416a9aa651332f6",
+        "backend/index.js": "dd380107370ec5e6bdbea1ca8f1103d429593154d7d854d8e5c2c0e5eb07f966",
+        "backend/mcp/agenda-tools.js": "0f42bc18b166330ff56d8e152fdf6bfc602c38775f842a5f491ca4b59fc5ce87",
+        "backend/mcp/http-handler.js": "5229d6fd8f20a1a0470241432c871d6521afd36056ba56d3a5a654e73add22d0",
+        "backend/mcp/system-tools.js": "a196b7d4e4c528679c458f6eab7cbc991216220eb43d8935bc84f8cb23124e6e",
+        "backend/package-lock.json": "a934b683e14af0f534c13d5322ef2bc8c97a55d793f80c296e13f65e360ef164",
+        "backend/package.json": "8c4556729fc41b2c6c9e4455a524d5e6ad90c8d3f861b3f3426c95fb68b14bbd",
+        "backend/public/3rdpartylicenses.txt": "81dc14610d3e1f586d37e114f4a72bf4c51ee275a4447533da976add4c2e2996",
+        "backend/public/assets/header-transparent.png": "6c48c9e8ec4f88c555e8db4af36d90d8322c557a22cac7b9b1ce440c9a05c8d9",
+        "backend/public/assets/header.jfif": "324252369933f4a073666db720fefefeecdd8d971e93306800c51e1b8d0fc7b6",
+        "backend/public/assets/livro-doce-brinquedo.svg": "e4c266db56a4f6aaae28c6be679a62b4b5b89598d15e82684f633a0e68a73439",
+        "backend/public/assets/sidebar.jpg": "fcecfcfa1f50a19c041215329e7c48d8c8cd88e56edd654b6e228dbaf3279653",
+        "backend/public/chunk-76RLDR24.js": "6f58bf4121e4807d9714cc4116bec9a07817c7d67bc984b43cef4424edcd2fd6",
+        "backend/public/chunk-NPTRQVJI.js": "6c4626a88e00baec2ffa854c8c0a9c8b31d089ef928a87867c7729019e4c2a85",
+        "backend/public/downloads/Agenda.Notifier.exe": "15762be24f51ca6015a7cea3f612ff41de578e788c16afc627616b4a23dd7237",
+        "backend/public/favicon-doce.png": "58d60b5dbc87a7f612a0ab6ae5ca624d616819d068b450e4162ebb2046dc9013",
+        "backend/public/favicon.ico": "f9102be80297c0529207607be5277b4f90bca89d65988fa1771b91c7894e815f",
+        "backend/public/header-favicon.jpg": "324252369933f4a073666db720fefefeecdd8d971e93306800c51e1b8d0fc7b6",
+        "backend/public/header.jfif": "324252369933f4a073666db720fefefeecdd8d971e93306800c51e1b8d0fc7b6",
+        "backend/public/index.html": "8e090e4cc25c723ba80a2fe150d72ac30d2e1a432b5e55e7c0c630c1d00cb2ec",
+        "backend/public/main-7XOSXNCH.js": "5fa8fa9842e85c695546a01bb019f1554f35778a460195326ac60d6650d868fe",
+        "backend/public/polyfills-RV3JTMEC.js": "ada6406bce793942b50bd47a7b63d72f69c8964fbc785e25043eedb19da4a32d",
+        "backend/public/prerendered-routes.json": "a79ddcc8a115190e9c19479ed36914741a7d1db74f0a1153529efc80725505fe",
+        "backend/public/sidebar-icon.png": "58d60b5dbc87a7f612a0ab6ae5ca624d616819d068b450e4162ebb2046dc9013",
+        "backend/public/sidebar.jpg": "fcecfcfa1f50a19c041215329e7c48d8c8cd88e56edd654b6e228dbaf3279653",
+        "backend/public/sidebar.png": "3638c4ce6f84f64b97426858ea40ac2d1b8d4e334d61d7ada9b6d37e77e546b6",
+        "backend/public/styles-K6IDXB42.css": "aeee8e86bba74515f283b078848ca58adbd602bb2d9cafa2907eae55af10826f",
+        "backend/realtime-auth.js": "6daa6b789c5fc5e06308690918aec593db89e1cd4847d97ab8df389a56e5fff4",
+        "backend/routes/ai.js": "9f2ac6ff42dd8e55fd628cc1358787bc65bbe521593dfcd98dad23ecd95f0423",
+        "backend/routes/attachments.js": "41cf830cc79d804c415c56154c50c833eb36e1f8a7622b17989258c8b9903bc6",
+        "backend/routes/calendars.js": "813c726bda857a96fe4cbe37ab092840b017a7bf167d84e11edebcf11e68c542",
+        "backend/routes/events.js": "21579cb429dcf2b51b359a85105c1d8a512f0d6af8a013d2f767fb4dcdec78d6",
+        "backend/routes/kanban.js": "35a16e5bc4fe84599ae1b9915c676819132bb4b869c49d6a704e7ba5e81a6417",
+        "backend/routes/members.js": "bec76c4434f630f765fa98b62368f1824d396e5bf4bb6fd0ed263b2cf5b1709f",
+        "backend/routes/notifications.js": "45d044c9229517b991adfab485a36d0bd216bbba6fd68a892ee0c445cce78c5f",
+        "backend/routes/privacy.js": "810dc421504cd21df484e5e9ffbcc0a3409a4dcc052d4a64929ce01162f6d777",
+        "backend/scripts/generate-lgpd-report.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "backend/scripts/generate-security-report.js": "03e3c74256e76ceb1c50ac8e1fc0159e472df4e60a66f21c2797b203ec7a0a65",
+        "backend/scripts/migrate-sqlite-to-postgres.js": "fbd63c4917c7098a678831e89ffc0a6cca1e7c63f8dd18d610dfea5d77907ae8",
+        "backend/scripts/security-setup.sql": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "backend/scripts/setup-postgres.js": "63800ae4a10a27a15bba6af64e1d6ab9ecd3db8215148f99485e6740dc923b5b",
+        "backend/test/ai.test.js": "0453324e5d4492afa32cdbc02031e38d4afe5f45e6b3d277175596d5b217f8f5",
+        "backend/test/mcp.test.js": "b8adcbc63691cfd77dc2064551fb7c059e39bec6de38063e5385ff3fdae890a5",
+        "backend/test/notifications.test.js": "214f60fc2f6ad07585a9ca04cbb762c26608eda0fa96a5b68bf54db4bdc9c70d",
+        "backend/test/realtime-auth.test.js": "49cde2abb4ba815dd874d4b9468afc2a24d8c737d0c0e9e3bcf6a168b3d66bcd",
+        "backend/test/routes.test.js": "b142af45f2f39bf8e4645b99cf1d42e8da036c070dcc5e6616c07ef1801b54dd",
+        "backend/test/validation.test.js": "4617da9aa5f3682ed25ff6515284b49f378e8b2472c9d39e1d2e5935b5ee7a85",
+        "backend/validation.js": "10aa57ce2629ca536a08bc14645478613c87c6c47df8fd2eb60aac387a721682"
+      },
+      "pushed": false,
+      "pushedTo": [
+        "prod"
+      ]
+    },
+    {
+      "id": "7db8f169-6051-4f9a-aec2-1a5cbe595528",
+      "date": "2026-09-22T11:22:25.683Z",
+      "message": "fix",
+      "changes": {
+        "added": [
+          "backend/public/CaduMaverick_.jpg",
+          "backend/public/assets/CaduMaverick_.jpg",
+          "backend/public/media/CaduMaverick_-R4CXFYUG.jpg",
+          "backend/public/styles-BQ5CQJML.css"
+        ],
+        "modified": [
+          "backend/public/index.html"
+        ],
+        "deleted": [
+          "backend/public/styles-K6IDXB42.css"
+        ]
+      },
+      "snapshot": {
+        "backend/.env": "c52a863171b96cc5bcd4dcb02f9007a792f1d2089df7c52bd92a794092cebf77",
+        "backend/.env.example": "17708ae05a54a66af38e7dd6c57e381ca3113b617e27ec11c110a8ae163a59f2",
+        "backend/agenda.db": "17cde3325884d62298688b843141d9acd1af3b913f282c95d88e72dba61da8fd",
+        "backend/async-route.js": "1cecfd2b97b0bcf687cf39f0c1ce2dc2fd451fdc5df6592b1f7397a79bb9d1c6",
+        "backend/db.js": "f36be618cd3effc9e74336d7c751c0f79d321ed38349fedd396affdd231a070a",
+        "backend/ecosystem.config.cjs": "be060f37cd4d8be6bb7af99d30402b5c82bd7fe79baa32d2d416a9aa651332f6",
+        "backend/index.js": "dd380107370ec5e6bdbea1ca8f1103d429593154d7d854d8e5c2c0e5eb07f966",
+        "backend/mcp/agenda-tools.js": "0f42bc18b166330ff56d8e152fdf6bfc602c38775f842a5f491ca4b59fc5ce87",
+        "backend/mcp/http-handler.js": "5229d6fd8f20a1a0470241432c871d6521afd36056ba56d3a5a654e73add22d0",
+        "backend/mcp/system-tools.js": "a196b7d4e4c528679c458f6eab7cbc991216220eb43d8935bc84f8cb23124e6e",
+        "backend/package-lock.json": "a934b683e14af0f534c13d5322ef2bc8c97a55d793f80c296e13f65e360ef164",
+        "backend/package.json": "8c4556729fc41b2c6c9e4455a524d5e6ad90c8d3f861b3f3426c95fb68b14bbd",
+        "backend/public/3rdpartylicenses.txt": "81dc14610d3e1f586d37e114f4a72bf4c51ee275a4447533da976add4c2e2996",
+        "backend/public/assets/CaduMaverick_.jpg": "b9288446bbf381f6ed76626b6c195fa7832defba92e54563c63ce3ebca45b017",
+        "backend/public/assets/header-transparent.png": "6c48c9e8ec4f88c555e8db4af36d90d8322c557a22cac7b9b1ce440c9a05c8d9",
+        "backend/public/assets/header.jfif": "324252369933f4a073666db720fefefeecdd8d971e93306800c51e1b8d0fc7b6",
+        "backend/public/assets/livro-doce-brinquedo.svg": "e4c266db56a4f6aaae28c6be679a62b4b5b89598d15e82684f633a0e68a73439",
+        "backend/public/assets/sidebar.jpg": "fcecfcfa1f50a19c041215329e7c48d8c8cd88e56edd654b6e228dbaf3279653",
+        "backend/public/CaduMaverick_.jpg": "b9288446bbf381f6ed76626b6c195fa7832defba92e54563c63ce3ebca45b017",
+        "backend/public/chunk-76RLDR24.js": "6f58bf4121e4807d9714cc4116bec9a07817c7d67bc984b43cef4424edcd2fd6",
+        "backend/public/chunk-NPTRQVJI.js": "6c4626a88e00baec2ffa854c8c0a9c8b31d089ef928a87867c7729019e4c2a85",
+        "backend/public/downloads/Agenda.Notifier.exe": "15762be24f51ca6015a7cea3f612ff41de578e788c16afc627616b4a23dd7237",
+        "backend/public/favicon-doce.png": "58d60b5dbc87a7f612a0ab6ae5ca624d616819d068b450e4162ebb2046dc9013",
+        "backend/public/favicon.ico": "f9102be80297c0529207607be5277b4f90bca89d65988fa1771b91c7894e815f",
+        "backend/public/header-favicon.jpg": "324252369933f4a073666db720fefefeecdd8d971e93306800c51e1b8d0fc7b6",
+        "backend/public/header.jfif": "324252369933f4a073666db720fefefeecdd8d971e93306800c51e1b8d0fc7b6",
+        "backend/public/index.html": "0a42982f67845c4f449520f3e00a29b22b5c42df36035513e298ba203c9608fa",
+        "backend/public/main-7XOSXNCH.js": "5fa8fa9842e85c695546a01bb019f1554f35778a460195326ac60d6650d868fe",
+        "backend/public/media/CaduMaverick_-R4CXFYUG.jpg": "b9288446bbf381f6ed76626b6c195fa7832defba92e54563c63ce3ebca45b017",
+        "backend/public/polyfills-RV3JTMEC.js": "ada6406bce793942b50bd47a7b63d72f69c8964fbc785e25043eedb19da4a32d",
+        "backend/public/prerendered-routes.json": "a79ddcc8a115190e9c19479ed36914741a7d1db74f0a1153529efc80725505fe",
+        "backend/public/sidebar-icon.png": "58d60b5dbc87a7f612a0ab6ae5ca624d616819d068b450e4162ebb2046dc9013",
+        "backend/public/sidebar.jpg": "fcecfcfa1f50a19c041215329e7c48d8c8cd88e56edd654b6e228dbaf3279653",
+        "backend/public/sidebar.png": "3638c4ce6f84f64b97426858ea40ac2d1b8d4e334d61d7ada9b6d37e77e546b6",
+        "backend/public/styles-BQ5CQJML.css": "3b0bb4aacc98f79a6b232e7abe41beb23f7775f701b92b89b75104bf45122b38",
+        "backend/realtime-auth.js": "6daa6b789c5fc5e06308690918aec593db89e1cd4847d97ab8df389a56e5fff4",
+        "backend/routes/ai.js": "9f2ac6ff42dd8e55fd628cc1358787bc65bbe521593dfcd98dad23ecd95f0423",
+        "backend/routes/attachments.js": "41cf830cc79d804c415c56154c50c833eb36e1f8a7622b17989258c8b9903bc6",
+        "backend/routes/calendars.js": "813c726bda857a96fe4cbe37ab092840b017a7bf167d84e11edebcf11e68c542",
+        "backend/routes/events.js": "21579cb429dcf2b51b359a85105c1d8a512f0d6af8a013d2f767fb4dcdec78d6",
+        "backend/routes/kanban.js": "35a16e5bc4fe84599ae1b9915c676819132bb4b869c49d6a704e7ba5e81a6417",
+        "backend/routes/members.js": "bec76c4434f630f765fa98b62368f1824d396e5bf4bb6fd0ed263b2cf5b1709f",
+        "backend/routes/notifications.js": "45d044c9229517b991adfab485a36d0bd216bbba6fd68a892ee0c445cce78c5f",
+        "backend/routes/privacy.js": "810dc421504cd21df484e5e9ffbcc0a3409a4dcc052d4a64929ce01162f6d777",
+        "backend/scripts/generate-lgpd-report.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "backend/scripts/generate-security-report.js": "03e3c74256e76ceb1c50ac8e1fc0159e472df4e60a66f21c2797b203ec7a0a65",
+        "backend/scripts/migrate-sqlite-to-postgres.js": "fbd63c4917c7098a678831e89ffc0a6cca1e7c63f8dd18d610dfea5d77907ae8",
+        "backend/scripts/security-setup.sql": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "backend/scripts/setup-postgres.js": "63800ae4a10a27a15bba6af64e1d6ab9ecd3db8215148f99485e6740dc923b5b",
+        "backend/test/ai.test.js": "0453324e5d4492afa32cdbc02031e38d4afe5f45e6b3d277175596d5b217f8f5",
+        "backend/test/mcp.test.js": "b8adcbc63691cfd77dc2064551fb7c059e39bec6de38063e5385ff3fdae890a5",
+        "backend/test/notifications.test.js": "214f60fc2f6ad07585a9ca04cbb762c26608eda0fa96a5b68bf54db4bdc9c70d",
+        "backend/test/realtime-auth.test.js": "49cde2abb4ba815dd874d4b9468afc2a24d8c737d0c0e9e3bcf6a168b3d66bcd",
+        "backend/test/routes.test.js": "b142af45f2f39bf8e4645b99cf1d42e8da036c070dcc5e6616c07ef1801b54dd",
+        "backend/test/validation.test.js": "4617da9aa5f3682ed25ff6515284b49f378e8b2472c9d39e1d2e5935b5ee7a85",
+        "backend/validation.js": "10aa57ce2629ca536a08bc14645478613c87c6c47df8fd2eb60aac387a721682"
+      },
+      "pushed": false,
+      "pushedTo": [
+        "prod"
+      ]
     }
   ],
   "lastPush": {
-    "date": "2026-09-21T20:33:29.264Z",
-    "backupFile": "c:/server/BKS/BKP-Agenda/backup_20260921_173325.tar.gz",
+    "date": "2026-09-22T11:22:39.612Z",
+    "backupFile": "c:/server/BKS/BKP-Agenda/backup_20260922_082234.tar.gz",
     "commitIds": [
-      "2be1665b-c6da-4e9c-bd63-25309a9cd398"
+      "7db8f169-6051-4f9a-aec2-1a5cbe595528"
     ]
   },
   "lastPushes": {
@@ -3340,10 +3498,10 @@
       ]
     },
     "prod": {
-      "date": "2026-09-21T20:33:29.264Z",
-      "backupFile": "c:/server/BKS/BKP-Agenda/backup_20260921_173325.tar.gz",
+      "date": "2026-09-22T11:22:39.612Z",
+      "backupFile": "c:/server/BKS/BKP-Agenda/backup_20260922_082234.tar.gz",
       "commitIds": [
-        "2be1665b-c6da-4e9c-bd63-25309a9cd398"
+        "7db8f169-6051-4f9a-aec2-1a5cbe595528"
       ]
     }
   }

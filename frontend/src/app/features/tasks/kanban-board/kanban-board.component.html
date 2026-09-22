@@ -1,4 +1,20 @@
 <div class="kanban-shell" (click)="closeContextMenus()">
+  <!-- ══════════════ CABEÇALHO DE IMPRESSÃO (PRINT ONLY) ══════════════ -->
+  <header class="kanban-print-header" *ngIf="board() as currentBoard" [hidden]="printingSingleTask()">
+    <div class="print-header-brand">
+      <div class="print-header-logo">
+        <img src="sidebar.png" alt="Logo" class="print-logo-img">
+      </div>
+      <div class="print-header-titles">
+        <h1 class="print-title">Quadro Kanban</h1>
+        <p class="print-subtitle">Sistema de Gestão de Tarefas • {{ currentBoard.name || 'Gelelê' }}</p>
+      </div>
+    </div>
+    <div class="print-header-meta">
+      <span>Impresso em {{ printDateTime() }}</span>
+    </div>
+  </header>
+
   <header class="kanban-toolbar group-panel">
     <div class="board-heading">
       <span class="board-mark" [style.background]="board()?.color || 'var(--brand-500)'"><mat-icon>view_kanban</mat-icon></span>
@@ -12,6 +28,7 @@
     </div>
 
     <div class="toolbar-actions">
+      <button class="secondary-btn print-btn-action" (click)="printBoard()" matTooltip="Imprimir quadro Kanban"><mat-icon>print</mat-icon>Imprimir</button>
       <button class="secondary-btn" (click)="openTeamManager()"><mat-icon>groups</mat-icon>Gerenciar times</button>
       <button class="primary-btn" (click)="openCreate()"><mat-icon>add</mat-icon>Nova tarefa</button>
     </div>
@@ -58,8 +75,8 @@
   <div class="loading-state" *ngIf="loading()"><span class="spinner"></span>Carregando quadro...</div>
   <div class="error-banner" *ngIf="service.error()"><mat-icon>error_outline</mat-icon>{{ service.error() }}<button (click)="service.error.set('')"><mat-icon>close</mat-icon></button></div>
 
-  <main class="board-canvas" *ngIf="board() as currentBoard">
-    <section class="kanban-column" *ngFor="let column of currentBoard.columns; trackBy: trackById">
+  <main class="board-canvas" *ngIf="board() as currentBoard" [hidden]="printingSingleTask()">
+    <section class="kanban-column" *ngFor="let column of currentBoard.columns; let colIndex = index; trackBy: trackById" [style.--col-print-color]="columnPrintColor(column, colIndex)" [style.--col-print-bg]="columnPrintBg(column, colIndex)">
       <header class="column-header">
         <span class="column-accent" [style.background]="column.color"></span>
         <span class="column-title">{{ column.title }}</span>
@@ -100,8 +117,32 @@
             </div>
             <div class="assignee-stack" *ngIf="task.assigneeIds.length"><img *ngFor="let assigneeId of task.assigneeIds | slice:0:3" class="assignee-avatar" [src]="assigneeAvatar(assigneeId)" [alt]="assigneeName(assigneeId)" [matTooltip]="assigneeName(assigneeId)" (error)="$any($event.target).src = defaultAvatar"><span *ngIf="task.assigneeIds.length > 3">+{{ task.assigneeIds.length - 3 }}</span></div>
           </footer>
+
+          <!-- ── Elementos exclusivos para impressão ── -->
+          <div class="print-card-content">
+            <div class="print-card-title">{{ task.title }}</div>
+            <div class="print-card-meta">
+              <span class="print-priority-badge" [attr.data-priority]="task.priority">{{ task.priority === 'urgent' ? 'Alta' : task.priority === 'high' ? 'Alta' : task.priority === 'low' ? 'Baixa' : 'Média' }}</span>
+              <span class="print-card-date" *ngIf="task.dueDate">{{ formatFullDate(task.dueDate) }}</span>
+            </div>
+            <div class="print-card-assignee" *ngIf="task.assigneeIds.length">
+              {{ assigneeNames(task) }}
+            </div>
+            <div class="print-card-labels" *ngIf="task.labels.length">
+              <span *ngFor="let label of task.labels" class="print-label-tag">#{{ label.startsWith('#') ? label.substring(1) : label }}</span>
+            </div>
+            <div class="print-checklist" *ngIf="task.checklist.length">
+              <div class="print-checklist-item" *ngFor="let item of task.checklist">
+                <span class="print-checklist-box" [class.done]="item.done">{{ item.done ? '☑' : '☐' }}</span>
+                <span class="print-checklist-text" [class.done]="item.done">{{ item.text }}</span>
+              </div>
+            </div>
+          </div>
         </article>
         <div class="empty-column" *ngIf="!tasksFor(column.id).length && dragOverColumnId() !== column.id"><mat-icon>inbox</mat-icon><span>{{ showArchived() ? 'Nenhuma arquivada' : 'Arraste uma tarefa para cá' }}</span></div>
+        <div class="print-empty-column" *ngIf="!tasksFor(column.id).length">
+          <span>Nenhum item</span>
+        </div>
       </div>
       <button class="add-card-btn" (click)="openCreate(column.id)" *ngIf="!showArchived()"><mat-icon>add</mat-icon>Adicionar tarefa</button>
     </section>
@@ -111,6 +152,100 @@
       <form *ngIf="addingColumn()" (ngSubmit)="saveColumn()"><input [(ngModel)]="newColumnTitle" name="columnTitle" placeholder="Nome da lista" maxlength="60" autofocus><div><button class="primary-btn" type="submit">Adicionar</button><button class="icon-btn" type="button" (click)="addingColumn.set(false)"><mat-icon>close</mat-icon></button></div></form>
     </section>
   </main>
+  
+  <!-- ══════════════ FICHA INDIVIDUAL DA TAREFA (PRINT ONLY) ══════════════ -->
+  <div class="single-task-print-sheet" *ngIf="printingSingleTask()">
+    <header class="single-task-print-header">
+      <div class="single-task-brand">
+        <img src="sidebar.png" alt="Logo" class="print-logo-img">
+        <div>
+          <h2>Ficha de Tarefa</h2>
+          <p>{{ board()?.name || 'Quadro Kanban' }} · {{ board()?.scopeType === 'team' ? (board()?.teamName || currentTeam()?.name || 'Time') : 'Espaço Pessoal' }}</p>
+        </div>
+      </div>
+      <div class="single-task-meta-top">
+        <span class="single-task-stage-badge">{{ columnTitle(draft.columnId) }}</span>
+        <span class="single-task-date">Impresso em {{ printDateTime() }}</span>
+      </div>
+    </header>
+
+    <main class="single-task-print-body">
+      <div class="single-task-title-box">
+        <div class="single-task-badge-row">
+          <span class="single-task-priority-badge" [attr.data-priority]="draft.priority">
+            Prioridade {{ draft.priority === 'urgent' ? 'Urgente' : draft.priority === 'high' ? 'Alta' : draft.priority === 'low' ? 'Baixa' : 'Média' }}
+          </span>
+          <span class="single-task-due" *ngIf="draft.dueDate">Prazo: {{ formatFullDate(draft.dueDate) }}</span>
+        </div>
+        <h1 class="single-task-main-title">{{ draft.title || 'Sem título' }}</h1>
+      </div>
+
+      <div class="single-task-grid-info">
+        <div class="info-card">
+          <span class="info-label">Etapa atual</span>
+          <strong class="info-value">{{ columnTitle(draft.columnId) }}</strong>
+        </div>
+        <div class="info-card">
+          <span class="info-label">Responsáveis</span>
+          <strong class="info-value">{{ draftAssigneeNames() }}</strong>
+        </div>
+        <div class="info-card">
+          <span class="info-label">Prazo de Conclusão</span>
+          <strong class="info-value">{{ draft.dueDate ? formatFullDate(draft.dueDate) : 'Não definido' }}</strong>
+        </div>
+        <div class="info-card">
+          <span class="info-label">Quadro / Time</span>
+          <strong class="info-value">{{ board()?.name || 'Geral' }}</strong>
+        </div>
+      </div>
+
+      <div class="single-task-section" *ngIf="draftLabels().length">
+        <span class="section-title">Etiquetas</span>
+        <div class="single-task-labels-list">
+          <span *ngFor="let label of draftLabels()" class="single-task-tag">#{{ label.startsWith('#') ? label.substring(1) : label }}</span>
+        </div>
+      </div>
+
+      <div class="single-task-section" *ngIf="draft.description">
+        <span class="section-title">Descrição</span>
+        <div class="single-task-description-box">
+          <app-markdown-text [text]="draft.description" />
+        </div>
+      </div>
+
+      <div class="single-task-section" *ngIf="draft.checklist.length">
+        <span class="section-title">Checklist ({{ draft.checklist.filter(item => item.done).length }}/{{ draft.checklist.length }} itens)</span>
+        <div class="single-task-checklist-list">
+          <div class="single-task-check-row" *ngFor="let item of draft.checklist">
+            <span class="check-box" [class.done]="item.done">{{ item.done ? '☑' : '☐' }}</span>
+            <span class="check-text" [class.done]="item.done">{{ item.text }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="single-task-section" *ngIf="taskAttachments.length">
+        <span class="section-title">Anexos Vinculados ({{ taskAttachments.length }})</span>
+        <div class="single-task-attachments-list">
+          <div class="attachment-row" *ngFor="let att of taskAttachments">
+            <span class="att-name">📎 {{ att.fileName }}</span>
+            <span class="att-size">({{ att.byteSize / 1048576 | number:'1.0-2' }} MB)</span>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <footer class="single-task-print-footer">
+      <span>Agenda Corporativa • Sistema de Gestão de Tarefas • Ficha de Tarefa Oficial</span>
+      <span>Página 1 de 1</span>
+    </footer>
+  </div>
+
+  <!-- ══════════════ RODAPÉ DE IMPRESSÃO (PRINT ONLY) ══════════════ -->
+  <footer class="kanban-print-footer" [hidden]="printingSingleTask()">
+    <span class="print-footer-left">{{ board()?.name || 'Gelelê' }} • Kanban System • Layout otimizado para impressão</span>
+    <span class="print-footer-right">Página 1 de 1</span>
+  </footer>
+
 </div>
 
 <div class="team-context-menu" *ngIf="teamContextMenu() as menu" [style.left.px]="menu.x" [style.top.px]="menu.y" (click)="$event.stopPropagation()">
@@ -256,7 +391,7 @@
 
 <div class="task-modal-backdrop" *ngIf="modalOpen()" (mousedown)="closeTaskModal()">
   <section class="task-modal" role="dialog" aria-modal="true" aria-labelledby="task-modal-title" (mousedown)="$event.stopPropagation()">
-    <header><div class="modal-icon"><mat-icon>{{ editingId() ? 'edit_note' : 'add_task' }}</mat-icon></div><div><h2 id="task-modal-title">{{ editingId() ? 'Detalhes da tarefa' : 'Nova tarefa' }}</h2><p>Organize informações e acompanhe o progresso.</p></div><button class="icon-btn" (click)="closeTaskModal()"><mat-icon>close</mat-icon></button></header>
+    <header><div class="modal-icon"><mat-icon>{{ editingId() ? 'edit_note' : 'add_task' }}</mat-icon></div><div><h2 id="task-modal-title">{{ editingId() ? 'Detalhes da tarefa' : 'Nova tarefa' }}</h2><p>Organize informações e acompanhe o progresso.</p></div><button class="icon-btn" type="button" (click)="printSingleTask()" matTooltip="Imprimir esta tarefa"><mat-icon>print</mat-icon></button><button class="icon-btn" (click)="closeTaskModal()"><mat-icon>close</mat-icon></button></header>
     <div class="modal-body">
       <label class="field full"><span>Título *</span><input [(ngModel)]="draft.title" maxlength="160" placeholder="O que precisa ser feito?" autofocus></label>
       <div class="field full"><div class="description-header"><span>Descrição</span><app-ai-text-button [text]="draft.description" (textChange)="draft.description = $event" /></div><app-markdown-editor [text]="draft.description" (textChange)="draft.description = $event" [maxLength]="5000" placeholder="Adicione contexto, links ou critérios de aceite..." ariaLabel="Descrição da tarefa" /></div>
@@ -297,7 +432,7 @@
         <iframe *ngIf='attachmentPreviewMimeType() === "application/pdf"' [src]='trustedAttachmentPreviewUrl()' [title]='attachmentPreviewName()'></iframe>
       </section>
     </div>
-    <footer><div><button *ngIf="editingId() && !showArchived()" class="archive-btn" [disabled]="savingTask()" (click)="archiveEditing()"><mat-icon>archive</mat-icon>Arquivar</button><button *ngIf="editingId() && !showArchived()" class="subtasks-btn" [disabled]="savingTask()" (click)="openEditingChildBoard()"><mat-icon>account_tree</mat-icon>Subtarefas</button><button *ngIf="editingId() && showArchived()" class="archive-btn" [disabled]="savingTask()" (click)="archiveEditing()"><mat-icon>unarchive</mat-icon>Restaurar</button><button *ngIf="editingId() && canDeleteTasks()" class="delete-btn" [disabled]="savingTask()" (click)="deleteEditing()"><mat-icon>delete_outline</mat-icon>Lixeira</button></div><div><button class="cancel-btn" [disabled]="savingTask()" (click)="closeTaskModal()">Cancelar</button><button class="primary-btn" [disabled]="savingTask() || !draft.title.trim()" (click)="saveTask()"><mat-icon>{{ savingTask() ? 'hourglass_top' : 'save' }}</mat-icon>{{ savingTask() ? 'Salvando...' : 'Salvar tarefa' }}</button></div></footer>
+    <footer><div><button *ngIf="editingId() && !showArchived()" class="archive-btn" [disabled]="savingTask()" (click)="archiveEditing()"><mat-icon>archive</mat-icon>Arquivar</button><button *ngIf="editingId() && !showArchived()" class="subtasks-btn" [disabled]="savingTask()" (click)="openEditingChildBoard()"><mat-icon>account_tree</mat-icon>Subtarefas</button><button *ngIf="editingId() && showArchived()" class="archive-btn" [disabled]="savingTask()" (click)="archiveEditing()"><mat-icon>unarchive</mat-icon>Restaurar</button><button *ngIf="editingId() && canDeleteTasks()" class="delete-btn" [disabled]="savingTask()" (click)="deleteEditing()"><mat-icon>delete_outline</mat-icon>Lixeira</button></div><div><button type="button" class="secondary-btn print-task-btn" (click)="printSingleTask()"><mat-icon>print</mat-icon>Imprimir</button><button class="cancel-btn" [disabled]="savingTask()" (click)="closeTaskModal()">Cancelar</button><button class="primary-btn" [disabled]="savingTask() || !draft.title.trim()" (click)="saveTask()"><mat-icon>{{ savingTask() ? 'hourglass_top' : 'save' }}</mat-icon>{{ savingTask() ? 'Salvando...' : 'Salvar tarefa' }}</button></div></footer>
   </section>
 </div>
 

@@ -19,8 +19,9 @@ export class ThemeToggleComponent {
   get title(): string {
     const t = this.theme.theme();
     if (t === 'dark-angel' || t === 'light-angel') return 'Modo Angelical — clique para alternar modo claro/escuro';
-    if (t === 'dark-demon' || t === 'light-demon')  return 'Modo Demoníaco — clique para alternar modo claro/escuro';
-    if (t === 'dark')        return 'Ativar modo claro';
+    if (t === 'dark-demon' || t === 'light-demon') return 'Modo Demoníaco — clique para alternar modo claro/escuro';
+    if (t === 'dark-cadu' || t === 'light-cadu') return 'Modo Cadu Maverick 🏄‍♂️ — clique para alternar entre Sol e Noite na Ilha Pen Gu';
+    if (t === 'dark') return 'Ativar modo claro';
     return 'Ativar modo escuro';
   }
 }

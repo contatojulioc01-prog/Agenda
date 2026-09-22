@@ -3,16 +3,17 @@
   [class.dark]="theme.isDark()"
   [class.angel]="theme.realm() === 'angel'"
   [class.demon]="theme.realm() === 'demon'"
+  [class.cadu]="theme.realm() === 'cadu'"
   (click)="toggle()"
   [title]="title"
   id="btn-theme-toggle"
 >
-  <!-- ── Efeito de aura (angel / demon) ── -->
+  <!-- ── Efeito de aura (angel / demon / cadu) ── -->
   <span class="realm-aura"></span>
   <span class="realm-ring"></span>
 
   <!-- ── Asa esquerda (angel) ── -->
-  <span class="realm-badge badge-left">
+  <span class="realm-badge badge-left" *ngIf="theme.realm() === 'angel'">
     <svg class="wing-svg" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M28 38 C20 30, 4 28, 2 10 C8 16, 14 14, 18 20 C14 12, 20 6, 28 2 C22 14, 26 24, 28 38Z"
             fill="url(#wingGrad)" opacity="0.9"/>
@@ -29,7 +30,7 @@
   </span>
 
   <!-- ── Chifre esquerdo (demon) ── -->
-  <span class="realm-badge badge-left">
+  <span class="realm-badge badge-left" *ngIf="theme.realm() === 'demon'">
     <svg class="horn-svg" viewBox="0 0 20 36" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M10 34 C8 26, 2 18, 4 6 C7 10, 9 14, 10 20 C11 14, 14 10, 16 4 C18 16, 14 26, 10 34Z"
             fill="url(#hornGrad)" opacity="0.9"/>
@@ -39,6 +40,22 @@
           <stop offset="0%" stop-color="#7f0000"/>
           <stop offset="50%" stop-color="#dc2626"/>
           <stop offset="100%" stop-color="#ff6b2b"/>
+        </linearGradient>
+      </defs>
+    </svg>
+  </span>
+
+  <!-- ── Prancha de Surf / Onda (cadu) ── -->
+  <span class="realm-badge badge-left" *ngIf="theme.realm() === 'cadu'">
+    <svg class="surf-svg" viewBox="0 0 24 38" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 2 C18 10, 22 24, 18 36 C14 38, 10 38, 6 36 C2 24, 6 10, 12 2Z"
+            fill="url(#surfGrad)" opacity="0.95"/>
+      <path d="M12 4 L12 34" stroke="#ffffff" stroke-width="1.2" stroke-linecap="round" opacity="0.8"/>
+      <defs>
+        <linearGradient id="surfGrad" x1="12" y1="2" x2="12" y2="36" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#06b6d4"/>
+          <stop offset="50%" stop-color="#f59e0b"/>
+          <stop offset="100%" stop-color="#ea580c"/>
         </linearGradient>
       </defs>
     </svg>
@@ -56,6 +73,7 @@
   <span class="toggle-icon icon-moon">🌙</span>
   <span class="toggle-icon icon-angel">😇</span>
   <span class="toggle-icon icon-demon">😈</span>
+  <span class="toggle-icon icon-cadu">🏄‍♂️</span>
 
   <!-- ── Thumb ── -->
   <span class="toggle-thumb"></span>

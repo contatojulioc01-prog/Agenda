@@ -90,6 +90,7 @@ export class KanbanBoardComponent implements OnDestroy {
   readonly teamDeleteLoading = signal(false);
   readonly taskDeleteLoading = signal(false);
   readonly trashActionLoading = signal(false);
+  readonly printingSingleTask = signal(false);
   readonly inviteableUsers = computed(() => [...this.auth.allUsers()].sort((first, second) =>
     (first.name || first.email || '').localeCompare(second.name || second.email || '', 'pt-BR', { sensitivity: 'base' })
   ));
@@ -148,6 +149,11 @@ export class KanbanBoardComponent implements OnDestroy {
   draft: KanbanTaskInput = this.emptyDraft('');
 
   constructor() {
+    if (typeof window !== 'undefined') {
+      window.addEventListener('afterprint', () => {
+        this.printingSingleTask.set(false);
+      });
+    }
     const updateRouteState = () => {
       const params = this.route.snapshot.paramMap;
       const query = this.route.snapshot.queryParamMap;
@@ -854,6 +860,63 @@ export class KanbanBoardComponent implements OnDestroy {
 
   formatDate(date: string | null): string {
     return date ? new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' }).format(new Date(`${date}T12:00:00`)) : '';
+  }
+
+
+  printSingleTask(): void {
+    this.printingSingleTask.set(true);
+    setTimeout(() => {
+      window.print();
+    }, 120);
+  }
+
+  columnTitle(columnId: string): string {
+    return this.board()?.columns.find(c => c.id === columnId)?.title || 'Etapa';
+  }
+
+  draftAssigneeNames(): string {
+    if (!this.draft.assigneeIds.length) return 'Não atribuído';
+    return this.draft.assigneeIds.map(id => this.assigneeName(id)).filter(Boolean).join(', ');
+  }
+
+  draftLabels(): string[] {
+    if (this.labelText) {
+      return this.labelText.split(',').map(s => s.trim()).filter(Boolean);
+    }
+    return this.draft.labels || [];
+  }
+
+  printBoard(): void {
+    window.print();
+  }
+
+  printDateTime(): string {
+    const now = new Date();
+    const dateStr = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(now);
+    const timeStr = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(now);
+    return `${dateStr}  ${timeStr}`;
+  }
+
+  formatFullDate(date: string | null): string {
+    if (!date) return '';
+    const d = new Date(`${date}T12:00:00`);
+    return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(d);
+  }
+
+  assigneeNames(task: KanbanTask): string {
+    if (!task.assigneeIds.length) return '';
+    return task.assigneeIds.map(id => this.assigneeName(id)).filter(Boolean).join(', ');
+  }
+
+  columnPrintColor(column: KanbanColumn, index: number): string {
+    if (column.color && column.color !== '#4f46e5' && column.color !== 'var(--brand-500)') return column.color;
+    const palette = ['#475569', '#f59e0b', '#8b5cf6', '#10b981', '#0ea5e9', '#ec4899', '#6366f1'];
+    return palette[index % palette.length];
+  }
+
+  columnPrintBg(column: KanbanColumn, index: number): string {
+    const bgPalette = ['#f8fafc', '#fffbeb', '#f5f3ff', '#ecfdf5', '#f0f9ff', '#fdf2f8', '#eef2ff'];
+    return bgPalette[index % bgPalette.length];
   }
 
   trackById(_: number, item: { id: string }): string { return item.id; }
