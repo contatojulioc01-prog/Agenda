@@ -1,10 +1,9 @@
 const express = require('express');
 const { executeAgendaTool, getAiToolCatalog, shouldPlanWithAgendaTools, TIME_ZONE } = require('../mcp/agenda-tools');
-
 const router = express.Router();
-const CHAT_MODEL = 'gemini-3.1-flash-lite';
+const CHAT_MODEL = process.env.AI_MODEL || 'gemini-3.5-flash-lite';
 
-const DEFAULT_SYSTEM_PROMPT = 'Você é o assistente inteligente da Agenda Corporativa Doce Brinquedo, atuando como um especialista em organização de tempo, análise de eventos e gestão de tarefas em Kanban. Responda em português do Brasil com tom profissional, clareza e formatação Markdown elegante. Regras obrigatórias: 1) A IA opera exclusivamente em modo de LEITURA (consultas e análises). Caso o usuário solicite a criação, edição ou remoção de registros, oriente-o a realizar a operação diretamente pela interface. 2) Nunca invente compromissos, equipes, quadros, cards, prazos, responsáveis, prioridades ou status fictícios. 3) Baseie-se exclusivamente nos registros reais obtidos pelas ferramentas MCP fornecidas no contexto da sessão. 4) Se as ferramentas MCP não retornarem registros correspondentes, informe com clareza o que foi consultado e que nenhum item foi encontrado. 5) EVENTOS PADRÃO (PAGAMENTOS, ADIANTAMENTOS E FERIADOS): A agenda padrão do usuário ("Minha Agenda") contém automaticamente todos os feriados nacionais, eventos de pagamento salarial (5º dia útil legal, antecipado para sexta se cair em fim de semana ou feriado) e adiantamento salarial (dia 20, antecipado para sexta se cair em fim de semana ou feriado). NUNCA pergunte em qual agenda consultar quando a pergunta for sobre datas de pagamento, salário, adiantamento salarial, vales ou feriados; consulte diretamente a agenda. 6) ESCLARECIMENTO E INTERATIVIDADE COM MÚLTIPLA ESCOLHA: Aplique perguntas de esclarecimento com opções interativas SOMENTE quando houver ambiguidade real entre múltiplos times/quadros ou agendas distintas. Formato: ```options\n{\n  "question": "De quais times você gostaria de visualizar as tarefas?",\n  "multiSelect": true,\n  "options": ["Nome 1", "Nome 2", "Todos"]\n}\n```. Para perguntas sobre dias específicos ("o que tenho hoje", "meu dia amanhã"), consulte imediatamente os eventos e tarefas desse período sem perguntar. 7) Para redações e transformações de texto, forneça diretamente a versão final pronta para uso. 8) Fuso horário corporativo padrão: America/Sao_Paulo.';
+const DEFAULT_SYSTEM_PROMPT = 'Você é o assistente inteligente da Agenda Corporativa Doce Brinquedo, atuando como um especialista em organização de tempo, análise de eventos e gestão de tarefas em Kanban. Responda em português do Brasil com tom profissional, clareza e formatação Markdown elegante. Regras obrigatórias: 1) A IA opera exclusivamente em modo de LEITURA (consultas e análises). Caso o usuário solicite a criação, edição ou remoção de registros, oriente-o a realizar a operação diretamente pela interface. 2) Nunca invente compromissos, equipes, quadros, cards, prazos, responsáveis, prioridades ou status fictícios. 3) Baseie-se exclusivamente nos registros reais obtidos pelas ferramentas MCP fornecidas no contexto da sessão. 4) Se as ferramentas MCP não retornarem registros correspondentes, informe com clareza o que foi consultado e que nenhum item foi encontrado. 5) EVENTOS PADRÃO (PAGAMENTOS, ADIANTAMENTOS E FERIADOS): A agenda padrão do usuário ("Minha Agenda") contém automaticamente todos os feriados nacionais, eventos de pagamento salarial (5º dia útil legal, antecipado para sexta se cair em fim de semana ou feriado) e adiantamento salarial (dia 20, antecipado para sexta se cair em fim de semana ou feriado). NUNCA pergunte em qual agenda consultar quando a pergunta for sobre datas de pagamento, salário, adiantamento salarial, vales ou feriados; consulte diretamente a agenda. 6) ESCLARECIMENTO E INTERATIVIDADE COM MÚLTIPLA ESCOLHA: Aplique perguntas de esclarecimento com opções interativas SOMENTE quando houver ambiguidade real entre múltiplos times/quadros ou agendas distintas. Formato: ```options\n{\n  "question": "De quais times você gostaria de visualizar as tarefas?",\n  "multiSelect": true,\n  "options": ["Nome 1", "Nome 2", "Todos"]\n}\n```. Para perguntas sobre dias específicos ("o que tenho hoje", "meu dia amanhã"), consulte imediatamente os eventos e tarefas desse período sem perguntar. 7) Para redações e transformações de texto, forneça diretamente a versão final pronta para uso. 8) Fuso horário corporativo padrão: America/Sao_Paulo. 9) RESPOSTA DIRETA AO USUÁRIO: Todas as consultas ao banco de dados e MCP JÁ FORAM EXECUTADAS pelo sistema antes de você responder. NUNCA gere blocos de código com ```mcp, ```tool, ```function, get_tasks, get_events, pseudocódigos ou instruções de chamada de ferramenta na sua resposta. Responda SEMPRE em linguagem natural e Markdown formatado diretamente ao usuário humano.';
 const MAX_MESSAGE_LENGTH = 12000;
 const MAX_MESSAGES = 30;
 const TEXT_ACTION_PROMPTS = {
@@ -232,6 +231,227 @@ function normalizeLookupText(value) {
     .trim();
 }
 
+const TOOL_ALIASES = {
+  get_tasks: 'listar_tarefas',
+  list_tasks: 'listar_tarefas',
+  search_tasks: 'listar_tarefas',
+  find_tasks: 'listar_tarefas',
+  tasks: 'listar_tarefas',
+  tarefas: 'listar_tarefas',
+
+  get_events: 'listar_eventos',
+  list_events: 'listar_eventos',
+  search_events: 'listar_eventos',
+  find_events: 'listar_eventos',
+  events: 'listar_eventos',
+  eventos: 'listar_eventos',
+
+  get_context: 'obter_contexto',
+  get_full_context: 'obter_contexto_completo',
+  context: 'obter_contexto',
+  contexto: 'obter_contexto',
+
+  get_boards: 'listar_quadros',
+  list_boards: 'listar_quadros',
+  boards: 'listar_quadros',
+  quadros: 'listar_quadros',
+
+  get_teams: 'listar_equipes',
+  list_teams: 'listar_equipes',
+  teams: 'listar_equipes',
+  equipes: 'listar_equipes',
+
+  get_columns: 'listar_colunas',
+  list_columns: 'listar_colunas',
+  columns: 'listar_colunas',
+  colunas: 'listar_colunas',
+
+  get_task: 'obter_tarefa',
+  task: 'obter_tarefa',
+  tarefa: 'obter_tarefa',
+
+  get_event: 'obter_evento',
+  event: 'obter_evento',
+  evento: 'obter_evento',
+
+  get_notifications: 'obter_configuracao_notificacoes',
+  notifications: 'obter_configuracao_notificacoes',
+  notificacoes: 'obter_configuracao_notificacoes',
+};
+
+const ARG_ALIASES = {
+  keyword: 'busca',
+  query: 'busca',
+  termo: 'busca',
+  search: 'busca',
+  filtro: 'busca',
+  texto: 'busca',
+  q: 'busca',
+
+  team: 'equipe',
+  teamname: 'equipe',
+  team_name: 'equipe',
+  time: 'equipe',
+  nome_equipe: 'equipe',
+
+  teamid: 'equipeId',
+  team_id: 'equipeId',
+  equipe_id: 'equipeId',
+
+  boardid: 'quadroId',
+  board_id: 'quadroId',
+  quadro_id: 'quadroId',
+  board: 'quadroId',
+  quadro: 'quadroId',
+
+  columnid: 'colunaId',
+  column_id: 'colunaId',
+  coluna_id: 'colunaId',
+  coluna: 'colunaId',
+
+  startdate: 'dataInicial',
+  start_date: 'dataInicial',
+  data_inicio: 'dataInicial',
+  datainicio: 'dataInicial',
+  inicio: 'dataInicial',
+
+  enddate: 'dataFinal',
+  end_date: 'dataFinal',
+  data_fim: 'dataFinal',
+  datafim: 'dataFinal',
+  fim: 'dataFinal',
+
+  taskid: 'tarefaId',
+  task_id: 'tarefaId',
+  tarefa_id: 'tarefaId',
+
+  eventid: 'eventoId',
+  event_id: 'eventoId',
+  evento_id: 'eventoId',
+};
+
+function normalizeToolName(name) {
+  if (!name || typeof name !== 'string') return '';
+  const clean = name.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+  return TOOL_ALIASES[clean] || clean;
+}
+
+function normalizeToolArguments(args) {
+  if (!args || typeof args !== 'object' || Array.isArray(args)) return {};
+  const normalized = {};
+  for (const [key, val] of Object.entries(args)) {
+    const cleanKey = key.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+    const mappedKey = ARG_ALIASES[cleanKey] || key;
+    normalized[mappedKey] = val;
+  }
+  return normalized;
+}
+
+function parsePlannerDecision(text, catalog) {
+  const raw = String(text || '').trim();
+  if (!raw) return null;
+
+  const json = extractJsonObject(raw);
+  if (json && typeof json === 'object') {
+    if (json.action === 'answer') return { action: 'answer' };
+    const rawTool = json.tool || json.call || json.name || json.function || (json.action !== 'call' && json.action !== 'answer' ? json.action : '');
+    const tool = normalizeToolName(rawTool);
+    const args = normalizeToolArguments(json.arguments || json.args || json.parameters || json.params || {});
+    if (tool && catalog.some(c => c.name === tool)) {
+      return { action: 'call', tool, arguments: args };
+    }
+  }
+
+  const mcpBlockMatch = raw.match(/```(?:mcp|tool|function|json)?\s*([\s\S]*?)\s*```/i);
+  const contentToScan = mcpBlockMatch ? mcpBlockMatch[1].trim() : raw;
+
+  const funcCallMatch = contentToScan.match(/([a-zA-Z_0-9]+)\s*\(([\s\S]*?)\)/);
+  if (funcCallMatch) {
+    const rawTool = funcCallMatch[1];
+    const tool = normalizeToolName(rawTool);
+    if (tool && catalog.some(c => c.name === tool)) {
+      const args = {};
+      const paramsText = funcCallMatch[2];
+      const paramMatches = paramsText.matchAll(/([a-zA-Z_0-9]+)\s*[:=]\s*(?:"([^"]*)"|'([^']*)'|([^,\s\)]+))/g);
+      for (const m of paramMatches) {
+        const k = m[1];
+        const v = m[2] !== undefined ? m[2] : (m[3] !== undefined ? m[3] : m[4]);
+        args[k] = v === 'true' ? true : v === 'false' ? false : v;
+      }
+      return { action: 'call', tool, arguments: normalizeToolArguments(args) };
+    }
+  }
+
+  const lines = contentToScan.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  if (lines.length > 0) {
+    const firstWord = lines[0].replace(/[^a-zA-Z0-9_]/g, '');
+    const tool = normalizeToolName(firstWord);
+    if (tool && catalog.some(c => c.name === tool)) {
+      const args = {};
+      for (let i = 1; i < lines.length; i++) {
+        const lineMatch = lines[i].match(/^([a-zA-Z_0-9]+)\s*[:=]\s*(?:"([^"]*)"|'([^']*)'|(.*))$/);
+        if (lineMatch) {
+          const k = lineMatch[1];
+          let v = lineMatch[2] !== undefined ? lineMatch[2] : (lineMatch[3] !== undefined ? lineMatch[3] : lineMatch[4]?.trim());
+          if (v === 'true') v = true;
+          else if (v === 'false') v = false;
+          args[k] = v;
+        }
+      }
+      return { action: 'call', tool, arguments: normalizeToolArguments(args) };
+    }
+  }
+
+  if (/^resposta|^responder|^answer/i.test(raw)) {
+    return { action: 'answer' };
+  }
+
+  return null;
+}
+
+async function autoHeuristicContextFallback(lastUserMessage, userId, broadcast) {
+  const transcript = [];
+  const normalized = normalizeLookupText(lastUserMessage);
+  
+  const isTaskRelated = /tarefa|tarefas|card|cards|kanban|quadro|time|times|equipe|equipes|pendencia|pendencias|fazer|atividade|atividades|linkedin|revisao/.test(normalized);
+  const isEventRelated = /evento|eventos|agenda|agendas|compromisso|compromissos|reuniao|reunioes|pagamento|adiantamento|salario|vale|feriado|feriados|hoje|amanha/.test(normalized);
+
+  if (isTaskRelated || isEventRelated) {
+    try {
+      const ctx = await executeAgendaTool('obter_contexto', {}, { userId, broadcast });
+      transcript.push(`obter_contexto: ${JSON.stringify(ctx).slice(0, 8000)}`);
+      
+      const stopwords = new Set(['verifique', 'informe', 'referente', 'sobre', 'para', 'com', 'onde', 'qual', 'quais', 'como', 'quem', 'meu', 'minha', 'dos', 'das', 'time', 'equipe', 'quadro', 'tarefa', 'tarefas', 'cards', 'card', 'agenda', 'evento', 'eventos']);
+      const words = lastUserMessage.split(/[\s,.;:!?()"'`]+/).filter(w => w.length > 2 && !stopwords.has(w.toLowerCase()));
+      const searchTerms = words.join(' ').trim();
+
+      if (isTaskRelated) {
+        const teamMatch = (ctx.quadros || []).find(b => 
+          (b.teamName && normalized.includes(normalizeLookupText(b.teamName))) ||
+          (b.name && normalized.includes(normalizeLookupText(b.name)))
+        );
+        const taskArgs = {};
+        if (teamMatch) taskArgs.quadroId = teamMatch.id;
+        if (searchTerms) taskArgs.busca = searchTerms.slice(0, 80);
+        
+        const tasks = await executeAgendaTool('listar_tarefas', taskArgs, { userId, broadcast });
+        transcript.push(`listar_tarefas: ${JSON.stringify(tasks).slice(0, 12000)}`);
+      }
+
+      if (isEventRelated) {
+        const evtArgs = {};
+        if (searchTerms) evtArgs.busca = searchTerms.slice(0, 80);
+        const events = await executeAgendaTool('listar_eventos', evtArgs, { userId, broadcast });
+        transcript.push(`listar_eventos: ${JSON.stringify(events).slice(0, 12000)}`);
+      }
+    } catch (err) {
+      console.warn('[AI MCP] Fallback heurístico:', err.message);
+    }
+  }
+
+  return transcript;
+}
+
 async function prepareAgendaContext(provider, messages, req, signal) {
   const lastUserMessage = [...messages].reverse().find(message => message.role === 'user')?.content || '';
   if (!shouldPlanWithAgendaTools(lastUserMessage)) return '';
@@ -247,42 +467,35 @@ async function prepareAgendaContext(provider, messages, req, signal) {
   const selectedNames = new Set(toolGroups.core);
   const normalizedIntent = normalizeLookupText(lastUserMessage);
   if (/agenda|evento|calendario|compromisso|reuniao|convite|membro/.test(normalizedIntent)) toolGroups.calendar.forEach(name => selectedNames.add(name));
-  if (/kanban|quadro|coluna|lista|card|tarefa|equipe|time|backlog|pendencia|fazer|atividade|lixeira/.test(normalizedIntent)) toolGroups.kanban.forEach(name => selectedNames.add(name));
+  if (/kanban|quadro|coluna|lista|card|tarefa|equipe|time|backlog|pendencia|fazer|atividade|lixeira|linkedin/.test(normalizedIntent)) toolGroups.kanban.forEach(name => selectedNames.add(name));
   if (/anexo|arquivo|documento/.test(normalizedIntent)) toolGroups.attachments.forEach(name => selectedNames.add(name));
   if (/notifica|alerta|lembrete|dispositivo|computador/.test(normalizedIntent)) toolGroups.notifications.forEach(name => selectedNames.add(name));
   if (/lgpd|privacidade|exportar meus dados|meus dados/.test(normalizedIntent)) toolGroups.privacy.forEach(name => selectedNames.add(name));
   if (selectedNames.size === toolGroups.core.length) [...toolGroups.calendar, ...toolGroups.kanban].forEach(name => selectedNames.add(name));
   const catalog = getAiToolCatalog([...selectedNames]).filter(tool => tool.readOnly);
   const transcript = [];
-  const plannerSystem = `Você é o planejador de consultas MCP (Somente Leitura / Read-Only) da Agenda Corporativa.
-Seu papel é analisar a intenção do usuário e consultar dados reais do sistema para responder às dúvidas.
+  const plannerSystem = `Você é o planejador de consultas MCP (Somente Leitura) da Agenda Corporativa.
+Seu papel é escolher qual ferramenta chamar para consultar os dados reais antes de responder ao usuário.
 Fuso horário de referência: ${TIME_ZONE}.
-IMPORTANTE: A LLM possui permissão estritamente de LEITURA. Nenhuma operação de gravação, criação, edição ou exclusão está habilitada.
-Responda EXCLUSIVAMENTE em formato JSON estruturado (sem blocos de código markdown ou texto livre).
-Para invocar uma ferramenta de consulta: {"action":"call","tool":"nome_da_ferramenta","arguments":{...}}
-Quando já tiver todos os dados necessários ou nenhuma ferramenta for necessária: {"action":"answer"}
 
-Regras de Operação e QA:
-1. NUNCA invente compromissos, equipes, quadros, tarefas, responsáveis, prazos, IDs ou nomes de agenda.
-2. Para descobrir IDs de quadros, agendas ou equipes, utilize 'obter_contexto' se ainda não tiver os dados.
+Responda EXCLUSIVAMENTE em formato JSON:
+Para consultar dados:
+{"action":"call","tool":"nome_da_ferramenta","arguments":{"param1":"valor"}}
 
-3. Para perguntas sobre PAGAMENTO SALARIAL, ADIANTAMENTO SALARIAL, VALES ou FERIADOS NACIONAIS:
-   - NUNCA pergunte ao usuário em qual agenda verificar. Esses registros pertencem à "Minha Agenda" (agenda padrão).
-   - Chame diretamente 'listar_eventos' (ex: com busca: "pagamento", busca: "adiantamento", busca: "feriado", ou com dataInicial/dataFinal) para obter as datas reais.
+Quando já tiver os dados necessários ou for conversa geral/saudação:
+{"action":"answer"}
 
-4. Para perguntas sobre AGENDA/EVENTOS ("o que tenho hoje", "o que está agendado", "compromissos de amanhã", "minha semana", etc.):
-   - Chame 'listar_eventos' com o período correspondente (hoje, amanhã, semana, mês) usando dataInicial e dataFinal.
-   - Não pergunte ao usuário se a consulta puder ser feita diretamente em todas as agendas ou na agenda padrão.
+Exemplos de chamadas:
+- Usuário: "Verifique referente a Revisão Final do time linkedin"
+  {"action":"call","tool":"listar_tarefas","arguments":{"equipe":"LinkedIn","busca":"Revisão Final"}}
+- Usuário: "Quais são as minhas equipes e quadros?"
+  {"action":"call","tool":"obter_contexto","arguments":{}}
+- Usuário: "O que tenho agendado hoje?"
+  {"action":"call","tool":"listar_eventos","arguments":{"dataInicial":"2026-09-23","dataFinal":"2026-09-23"}}
+- Usuário: "Quando cai o pagamento e adiantamento?"
+  {"action":"call","tool":"listar_eventos","arguments":{"busca":"pagamento"}}
 
-5. Para perguntas sobre TAREFAS/KANBAN ("o que tenho a fazer", "quais cards", "pendências", etc.):
-   - Chame 'obter_contexto' para mapear equipes e quadros acessíveis.
-   - Se o usuário não especificou equipe/quadro e há MÚLTIPLOS quadros: encerre com {"action":"answer"} para que o assistente pergunte em qual equipe/quadro consultar (com opções interativas).
-   - Se o usuário JÁ especificou equipe/quadro (ou respondeu à seleção interativa): chame 'listar_tarefas' com o boardId correspondente.
-
-6. Se o usuário pedir para criar, editar ou excluir registros, oriente o usuário pela interface.
-7. Faça no máximo uma chamada de ferramenta por rodada.
-
-Ferramentas de Leitura disponíveis:
+Ferramentas disponíveis:
 ${JSON.stringify(catalog)}`;
 
   const plannerSessionId = resolveSessionId(req);
@@ -304,8 +517,13 @@ ${JSON.stringify(catalog)}`;
       console.warn(`[AI MCP] ${providerErrorMessage(provider, response.status, payload)}`);
       break;
     }
-    let decision;
-    try { decision = extractJsonObject(extractCompleteText(provider, JSON.parse(payload))); } catch { decision = null; }
+    let rawText = '';
+    try {
+      rawText = extractCompleteText(provider, JSON.parse(payload));
+    } catch {
+      rawText = payload;
+    }
+    const decision = parsePlannerDecision(rawText, catalog);
     if (!decision || decision.action !== 'call' || !catalog.some(tool => tool.name === decision.tool)) break;
 
     try {
@@ -317,6 +535,12 @@ ${JSON.stringify(catalog)}`;
     } catch (error) {
       transcript.push(`${decision.tool}: ${JSON.stringify({ error: error.expose ? error.message : 'Falha ao executar a ferramenta.' })}`);
     }
+  }
+
+  // Se o modelo não conseguiu fazer nenhuma chamada ou falhou, usar fallback heurístico proativo
+  if (!transcript.length) {
+    const fallbackResults = await autoHeuristicContextFallback(lastUserMessage, req.headers['x-user-id'], req.broadcast);
+    transcript.push(...fallbackResults);
   }
 
   const compactTranscript = transcript.join('\n').slice(0, 24000);

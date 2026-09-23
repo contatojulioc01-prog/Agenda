@@ -421,10 +421,28 @@ async function executeAgendaTool(name, args = {}, context = {}) {
   }
 
   if (name === 'listar_tarefas') {
-    const access = await kanbanRouter.boardAccess(args.quadroId, userId);
-    if (!access) fail('Quadro não encontrado ou sem acesso.');
-    const values = [args.quadroId];
-    const where = ['t.board_id = $1', 't.deleted_at IS NULL'];
+    let boardIds = [];
+    if (args.quadroId) {
+      const access = await kanbanRouter.boardAccess(args.quadroId, userId);
+      if (!access) fail('Quadro não encontrado ou sem acesso.');
+      boardIds = [args.quadroId];
+    } else {
+      const boards = await listBoards(userId);
+      if (args.equipe || args.equipeId) {
+        const matchName = String(args.equipe || '').toLowerCase();
+        const filtered = boards.filter(b => 
+          (args.equipeId && b.teamId === args.equipeId) || 
+          (matchName && (String(b.teamName || '').toLowerCase().includes(matchName) || String(b.name || '').toLowerCase().includes(matchName)))
+        );
+        boardIds = (filtered.length ? filtered : boards).map(b => b.id);
+      } else {
+        boardIds = boards.map(b => b.id);
+      }
+    }
+    if (!boardIds.length) return [];
+
+    const values = [boardIds];
+    const where = ['t.board_id = ANY($1)', 't.deleted_at IS NULL'];
     if (args.colunaId) { values.push(args.colunaId); where.push(`t.column_id = $${values.length}`); }
     if (args.prioridade) { values.push(args.prioridade); where.push(`t.priority = $${values.length}`); }
     if (args.dataInicial) { values.push(args.dataInicial); where.push(`t.due_date >= $${values.length}`); }
@@ -549,7 +567,7 @@ const toolDefinitions = [
   { name: 'excluir_evento', title: 'Excluir evento', description: 'Exclui um evento e seus anexos. Exige confirmação explícita.', schema: z.object({ eventoId: z.string(), confirmar: z.literal(true) }), annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false } },
   { name: 'listar_quadros', title: 'Listar quadros Kanban', description: 'Lista quadros pessoais e de equipe acessíveis.', schema: z.object({}), annotations: { readOnlyHint: true, openWorldHint: false } },
   { name: 'listar_colunas', title: 'Listar colunas Kanban', description: 'Lista as colunas de um quadro acessível.', schema: z.object({ quadroId: z.string() }), annotations: { readOnlyHint: true, openWorldHint: false } },
-  { name: 'listar_tarefas', title: 'Listar tarefas', description: 'Pesquisa tarefas de um quadro acessível.', schema: z.object({ quadroId: z.string(), colunaId: z.string().optional(), prioridade: z.enum(PRIORITIES).optional(), dataInicial: z.string().optional(), dataFinal: z.string().optional(), busca: z.string().max(160).optional(), incluirArquivadas: z.boolean().optional(), limite: z.number().int().min(1).max(200).optional() }), annotations: { readOnlyHint: true, openWorldHint: false } },
+  { name: 'listar_tarefas', title: 'Listar tarefas', description: 'Pesquisa tarefas de um quadro ou de todos os quadros/equipes acessíveis.', schema: z.object({ quadroId: z.string().optional(), equipeId: z.string().optional(), equipe: z.string().optional(), colunaId: z.string().optional(), prioridade: z.enum(PRIORITIES).optional(), dataInicial: z.string().optional(), dataFinal: z.string().optional(), busca: z.string().max(160).optional(), incluirArquivadas: z.boolean().optional(), limite: z.number().int().min(1).max(200).optional() }), annotations: { readOnlyHint: true, openWorldHint: false } },
   { name: 'obter_tarefa', title: 'Obter tarefa', description: 'Obtém detalhes de uma tarefa acessível.', schema: z.object({ tarefaId: z.string() }), annotations: { readOnlyHint: true, openWorldHint: false } },
   { name: 'criar_tarefa', title: 'Criar tarefa', description: 'Cria tarefa ou subtarefa; usa a primeira coluna quando colunaId não for informado. Descrições aceitam Markdown.', schema: z.object({ quadroId: z.string(), colunaId: z.string().optional(), tarefaPrincipalId: z.string().optional(), titulo: z.string().min(1).max(160), descricao: z.string().max(5000).optional(), prioridade: z.enum(PRIORITIES).optional(), prazo: z.string().nullable().optional(), etiquetas: z.array(z.string().max(50)).max(8).optional(), responsaveisIds: z.array(z.string()).max(100).optional(), checklist: checklistSchema.optional() }), annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false } },
   { name: 'atualizar_tarefa', title: 'Atualizar tarefa', description: 'Atualiza conteúdo, coluna, posição, prioridade, prazo, responsáveis, checklist ou arquivamento.', schema: z.object({ tarefaId: z.string(), titulo: z.string().min(1).max(160).optional(), descricao: z.string().max(5000).optional(), colunaId: z.string().optional(), posicao: z.number().int().min(0).optional(), prioridade: z.enum(PRIORITIES).optional(), prazo: z.string().nullable().optional(), etiquetas: z.array(z.string().max(50)).max(8).optional(), responsaveisIds: z.array(z.string()).max(100).optional(), checklist: checklistSchema.optional(), arquivada: z.boolean().optional() }), annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false } },

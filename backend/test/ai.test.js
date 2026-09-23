@@ -47,7 +47,7 @@ test('encaminha chat ao Doce LLM e converte o stream para o SSE público', async
       assert.equal(response.status, 200);
       assert.match(await response.text(), /data: \{"delta":"Olá"\}/);
       assert.equal(forwardedBody.provider, 'GEMINI');
-      assert.equal(forwardedBody.model, 'gemini-3.1-flash-lite');
+      assert.equal(forwardedBody.model, 'gemini-3.5-flash-lite');
       assert.equal(forwardedBody.stream, true);
       assert.equal(forwardedBody.store, true);
       assert.equal(forwardedBody.sessionId, 'Agenda-User-usuario-42-session-987654321');
@@ -183,3 +183,51 @@ test('retorna eventos de pagamento e feriados na listagem de eventos sem pergunt
     if (originalKey === undefined) delete process.env.SSO_LLM_API_KEY; else process.env.SSO_LLM_API_KEY = originalKey;
   }
 });
+
+test('interpreta chamadas MCP simplificadas do Groq/Llama em formato texto/pseudocódigo (get_tasks)', async () => {
+  const originalFetch = global.fetch;
+  const originalKey = process.env.SSO_LLM_API_KEY;
+  process.env.SSO_LLM_API_KEY = 'test-secret';
+  let passedContext = '';
+  global.fetch = async (url, options) => {
+    const parsedBody = JSON.parse(options.body);
+    const isStream = Boolean(parsedBody.stream);
+    if (!isStream) {
+      return new Response(JSON.stringify({
+        choices: [{
+          message: {
+            content: '```mcp\nget_tasks\nteam="LinkedIn"\nkeyword="Revisão Final"\n```',
+          },
+        }],
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    passedContext = parsedBody.systemInstruction || '';
+    return new Response('data: {"choices":[{"delta":{"content":"Tarefas encontradas com sucesso."}}]}\n\ndata: [DONE]\n\n', {
+      status: 200,
+      headers: { 'Content-Type': 'text/event-stream' },
+    });
+  };
+
+  try {
+    await withServer(async baseUrl => {
+      const response = await originalFetch(`${baseUrl}/api/ai/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-user-id': 'user-qa' },
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: 'verifique e me informe referente a Revisão Final do time linkedin' }],
+        }),
+      });
+      assert.equal(response.status, 200);
+      const text = await response.text();
+      assert.match(text, /Tarefas encontradas com sucesso\./);
+      assert.match(passedContext, /listar_tarefas/);
+    });
+  } finally {
+    global.fetch = originalFetch;
+    if (originalKey === undefined) delete process.env.SSO_LLM_API_KEY; else process.env.SSO_LLM_API_KEY = originalKey;
+  }
+});
+

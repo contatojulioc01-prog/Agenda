@@ -9,7 +9,8 @@
     "dev": "npx nodemon index.js",
     "test": "node --test test/*.test.js",
     "db:setup": "node scripts/setup-postgres.js",
-    "db:migrate:sqlite": "node scripts/migrate-sqlite-to-postgres.js"
+    "db:migrate:sqlite": "node scripts/migrate-sqlite-to-postgres.js",
+    "seed:linkedin": "node scripts/seed-linkedin.js"
   },
   "dependencies": {
     "@modelcontextprotocol/node": "^2.0.0",

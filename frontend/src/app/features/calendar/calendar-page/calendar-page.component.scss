@@ -265,48 +265,58 @@
   align-items: center;
   gap: 2px;
   border-radius: 8px;
-  padding: 1px 2px;
+  padding: 2px 4px 2px 2px;
   border: 1px solid transparent;
+  border-left: 4px solid var(--cal-color, var(--brand-500));
   cursor: pointer;
   transition: all var(--transition);
+  user-select: none;
 
   &:hover {
     background: var(--bg-hover);
+    border-left-width: 5px;
   }
 
   &.is-active {
-    background: var(--bg-active);
-    border-color: rgba(79, 70, 229, 0.15);
+    background: color-mix(in srgb, var(--cal-color, var(--brand-500)) 10%, var(--bg-surface));
+    border-color: color-mix(in srgb, var(--cal-color, var(--brand-500)) 25%, transparent);
+    border-left: 4px solid var(--cal-color, var(--brand-500));
 
     .calendar-name {
-      font-weight: 600;
+      font-weight: 650;
       color: var(--text-primary);
     }
   }
 
+  &:not(.is-active) {
+    opacity: 0.55;
+    border-left-color: color-mix(in srgb, var(--cal-color, var(--brand-500)) 40%, transparent);
+
+    .calendar-name {
+      color: var(--text-muted);
+    }
+
+    &:hover {
+      opacity: 0.95;
+      border-left-color: var(--cal-color, var(--brand-500));
+    }
+  }
+
   &.is-solo {
-    box-shadow: inset 2px 0 0 var(--brand-500);
-    background: var(--bg-active);
+    box-shadow: inset 0 0 0 1px var(--cal-color, var(--brand-500));
   }
 
   &:hover .btn-cal-menu { opacity: 0.8; }
 }
 
-.calendar-checkbox-label {
+.calendar-info {
   display: flex;
   align-items: center;
   gap: 8px;
   flex: 1;
-  padding: 5px 8px;
+  padding: 6px 10px;
   cursor: pointer;
   min-width: 0;
-}
-
-.calendar-checkbox {
-  width: 14px;
-  height: 14px;
-  accent-color: var(--brand-500);
-  cursor: pointer;
 }
 
 .calendar-dot {
