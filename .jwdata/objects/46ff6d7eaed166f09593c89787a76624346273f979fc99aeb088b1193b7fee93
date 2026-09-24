@@ -1,0 +1,654 @@
+const { z } = require('zod');
+const db = require('../db');
+const { validateEventInput, validateTaskInput } = require('../validation');
+const eventsRouter = require('../routes/events');
+const kanbanRouter = require('../routes/kanban');
+const { executeSystemTool, systemToolDefinitions, SYSTEM_MANUAL } = require('./system-tools');
+
+const TIME_ZONE = process.env.AGENDA_TIME_ZONE || 'America/Sao_Paulo';
+const EVENT_COLORS = ['indigo', 'blue', 'teal', 'emerald', 'amber', 'orange', 'rose', 'purple', 'pink', 'slate'];
+const PRIORITIES = ['low', 'medium', 'high', 'urgent'];
+const SAFE_CATEGORY_RE = /^[\p{L}\p{N}_\s!@#(),.:\-]{1,60}$/u;
+
+const id = prefix => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+const noBroadcast = () => {};
+const clampLimit = value => Math.max(1, Math.min(Number(value) || 50, 200));
+
+function result(value, isError = false) {
+  return {
+    content: [{ type: 'text', text: JSON.stringify(value, null, 2) }],
+    structuredContent: { result: value },
+    ...(isError ? { isError: true } : {}),
+  };
+}
+
+function fail(message) {
+  const error = new Error(message);
+  error.expose = true;
+  throw error;
+}
+
+function parseJson(value, fallback) {
+  try { return JSON.parse(value); } catch { return fallback; }
+}
+
+
+function getEasterDate(year) {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(year, month - 1, day);
+}
+
+function toIsoDate(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function getNationalHolidays(year) {
+  const easter = getEasterDate(year);
+  const addDays = (base, days) => {
+    const res = new Date(base);
+    res.setDate(res.getDate() + days);
+    return res;
+  };
+
+  const holidays = [
+    { date: `${year}-01-01`, title: 'Confraternização Universal' },
+    { date: toIsoDate(addDays(easter, -47)), title: 'Carnaval' },
+    { date: toIsoDate(addDays(easter, -2)), title: 'Sexta-feira Santa (Paixão de Cristo)' },
+    { date: toIsoDate(easter), title: 'Páscoa' },
+    { date: `${year}-04-21`, title: 'Tiradentes' },
+    { date: `${year}-05-01`, title: 'Dia do Trabalho' },
+    { date: toIsoDate(addDays(easter, 60)), title: 'Corpus Christi' },
+    { date: `${year}-09-07`, title: 'Independência do Brasil' },
+    { date: `${year}-10-12`, title: 'Nossa Senhora Aparecida' },
+    { date: `${year}-11-02`, title: 'Finados' },
+    { date: `${year}-11-15`, title: 'Proclamação da República' },
+    { date: `${year}-11-20`, title: 'Dia Nacional de Zumbi e da Consciência Negra' },
+    { date: `${year}-12-25`, title: 'Natal' },
+  ];
+  return holidays.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function getSystemEventsForYear(year, defaultCalendar) {
+  if (!defaultCalendar) return [];
+  const holidays = getNationalHolidays(year);
+  const holidayDates = new Set(holidays.map(h => h.date));
+  const isHoliday = (d) => holidayDates.has(toIsoDate(d));
+  const isBankingDay = (d) => d.getDay() !== 0 && d.getDay() !== 6 && !isHoliday(d);
+  const isWorkdayForCount = (d) => d.getDay() !== 0 && !isHoliday(d);
+
+  const fifthBusinessDay = (month) => {
+    let businessDays = 0;
+    let targetDate = new Date(year, month, 1);
+    for (let day = 1; ; day++) {
+      const date = new Date(year, month, day);
+      if (isWorkdayForCount(date)) {
+        businessDays++;
+        if (businessDays === 5) {
+          targetDate = date;
+          break;
+        }
+      }
+    }
+    while (!isBankingDay(targetDate)) {
+      targetDate.setDate(targetDate.getDate() - 1);
+    }
+    return targetDate;
+  };
+
+  const salaryAdvanceDay = (month) => {
+    const date = new Date(year, month, 20);
+    while (!isBankingDay(date)) {
+      date.setDate(date.getDate() - 1);
+    }
+    return date;
+  };
+
+  const events = [];
+
+  for (const h of holidays) {
+    events.push({
+      id: `system-holiday-${h.date}`,
+      calendarId: defaultCalendar.id,
+      calendarName: defaultCalendar.name || 'Minha Agenda',
+      title: `Feriado: ${h.title}`,
+      description: `Feriado Nacional: ${h.title}`,
+      date: h.date,
+      endDate: h.date,
+      startTime: '00:00',
+      endTime: '23:59',
+      dayTimes: {},
+      color: 'rose',
+      category: 'Feriado',
+      allDay: true,
+      isSystem: true,
+      isTaskDeadline: false,
+    });
+  }
+
+  for (let month = 0; month < 12; month++) {
+    const fifthDate = toIsoDate(fifthBusinessDay(month));
+    const advanceDate = toIsoDate(salaryAdvanceDay(month));
+
+    events.push({
+      id: `system-payment-fifth-${year}-${month}`,
+      calendarId: defaultCalendar.id,
+      calendarName: defaultCalendar.name || 'Minha Agenda',
+      title: 'Pagamento, vale alimentação e transporte',
+      description: 'Evento padrão de pagamento salarial (5º dia útil).',
+      date: fifthDate,
+      endDate: fifthDate,
+      startTime: '00:00',
+      endTime: '23:59',
+      dayTimes: {},
+      color: 'emerald',
+      category: 'Financeiro',
+      allDay: true,
+      isSystem: true,
+      isTaskDeadline: false,
+    });
+
+    events.push({
+      id: `system-payment-advance-${year}-${month}`,
+      calendarId: defaultCalendar.id,
+      calendarName: defaultCalendar.name || 'Minha Agenda',
+      title: 'Adiantamento salarial e vale transporte',
+      description: 'Evento padrão de adiantamento salarial (dia 20).',
+      date: advanceDate,
+      endDate: advanceDate,
+      startTime: '00:00',
+      endTime: '23:59',
+      dayTimes: {},
+      color: 'emerald',
+      category: 'Financeiro',
+      allDay: true,
+      isSystem: true,
+      isTaskDeadline: false,
+    });
+  }
+
+  return events;
+}
+
+function eventDto(event) {
+  return {
+    id: event.id,
+    calendarId: event.calendar_id,
+    calendarName: event.calendar_name,
+    title: event.title,
+    description: event.description || '',
+    date: event.date,
+    endDate: event.end_date || event.date,
+    startTime: event.start_time,
+    endTime: event.end_time,
+    dayTimes: parseJson(event.day_times || '{}', {}),
+    color: event.color,
+    category: event.category,
+    allDay: event.all_day === 1,
+    isTaskDeadline: event.is_task_deadline === 1,
+    taskId: event.task_id || undefined,
+    updatedAt: event.updated_at,
+  };
+}
+
+function taskDto(task) {
+  const assigneeIds = parseJson(task.assignee_ids || '[]', []);
+  if (!assigneeIds.length && task.assignee_id) assigneeIds.push(task.assignee_id);
+  return {
+    id: task.id,
+    boardId: task.board_id,
+    boardName: task.board_name,
+    columnId: task.column_id,
+    columnTitle: task.column_title,
+    title: task.title,
+    description: task.description || '',
+    priority: task.priority,
+    dueDate: task.due_date,
+    labels: parseJson(task.labels || '[]', []),
+    checklist: parseJson(task.checklist || '[]', []),
+    assigneeIds,
+    parentTaskId: task.parent_task_id || null,
+    archived: task.archived === 1,
+    deletedAt: task.deleted_at || null,
+    updatedAt: task.updated_at,
+  };
+}
+
+async function accessibleCalendars(userId) {
+  await kanbanRouter.ensureDefaultCalendar(userId, noBroadcast);
+  return db.all(`SELECT DISTINCT c.*, COALESCE(cm.permission,
+      CASE WHEN c.owner_id = $1 THEN 'owner' END) AS my_permission,
+      kt.name AS task_team_name
+    FROM calendars c
+    LEFT JOIN calendar_members cm ON cm.calendar_id = c.id AND cm.user_id = $2
+    LEFT JOIN kanban_teams kt ON kt.calendar_id = c.id
+    WHERE c.owner_id = $3 OR cm.user_id = $4
+    ORDER BY c.created_at`, [userId, userId, userId, userId]);
+}
+
+async function listCalendars(userId) {
+  const rows = await accessibleCalendars(userId);
+  return rows.map(row => ({
+    id: row.id,
+    name: row.name,
+    color: row.color,
+    permission: row.my_permission,
+    isPrivate: row.is_private === 1,
+    isDefault: row.is_default === 1,
+    isTaskCalendar: row.is_task_calendar === 1,
+    taskTeamName: row.task_team_name || null,
+  }));
+}
+
+async function listBoards(userId) {
+  await kanbanRouter.createDefaultPersonalBoard(userId);
+  const rows = await db.all(`SELECT DISTINCT b.*,
+      CASE WHEN b.scope_type = 'team' THEN tm.role ELSE 'admin' END AS my_role,
+      t.name AS team_name,
+      (SELECT COUNT(*) FROM kanban_tasks x WHERE x.board_id = b.id AND x.archived = 0 AND x.deleted_at IS NULL) AS task_count
+    FROM kanban_boards b
+    LEFT JOIN kanban_team_members tm ON tm.team_id = b.team_id AND tm.user_id = $1
+    LEFT JOIN kanban_teams t ON t.id = b.team_id
+    WHERE (COALESCE(b.scope_type, 'personal') = 'personal' AND b.owner_id = $2)
+       OR (b.scope_type = 'team' AND tm.user_id = $3)
+    ORDER BY b.scope_type, b.created_at`, [userId, userId, userId]);
+  return rows.map(row => ({
+    id: row.id,
+    name: row.name,
+    description: row.description || '',
+    color: row.color,
+    scopeType: row.scope_type || 'personal',
+    teamId: row.team_id || null,
+    teamName: row.team_name || null,
+    role: row.my_role,
+    taskCount: Number(row.task_count),
+  }));
+}
+
+async function executeAgendaTool(name, args = {}, context = {}) {
+  const definition = toolDefinitions.find(tool => tool.name === name);
+  if (!definition) fail(`Ferramenta desconhecida: ${name}`);
+  const parsedArguments = definition.schema.safeParse(args || {});
+  if (!parsedArguments.success) fail(`Parâmetros inválidos para ${name}: ${parsedArguments.error.issues.map(issue => issue.message).join('; ')}`);
+  args = parsedArguments.data;
+  const userId = String(context.userId || '');
+  const broadcast = context.broadcast || noBroadcast;
+  if (!userId) fail('Usuário autenticado ausente.');
+
+  if (name === 'obter_contexto') {
+    const [calendars, boards] = await Promise.all([listCalendars(userId), listBoards(userId)]);
+    const now = new Date();
+    return {
+      agora: now.toLocaleString('pt-BR', { timeZone: TIME_ZONE }),
+      dataIso: new Intl.DateTimeFormat('en-CA', { timeZone: TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now),
+      fusoHorario: TIME_ZONE,
+      usuarioId: userId,
+      agendas: calendars,
+      quadros: boards,
+    };
+  }
+
+  if (name === 'listar_agendas') return listCalendars(userId);
+
+  if (name === 'listar_eventos') {
+    const values = [userId];
+    const where = [`(c.owner_id = $1 OR EXISTS (
+      SELECT 1 FROM calendar_members cm WHERE cm.calendar_id = c.id AND cm.user_id = $1
+    ))`];
+    if (args.calendarId) { values.push(args.calendarId); where.push(`e.calendar_id = $${values.length}`); }
+    if (args.dataInicial) { values.push(args.dataInicial); where.push(`COALESCE(e.end_date, e.date) >= $${values.length}`); }
+    if (args.dataFinal) { values.push(args.dataFinal); where.push(`e.date <= $${values.length}`); }
+    if (args.busca) { values.push(`%${args.busca}%`); where.push(`(e.title ILIKE $${values.length} OR e.description ILIKE $${values.length})`); }
+    values.push(clampLimit(args.limite));
+    const rows = await db.all(`SELECT e.*, c.name AS calendar_name,
+        CASE WHEN kte.event_id IS NULL THEN 0 ELSE 1 END AS is_task_deadline, kte.task_id
+      FROM events e
+      JOIN calendars c ON c.id = e.calendar_id
+      LEFT JOIN kanban_task_events kte ON kte.event_id = e.id
+      WHERE ${where.join(' AND ')}
+      ORDER BY e.date, e.start_time LIMIT $${values.length}`, values);
+    return rows.map(eventDto);
+  }
+
+  if (name === 'obter_evento') {
+    const row = await db.get(`SELECT e.*, c.name AS calendar_name,
+        CASE WHEN kte.event_id IS NULL THEN 0 ELSE 1 END AS is_task_deadline, kte.task_id
+      FROM events e JOIN calendars c ON c.id = e.calendar_id
+      LEFT JOIN kanban_task_events kte ON kte.event_id = e.id
+      WHERE e.id = $1`, [args.eventoId]);
+    if (!row || !(await eventsRouter.hasAccess(row.calendar_id, userId))) fail('Evento não encontrado ou sem acesso.');
+    return eventDto(row);
+  }
+
+  if (name === 'criar_evento') {
+    if (!(await eventsRouter.hasAccess(args.calendarId, userId, true))) fail('Sem permissão para criar eventos nesta agenda.');
+    const category = typeof args.categoria === 'string' && SAFE_CATEGORY_RE.test(args.categoria.trim()) ? args.categoria.trim() : 'Geral';
+    const input = {
+      title: args.titulo,
+      description: args.descricao || '',
+      date: args.data,
+      endDate: args.dataFinal || args.data,
+      startTime: args.horaInicial || '09:00',
+      endTime: args.horaFinal || '10:00',
+      dayTimes: args.horariosPorDia || {},
+      color: args.cor || 'indigo',
+      category,
+      allDay: args.diaInteiro === true,
+    };
+    const validationError = validateEventInput(input);
+    if (validationError) fail(validationError);
+    const eventId = id('evt');
+    const now = new Date().toISOString();
+    await db.run(`INSERT INTO events (id, calendar_id, title, description, date, end_date, start_time,
+      end_time, day_times, color, category, all_day, created_by, copy_group_id, updated_at)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+    [eventId, args.calendarId, args.titulo.trim(), input.description, input.date, input.endDate,
+      input.startTime, input.endTime, JSON.stringify(input.dayTimes), input.color, input.category, input.allDay ? 1 : 0, userId, eventId, now]);
+    broadcast({ type: 'event_created', calendarId: args.calendarId, eventId });
+    return eventDto(await db.get('SELECT * FROM events WHERE id = $1', [eventId]));
+  }
+
+  if (name === 'atualizar_evento') {
+    const event = await db.get('SELECT * FROM events WHERE id = $1', [args.eventoId]);
+    if (!event || !(await eventsRouter.hasAccess(event.calendar_id, userId, true))) fail('Evento não encontrado ou sem permissão.');
+    if (await eventsRouter.isTaskDeadlineEvent(event.id)) fail('O prazo desta tarefa deve ser alterado pelo card no Kanban.');
+    const next = {
+      ...eventsRouter.eventDto(event),
+      ...(args.titulo !== undefined ? { title: args.titulo } : {}),
+      ...(args.descricao !== undefined ? { description: args.descricao } : {}),
+      ...(args.data !== undefined ? { date: args.data } : {}),
+      ...(args.dataFinal !== undefined ? { endDate: args.dataFinal } : {}),
+      ...(args.horaInicial !== undefined ? { startTime: args.horaInicial } : {}),
+      ...(args.horaFinal !== undefined ? { endTime: args.horaFinal } : {}),
+      ...(args.horariosPorDia !== undefined ? { dayTimes: args.horariosPorDia } : {}),
+      ...(args.cor !== undefined ? { color: args.cor } : {}),
+      ...(args.categoria !== undefined ? { category: args.categoria } : {}),
+      ...(args.diaInteiro !== undefined ? { allDay: args.diaInteiro } : {}),
+    };
+    if (args.categoria !== undefined && !SAFE_CATEGORY_RE.test(String(args.categoria).trim())) fail('Categoria contém caracteres inválidos.');
+    const validationError = validateEventInput(next);
+    if (validationError) fail(validationError);
+    const fields = {
+      titulo: ['title', value => value.trim()], descricao: ['description', value => value],
+      data: ['date', value => value], dataFinal: ['end_date', value => value],
+      horaInicial: ['start_time', value => value], horaFinal: ['end_time', value => value],
+      horariosPorDia: ['day_times', value => JSON.stringify(value)],
+      cor: ['color', value => value], categoria: ['category', value => value.trim()],
+      diaInteiro: ['all_day', value => value ? 1 : 0],
+    };
+    const now = new Date().toISOString();
+    for (const [key, [column, transform]] of Object.entries(fields)) {
+      if (args[key] !== undefined) await db.run(`UPDATE events SET ${column} = $1, updated_at = $2 WHERE id = $3`, [transform(args[key]), now, event.id]);
+    }
+    broadcast({ type: 'event_updated', calendarId: event.calendar_id, eventId: event.id });
+    return eventDto(await db.get('SELECT * FROM events WHERE id = $1', [event.id]));
+  }
+
+  if (name === 'excluir_evento') {
+    if (args.confirmar !== true) fail('A exclusão exige confirmar=true.');
+    const event = await db.get('SELECT * FROM events WHERE id = $1', [args.eventoId]);
+    if (!event || !(await eventsRouter.hasAccess(event.calendar_id, userId, true))) fail('Evento não encontrado ou sem permissão.');
+    if (await eventsRouter.isTaskDeadlineEvent(event.id)) fail('O prazo desta tarefa só pode ser removido pelo card no Kanban.');
+    await db.transaction(async tx => {
+      await tx.run(`DELETE FROM attachments WHERE owner_type = 'event' AND owner_id = $1`, [event.id]);
+      await tx.run('DELETE FROM events WHERE id = $1', [event.id]);
+    });
+    broadcast({ type: 'event_deleted', calendarId: event.calendar_id, eventId: event.id });
+    return { success: true, eventoId: event.id };
+  }
+
+  if (name === 'listar_quadros') return listBoards(userId);
+
+  if (name === 'listar_colunas') {
+    const access = await kanbanRouter.boardAccess(args.quadroId, userId);
+    if (!access) fail('Quadro não encontrado ou sem acesso.');
+    return db.all('SELECT id, board_id AS "boardId", title, color, position FROM kanban_columns WHERE board_id = $1 ORDER BY position, created_at', [args.quadroId]);
+  }
+
+  if (name === 'listar_tarefas') {
+    let boardIds = [];
+    if (args.quadroId) {
+      const access = await kanbanRouter.boardAccess(args.quadroId, userId);
+      if (!access) fail('Quadro não encontrado ou sem acesso.');
+      boardIds = [args.quadroId];
+    } else {
+      const boards = await listBoards(userId);
+      if (args.equipe || args.equipeId) {
+        const matchName = String(args.equipe || '').toLowerCase();
+        const filtered = boards.filter(b => 
+          (args.equipeId && b.teamId === args.equipeId) || 
+          (matchName && (String(b.teamName || '').toLowerCase().includes(matchName) || String(b.name || '').toLowerCase().includes(matchName)))
+        );
+        boardIds = (filtered.length ? filtered : boards).map(b => b.id);
+      } else {
+        boardIds = boards.map(b => b.id);
+      }
+    }
+    if (!boardIds.length) return [];
+
+    const values = [boardIds];
+    const where = ['t.board_id = ANY($1)', 't.deleted_at IS NULL'];
+    if (args.colunaId) { values.push(args.colunaId); where.push(`t.column_id = $${values.length}`); }
+    if (args.prioridade) { values.push(args.prioridade); where.push(`t.priority = $${values.length}`); }
+    if (args.dataInicial) { values.push(args.dataInicial); where.push(`t.due_date >= $${values.length}`); }
+    if (args.dataFinal) { values.push(args.dataFinal); where.push(`t.due_date <= $${values.length}`); }
+    if (args.busca) { values.push(`%${args.busca}%`); where.push(`(t.title ILIKE $${values.length} OR t.description ILIKE $${values.length})`); }
+    where.push(args.incluirArquivadas ? 'TRUE' : 't.archived = 0');
+    values.push(clampLimit(args.limite));
+    const rows = await db.all(`SELECT t.*, b.name AS board_name, c.title AS column_title
+      FROM kanban_tasks t JOIN kanban_boards b ON b.id = t.board_id
+      JOIN kanban_columns c ON c.id = t.column_id
+      WHERE ${where.join(' AND ')} ORDER BY t.due_date NULLS LAST, t.position LIMIT $${values.length}`, values);
+    return rows.map(taskDto);
+  }
+
+  if (name === 'obter_tarefa') {
+    const task = await db.get(`SELECT t.*, b.name AS board_name, c.title AS column_title
+      FROM kanban_tasks t JOIN kanban_boards b ON b.id = t.board_id
+      JOIN kanban_columns c ON c.id = t.column_id WHERE t.id = $1`, [args.tarefaId]);
+    if (!task || !(await kanbanRouter.boardAccess(task.board_id, userId))) fail('Tarefa não encontrada ou sem acesso.');
+    return taskDto(task);
+  }
+
+  if (name === 'criar_tarefa') {
+    const access = await kanbanRouter.boardAccess(args.quadroId, userId, true);
+    if (!access) fail('Quadro não encontrado ou sem permissão.');
+    const column = args.colunaId
+      ? await db.get('SELECT * FROM kanban_columns WHERE id = $1 AND board_id = $2', [args.colunaId, args.quadroId])
+      : await db.get('SELECT * FROM kanban_columns WHERE board_id = $1 ORDER BY position, created_at LIMIT 1', [args.quadroId]);
+    if (!column) fail('Coluna não encontrada neste quadro.');
+    const assigneeIds = [...new Set(args.responsaveisIds || [])];
+    const input = { title: args.titulo, description: args.descricao || '', priority: args.prioridade || 'medium', dueDate: args.prazo || null, labels: args.etiquetas || [], assigneeIds, checklist: args.checklist || [] };
+    const validationError = validateTaskInput(input);
+    if (validationError) fail(validationError);
+    if (!(await kanbanRouter.validAssignees(access.board, assigneeIds))) fail('Um ou mais responsáveis não pertencem a este Kanban.');
+    if (args.tarefaPrincipalId && !(await db.get('SELECT 1 FROM kanban_tasks WHERE id = $1 AND board_id = $2 AND deleted_at IS NULL', [args.tarefaPrincipalId, args.quadroId]))) fail('Tarefa principal inválida.');
+    const next = await db.get(`SELECT COALESCE(MAX(position), -1) + 1 AS next FROM kanban_tasks
+      WHERE column_id = $1 AND archived = 0 AND COALESCE(parent_task_id, '') = COALESCE($2, '')`, [column.id, args.tarefaPrincipalId || null]);
+    const taskId = id('tsk');
+    const now = new Date().toISOString();
+    await db.run(`INSERT INTO kanban_tasks
+      (id, board_id, column_id, title, description, position, priority, due_date, labels,
+       assignee_id, assignee_ids, checklist, archived, created_by, created_at, updated_at, parent_task_id)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,0,$13,$14,$15,$16)`,
+    [taskId, args.quadroId, column.id, args.titulo.trim(), input.description, Number(next.next), input.priority,
+      input.dueDate, JSON.stringify(input.labels), assigneeIds[0] || null, JSON.stringify(assigneeIds), JSON.stringify(input.checklist), userId, now, now, args.tarefaPrincipalId || null]);
+    await kanbanRouter.syncTaskCalendarEvents(taskId, broadcast);
+    broadcast({ type: 'kanban_updated', boardId: args.quadroId, taskId });
+    return taskDto(await db.get(`SELECT t.*, b.name AS board_name, c.title AS column_title FROM kanban_tasks t
+      JOIN kanban_boards b ON b.id=t.board_id JOIN kanban_columns c ON c.id=t.column_id WHERE t.id=$1`, [taskId]));
+  }
+
+  if (name === 'atualizar_tarefa') {
+    const task = await db.get('SELECT * FROM kanban_tasks WHERE id = $1', [args.tarefaId]);
+    const access = task && await kanbanRouter.boardAccess(task.board_id, userId, true);
+    if (!task || !access || task.deleted_at) fail('Tarefa não encontrada ou sem permissão.');
+    const body = {
+      ...(args.titulo !== undefined ? { title: args.titulo } : {}),
+      ...(args.descricao !== undefined ? { description: args.descricao } : {}),
+      ...(args.prioridade !== undefined ? { priority: args.prioridade } : {}),
+      ...(args.prazo !== undefined ? { dueDate: args.prazo || null } : {}),
+      ...(args.arquivada !== undefined ? { archived: args.arquivada } : {}),
+      ...(args.etiquetas !== undefined ? { labels: args.etiquetas } : {}),
+      ...(args.responsaveisIds !== undefined ? { assigneeIds: [...new Set(args.responsaveisIds)] } : {}),
+      ...(args.checklist !== undefined ? { checklist: args.checklist } : {}),
+    };
+    const validationError = validateTaskInput(body, true);
+    if (validationError) fail(validationError);
+    if (args.colunaId !== undefined && !(await db.get('SELECT 1 FROM kanban_columns WHERE id = $1 AND board_id = $2', [args.colunaId, task.board_id]))) fail('A coluna não pertence ao quadro.');
+    if (body.assigneeIds && !(await kanbanRouter.validAssignees(access.board, body.assigneeIds))) fail('Um ou mais responsáveis não pertencem a este Kanban.');
+    const fields = {
+      titulo: ['title', value => value.trim()], descricao: ['description', value => value],
+      colunaId: ['column_id', value => value], prioridade: ['priority', value => value],
+      prazo: ['due_date', value => value || null], posicao: ['position', value => value], arquivada: ['archived', value => value ? 1 : 0],
+    };
+    const now = new Date().toISOString();
+    for (const [key, [column, transform]] of Object.entries(fields)) {
+      if (args[key] !== undefined) await db.run(`UPDATE kanban_tasks SET ${column} = $1, updated_at = $2 WHERE id = $3`, [transform(args[key]), now, task.id]);
+    }
+    if (args.etiquetas !== undefined) await db.run('UPDATE kanban_tasks SET labels = $1, updated_at = $2 WHERE id = $3', [JSON.stringify(args.etiquetas), now, task.id]);
+    if (args.checklist !== undefined) await db.run('UPDATE kanban_tasks SET checklist = $1, updated_at = $2 WHERE id = $3', [JSON.stringify(args.checklist), now, task.id]);
+    if (body.assigneeIds) await db.run('UPDATE kanban_tasks SET assignee_ids = $1, assignee_id = $2, updated_at = $3 WHERE id = $4', [JSON.stringify(body.assigneeIds), body.assigneeIds[0] || null, now, task.id]);
+    await kanbanRouter.syncTaskCalendarEvents(task.id, broadcast);
+    broadcast({ type: 'kanban_updated', boardId: task.board_id, taskId: task.id });
+    return taskDto(await db.get(`SELECT t.*, b.name AS board_name, c.title AS column_title FROM kanban_tasks t
+      JOIN kanban_boards b ON b.id=t.board_id JOIN kanban_columns c ON c.id=t.column_id WHERE t.id=$1`, [task.id]));
+  }
+
+  if (name === 'mover_tarefa_para_lixeira') {
+    if (args.confirmar !== true) fail('Mover para a lixeira exige confirmar=true.');
+    const task = await db.get('SELECT * FROM kanban_tasks WHERE id = $1', [args.tarefaId]);
+    const access = task && await kanbanRouter.boardAccess(task.board_id, userId);
+    if (!task || !access) fail('Tarefa não encontrada ou sem acesso.');
+    if (access.role !== 'admin') fail('Somente administradores podem mover tarefas para a lixeira.');
+    if (task.deleted_at) fail('A tarefa já está na lixeira.');
+    const descendants = await kanbanRouter.taskDescendants(task.id);
+    for (const child of descendants) await kanbanRouter.deleteTaskCalendarEvents(child.id, broadcast);
+    await kanbanRouter.deleteTaskCalendarEvents(task.id, broadcast);
+    const now = new Date().toISOString();
+    await db.transaction(async tx => {
+      for (const taskId of [task.id, ...descendants.map(item => item.id)]) {
+        await tx.run('UPDATE kanban_tasks SET deleted_at = $1, deleted_by = $2, updated_at = $3 WHERE id = $4', [now, userId, now, taskId]);
+      }
+    });
+    broadcast({ type: 'kanban_updated', boardId: task.board_id, taskId: task.id });
+    return { success: true, tarefaId: task.id, subtarefasMovidas: descendants.length };
+  }
+
+  if (systemToolDefinitions.some(tool => tool.name === name)) return executeSystemTool(name, args, context);
+  fail(`Ferramenta desconhecida: ${name}`);
+}
+
+const checklistSchema = z.array(z.object({ id: z.string().min(1), text: z.string().min(1).max(300), done: z.boolean() })).max(200);
+const dayTimesSchema = z.record(z.string(), z.object({ startTime: z.string(), endTime: z.string() }));
+
+const toolDefinitions = [
+  { name: 'obter_contexto', title: 'Obter contexto da Agenda', description: 'Retorna data/hora local, agendas e quadros acessíveis. Use primeiro quando IDs ou a data atual forem necessários.', schema: z.object({}), annotations: { readOnlyHint: true, openWorldHint: false } },
+  { name: 'listar_agendas', title: 'Listar agendas', description: 'Lista somente as agendas que o usuário autenticado pode acessar.', schema: z.object({}), annotations: { readOnlyHint: true, openWorldHint: false } },
+  { name: 'listar_eventos', title: 'Listar eventos', description: 'Pesquisa eventos acessíveis por agenda, período e texto.', schema: z.object({ calendarId: z.string().optional(), dataInicial: z.string().optional(), dataFinal: z.string().optional(), busca: z.string().max(160).optional(), limite: z.number().int().min(1).max(200).optional() }), annotations: { readOnlyHint: true, openWorldHint: false } },
+  { name: 'obter_evento', title: 'Obter evento', description: 'Obtém os detalhes de um evento acessível.', schema: z.object({ eventoId: z.string() }), annotations: { readOnlyHint: true, openWorldHint: false } },
+  { name: 'criar_evento', title: 'Criar evento', description: 'Cria um evento em uma agenda com permissão de escrita. Descrições aceitam Markdown.', schema: z.object({ calendarId: z.string(), titulo: z.string().min(1).max(160), descricao: z.string().max(5000).optional(), data: z.string(), dataFinal: z.string().optional(), horaInicial: z.string().optional(), horaFinal: z.string().optional(), horariosPorDia: dayTimesSchema.optional(), diaInteiro: z.boolean().optional(), cor: z.enum(EVENT_COLORS).optional(), categoria: z.string().max(60).optional() }), annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false } },
+  { name: 'atualizar_evento', title: 'Atualizar evento', description: 'Atualiza campos de um evento comum. Prazos Kanban devem ser alterados na tarefa.', schema: z.object({ eventoId: z.string(), titulo: z.string().min(1).max(160).optional(), descricao: z.string().max(5000).optional(), data: z.string().optional(), dataFinal: z.string().optional(), horaInicial: z.string().optional(), horaFinal: z.string().optional(), horariosPorDia: dayTimesSchema.optional(), diaInteiro: z.boolean().optional(), cor: z.enum(EVENT_COLORS).optional(), categoria: z.string().max(60).optional() }), annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
+  { name: 'excluir_evento', title: 'Excluir evento', description: 'Exclui um evento e seus anexos. Exige confirmação explícita.', schema: z.object({ eventoId: z.string(), confirmar: z.literal(true) }), annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false } },
+  { name: 'listar_quadros', title: 'Listar quadros Kanban', description: 'Lista quadros pessoais e de equipe acessíveis.', schema: z.object({}), annotations: { readOnlyHint: true, openWorldHint: false } },
+  { name: 'listar_colunas', title: 'Listar colunas Kanban', description: 'Lista as colunas de um quadro acessível.', schema: z.object({ quadroId: z.string() }), annotations: { readOnlyHint: true, openWorldHint: false } },
+  { name: 'listar_tarefas', title: 'Listar tarefas', description: 'Pesquisa tarefas de um quadro ou de todos os quadros/equipes acessíveis.', schema: z.object({ quadroId: z.string().optional(), equipeId: z.string().optional(), equipe: z.string().optional(), colunaId: z.string().optional(), prioridade: z.enum(PRIORITIES).optional(), dataInicial: z.string().optional(), dataFinal: z.string().optional(), busca: z.string().max(160).optional(), incluirArquivadas: z.boolean().optional(), limite: z.number().int().min(1).max(200).optional() }), annotations: { readOnlyHint: true, openWorldHint: false } },
+  { name: 'obter_tarefa', title: 'Obter tarefa', description: 'Obtém detalhes de uma tarefa acessível.', schema: z.object({ tarefaId: z.string() }), annotations: { readOnlyHint: true, openWorldHint: false } },
+  { name: 'criar_tarefa', title: 'Criar tarefa', description: 'Cria tarefa ou subtarefa; usa a primeira coluna quando colunaId não for informado. Descrições aceitam Markdown.', schema: z.object({ quadroId: z.string(), colunaId: z.string().optional(), tarefaPrincipalId: z.string().optional(), titulo: z.string().min(1).max(160), descricao: z.string().max(5000).optional(), prioridade: z.enum(PRIORITIES).optional(), prazo: z.string().nullable().optional(), etiquetas: z.array(z.string().max(50)).max(8).optional(), responsaveisIds: z.array(z.string()).max(100).optional(), checklist: checklistSchema.optional() }), annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false } },
+  { name: 'atualizar_tarefa', title: 'Atualizar tarefa', description: 'Atualiza conteúdo, coluna, posição, prioridade, prazo, responsáveis, checklist ou arquivamento.', schema: z.object({ tarefaId: z.string(), titulo: z.string().min(1).max(160).optional(), descricao: z.string().max(5000).optional(), colunaId: z.string().optional(), posicao: z.number().int().min(0).optional(), prioridade: z.enum(PRIORITIES).optional(), prazo: z.string().nullable().optional(), etiquetas: z.array(z.string().max(50)).max(8).optional(), responsaveisIds: z.array(z.string()).max(100).optional(), checklist: checklistSchema.optional(), arquivada: z.boolean().optional() }), annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
+  { name: 'mover_tarefa_para_lixeira', title: 'Mover tarefa para a lixeira', description: 'Move a tarefa e subtarefas para a lixeira por 30 dias. Exige confirmação explícita e perfil administrador.', schema: z.object({ tarefaId: z.string(), confirmar: z.literal(true) }), annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false } },
+  ...systemToolDefinitions,
+];
+
+function jsonSchemaForZod(schema) {
+  return z.toJSONSchema(schema, { target: 'draft-7' });
+}
+
+function getAiToolCatalog(names) {
+  const selected = names ? new Set(names) : null;
+  return toolDefinitions.filter(tool => !selected || selected.has(tool.name)).map(tool => ({
+    name: tool.name,
+    description: tool.description,
+    parameters: jsonSchemaForZod(tool.schema),
+    readOnly: tool.annotations?.readOnlyHint === true,
+    destructive: tool.annotations?.destructiveHint === true,
+  }));
+}
+
+function shouldPlanWithAgendaTools(text) {
+  return /\b(agenda|agendas|agendado|agendada|agendados|agendadas|evento|eventos|compromisso|compromissos|reuni[aã]o|reuni[oõ]es|calend[aá]rio|calendarios|kanban|quadro|quadros|coluna|colunas|card|cards|tarefa|tarefas|pend[eê]ncia|pend[eê]ncias|backlog|equipe|equipes|time|times|prazo|prazos|hoje|amanh[aã]|ontem|semana|m[eê]s|fazer|atividade|atividades|membro|membros|convite|convites|anexo|anexos|arquivo|arquivos|notifica|notifica[cç][aã]o|notifica[cç][oõ]es|lembrete|lembretes|alerta|alertas|dispositivo|dispositivos|lgpd|meus dados|privacidade|lixeira|restaurar|excluir|criar|listar|organizar|planejar|horario|horarios|hor[aá]rio|hor[aá]rios|periodo|período|turno|turnos|dia|dias|data|datas|segunda|ter[cç]a|quarta|quinta|sexta|s[aá]bado|domingo|jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez|janeiro|fevereiro|mar[cç]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\b/i.test(String(text || ''));
+}
+
+async function createAgendaMcpServer(userId, broadcast) {
+  const { McpServer } = await import('@modelcontextprotocol/server');
+  const server = new McpServer({ name: 'doce-agenda-mcp', version: '2.0.0' }, {
+    instructions: `Servidor MCP corporativo da Agenda Doce Brinquedo. Contexto autenticado do usuário (${userId}). Fuso horário corporativo: ${TIME_ZONE}. Todas as operações de leitura e escrita refletem a base de dados em tempo real. Consulte recursos (agenda://manual, agenda://schema, agenda://contexto) e ferramentas de contexto para obter IDs e permissões antes de executar mutações. Descrições suportam Markdown. Operações destrutivas exigem confirmar=true.`,
+  });
+
+  for (const tool of toolDefinitions) {
+    server.registerTool(tool.name, {
+      title: tool.title,
+      description: tool.description,
+      inputSchema: tool.schema,
+      annotations: tool.annotations,
+    }, async args => {
+      try { return result(await executeAgendaTool(tool.name, args, { userId, broadcast })); }
+      catch (error) { return result({ error: error.expose ? error.message : 'Falha ao executar a ferramenta.' }, true); }
+    });
+  }
+
+  server.registerResource('manual-da-agenda', 'agenda://manual', {
+    title: 'Manual operacional da Agenda',
+    description: 'Regras de uso, datas, Markdown, permissões e segurança.',
+    mimeType: 'text/markdown',
+  }, async uri => ({ contents: [{ uri: uri.href, mimeType: 'text/markdown', text: `${SYSTEM_MANUAL}\n- Fuso horário atual: **${TIME_ZONE}**.` }] }));
+
+  server.registerResource('schema-do-sistema', 'agenda://schema', {
+    title: 'Schema e catálogo do sistema',
+    description: 'Catálogo completo e legível por máquina das operações, parâmetros e efeitos destrutivos.',
+    mimeType: 'application/json',
+  }, async uri => ({ contents: [{ uri: uri.href, mimeType: 'application/json', text: JSON.stringify({
+    service: 'Agenda Corporativa',
+    version: '2.0.0',
+    timeZone: TIME_ZONE,
+    tools: getAiToolCatalog(),
+  }, null, 2) }] }));
+
+  server.registerResource('contexto-do-usuario', 'agenda://contexto', {
+    title: 'Contexto atual do usuário',
+    description: 'Estrutura completa visível, permissões, convites, preferências e totais da sessão autenticada.',
+    mimeType: 'application/json',
+  }, async uri => ({ contents: [{ uri: uri.href, mimeType: 'application/json', text: JSON.stringify(await executeAgendaTool('obter_contexto_completo', {}, { userId, broadcast }), null, 2) }] }));
+
+  server.registerPrompt('planejar_dia', {
+    title: 'Planejar o dia',
+    description: 'Orienta o cliente a consultar compromissos e tarefas antes de montar um plano direto.',
+    argsSchema: z.object({ data: z.string().optional(), objetivo: z.string().max(500).optional() }),
+  }, ({ data, objetivo }) => ({ messages: [{ role: 'user', content: { type: 'text', text: `Planeje ${data ? `o dia ${data}` : 'meu dia'}${objetivo ? ` com o objetivo: ${objetivo}` : ''}. Consulte primeiro os eventos e tarefas pelas ferramentas MCP. Entregue um plano direto e prático em Markdown.` } }] }));
+
+  return server;
+}
+
+module.exports = {
+  TIME_ZONE,
+  createAgendaMcpServer,
+  executeAgendaTool,
+  getAiToolCatalog,
+  shouldPlanWithAgendaTools,
+  toolDefinitions,
+};
