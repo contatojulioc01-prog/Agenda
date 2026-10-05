@@ -99,6 +99,7 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
     });
     this.invitationsService.load();
     this.kanbanService.loadTeamInvitations();
+    this.muralService.loadBoards();
   });
 
   readonly defaultAvatar = DEFAULT_AVATAR;

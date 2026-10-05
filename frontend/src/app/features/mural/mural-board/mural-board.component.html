@@ -4,28 +4,76 @@
   <div class="mural-toolbar group-panel">
 
     <div class="toolbar-left">
-      <!-- Board Selector -->
+      <!-- Board Selector com Angular Material Menu -->
       <div class="board-selector-wrapper">
-        <div class="board-mark" [style.background]="activeBoard()?.color || '#f59e0b'">
-          <mat-icon>space_dashboard</mat-icon>
-        </div>
-        <div class="board-heading">
-          <select class="board-select" [ngModel]="activeBoard()?.id" (ngModelChange)="selecionarMural($event)">
-            <optgroup label="Pessoal">
-              <option *ngFor="let b of boards()" [value]="b.id" [hidden]="b.scopeType !== 'personal'">
-                📋 {{ b.name }} ({{ b.itemCount }})
-              </option>
-            </optgroup>
-            <optgroup label="Times & Equipes">
-              <option *ngFor="let b of boards()" [value]="b.id" [hidden]="b.scopeType !== 'team'">
-                👥 {{ b.name }} ({{ b.itemCount }})
-              </option>
-            </optgroup>
-          </select>
-          <span class="board-subtitle" *ngIf="activeBoard()?.scopeType === 'team'">
-            {{ activeBoard()?.teamName || 'Mural do Time' }}
-          </span>
-        </div>
+        <button
+          type="button"
+          class="mat-board-trigger"
+          [matMenuTriggerFor]="muralMenu"
+          aria-label="Selecionar Mural"
+        >
+          <div class="board-mark" [style.background]="activeBoard()?.color || '#f59e0b'">
+            <mat-icon>{{ activeBoard()?.scopeType === 'team' ? 'groups' : 'space_dashboard' }}</mat-icon>
+          </div>
+          <div class="board-heading">
+            <div class="board-title-row">
+              <span class="board-active-name">{{ activeBoard()?.name || 'Selecionar Mural' }}</span>
+              <span class="board-items-badge" *ngIf="activeBoard()?.items?.length">({{ activeBoard()?.items?.length }})</span>
+              <mat-icon class="dropdown-chevron">expand_more</mat-icon>
+            </div>
+            <span class="board-subtitle" *ngIf="activeBoard()?.scopeType === 'team'">
+              {{ activeBoard()?.teamName || 'Mural do Time' }}
+            </span>
+          </div>
+        </button>
+
+        <mat-menu #muralMenu="matMenu" class="mural-custom-mat-menu" xPosition="after">
+          <!-- Cabeçalho do Menu / Ação Rápida -->
+          <div class="mat-menu-header" (click)="$event.stopPropagation()">
+            <span class="menu-header-title">Murais & Espaços</span>
+            <button type="button" class="mat-menu-action-btn" (click)="abrirCriarTime()">
+              <mat-icon>add</mat-icon><span>Novo Time</span>
+            </button>
+          </div>
+
+          <!-- Murais Pessoais -->
+          <div class="mat-menu-group-label" *ngIf="hasPersonalBoards()">
+            <mat-icon>person</mat-icon>
+            <span>Pessoal</span>
+          </div>
+          <ng-container *ngFor="let b of boards()">
+            <button
+              mat-menu-item
+              *ngIf="b.scopeType === 'personal'"
+              [class.active-item]="b.id === activeBoard()?.id"
+              (click)="selecionarMural(b.id)"
+            >
+              <span class="menu-board-dot" [style.background]="b.color"></span>
+              <span class="menu-board-title">{{ b.name }}</span>
+              <span class="menu-board-count" *ngIf="b.itemCount">({{ b.itemCount }})</span>
+              <mat-icon *ngIf="b.id === activeBoard()?.id" class="menu-check-icon">check</mat-icon>
+            </button>
+          </ng-container>
+
+          <!-- Murais de Time -->
+          <div class="mat-menu-group-label" *ngIf="hasTeamBoards()">
+            <mat-icon>groups</mat-icon>
+            <span>Times & Equipes</span>
+          </div>
+          <ng-container *ngFor="let b of boards()">
+            <button
+              mat-menu-item
+              *ngIf="b.scopeType === 'team'"
+              [class.active-item]="b.id === activeBoard()?.id"
+              (click)="selecionarMural(b.id)"
+            >
+              <span class="menu-board-dot" [style.background]="b.color"></span>
+              <span class="menu-board-title">{{ b.name }}</span>
+              <span class="menu-board-count" *ngIf="b.itemCount">({{ b.itemCount }})</span>
+              <mat-icon *ngIf="b.id === activeBoard()?.id" class="menu-check-icon">check</mat-icon>
+            </button>
+          </ng-container>
+        </mat-menu>
       </div>
 
       <!-- Busca -->
@@ -110,9 +158,6 @@
             <div class="card-body" *ngIf="item.content">
               <app-markdown-text [text]="item.content"></app-markdown-text>
             </div>
-            <div class="card-image-preview" *ngIf="pegarPrimeiraImagem(item) as img" (click)="abrirPreview($event, img)">
-              <img [src]="'/api/attachments/' + img.id + '/content'" [alt]="img.fileName" loading="lazy" />
-            </div>
             <div class="card-attachments-chips" *ngIf="item.attachments?.length">
               <span *ngFor="let att of item.attachments" class="att-chip" [class.is-pdf]="att.mimeType === 'application/pdf'" (click)="abrirPreview($event, att)">
                 <mat-icon>{{ att.mimeType === 'application/pdf' ? 'picture_as_pdf' : 'image' }}</mat-icon>
@@ -169,9 +214,6 @@
           <div class="card-header-row"><h4 class="card-title">{{ item.title }}</h4></div>
           <div class="card-body" *ngIf="item.content">
             <app-markdown-text [text]="item.content"></app-markdown-text>
-          </div>
-          <div class="card-image-preview" *ngIf="pegarPrimeiraImagem(item) as img" (click)="abrirPreview($event, img)">
-            <img [src]="'/api/attachments/' + img.id + '/content'" [alt]="img.fileName" loading="lazy" />
           </div>
           <div class="card-attachments-chips" *ngIf="item.attachments?.length">
             <span *ngFor="let att of item.attachments" class="att-chip" [class.is-pdf]="att.mimeType === 'application/pdf'" (click)="abrirPreview($event, att)">
@@ -242,16 +284,31 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button *ngIf="editingGroup()" class="delete-btn" (click)="excluirGrupo()" [disabled]="loadingExcluirGrupo">
-        <mat-progress-spinner *ngIf="loadingExcluirGrupo" mode="indeterminate" diameter="16" class="button-spinner"></mat-progress-spinner>
-        <mat-icon *ngIf="!loadingExcluirGrupo">delete</mat-icon><span>Excluir</span>
-      </button>
-      <button class="cancel-btn" (click)="fecharGrupoModal()">Cancelar</button>
-      <button class="primary-btn" (click)="salvarGrupo()" [disabled]="loadingSalvarGrupo || !groupTitle.trim()">
-        <mat-progress-spinner *ngIf="loadingSalvarGrupo" mode="indeterminate" diameter="16" class="button-spinner"></mat-progress-spinner>
-        <mat-icon *ngIf="!loadingSalvarGrupo">save</mat-icon>
-        <span>{{ loadingSalvarGrupo ? 'Salvando...' : 'Salvar Grupo' }}</span>
-      </button>
+      <ng-container *ngIf="!confirmDeleteGroup()">
+        <button *ngIf="editingGroup()" class="delete-btn" (click)="solicitarExclusaoGrupo()" [disabled]="loadingExcluirGrupo">
+          <mat-icon>delete</mat-icon><span>Excluir</span>
+        </button>
+        <button class="cancel-btn" (click)="fecharGrupoModal()">Cancelar</button>
+        <button class="primary-btn" (click)="salvarGrupo()" [disabled]="loadingSalvarGrupo || !groupTitle.trim()">
+          <mat-progress-spinner *ngIf="loadingSalvarGrupo" mode="indeterminate" diameter="16" class="button-spinner"></mat-progress-spinner>
+          <mat-icon *ngIf="!loadingSalvarGrupo">save</mat-icon>
+          <span>{{ loadingSalvarGrupo ? 'Salvando...' : 'Salvar Grupo' }}</span>
+        </button>
+      </ng-container>
+
+      <div class="delete-confirm-box" *ngIf="confirmDeleteGroup()">
+        <div class="confirm-text">
+          <mat-icon class="warn-icon">warning</mat-icon>
+          <span>Excluir grupo? As notas serão mantidas como notas soltas.</span>
+        </div>
+        <div class="confirm-actions">
+          <button class="cancel-btn" (click)="cancelarExclusaoGrupo()">Voltar</button>
+          <button class="danger-btn" (click)="confirmarExclusaoGrupo()" [disabled]="loadingExcluirGrupo">
+            <mat-progress-spinner *ngIf="loadingExcluirGrupo" mode="indeterminate" diameter="16" class="button-spinner"></mat-progress-spinner>
+            <span>Confirmar Exclusão</span>
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -340,9 +397,21 @@
           <h3>{{ team.name }}</h3>
           <p>{{ kanbanService.teamMembers().length || team.memberCount }} membro{{ (kanbanService.teamMembers().length || team.memberCount) !== 1 ? 's' : '' }} · {{ team.myRole === 'admin' ? 'Você administra este time' : 'Você é membro' }}</p>
         </div>
-        <button class="danger-icon" *ngIf="team.myRole === 'admin'" (click)="removeTeam()" matTooltip="Excluir time">
+        <button class="danger-icon" *ngIf="team.myRole === 'admin' && !confirmDeleteTeam()" (click)="solicitarExclusaoTime()" matTooltip="Excluir time">
           <mat-icon>delete_outline</mat-icon>
         </button>
+      </div>
+
+      <!-- Confirmação in-app de exclusão de time -->
+      <div class="in-app-confirm-banner" *ngIf="confirmDeleteTeam()">
+        <div class="confirm-content">
+          <mat-icon class="warn-icon">warning</mat-icon>
+          <span>Excluir time <strong>{{ team.name }}</strong> e todos os seus recursos?</span>
+        </div>
+        <div class="confirm-buttons">
+          <button class="cancel-btn-sm" (click)="cancelarExclusaoTime()">Cancelar</button>
+          <button class="danger-btn-sm" (click)="confirmarExclusaoTime()">Confirmar Exclusão</button>
+        </div>
       </div>
 
       <!-- Convidar usuário SSO -->

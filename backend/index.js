@@ -18,6 +18,7 @@ const { authenticateSocket } = require('./realtime-auth');
 
 const PORT = process.env.PORT || 9900;
 const HOST = process.env.HOST || '0.0.0.0';
+const APP_VERSION = 'v5.1-mural-r2';
 const DEV_AUTH_REQUESTED = process.env.NODE_ENV === 'development' && process.env.DEV_AUTH_BYPASS === 'true';
 const DEV_AUTH_ENABLED = DEV_AUTH_REQUESTED && ['127.0.0.1', 'localhost', '::1', '0.0.0.0'].includes(HOST);
 const DEV_AUTH_TOKEN = process.env.DEV_AUTH_TOKEN || 'agenda-dev-local';
@@ -49,6 +50,7 @@ const realtimeClients = new Set();
 let realtimeSequence = 0;
 let shuttingDown = false;
 let closeMcp = async () => {};
+let routesReady = false;
 
 async function shutdown(signal) {
   if (shuttingDown) return;
@@ -289,7 +291,9 @@ async function authenticateAgendaRequest(req, res, next) {
 
 app.get('/health', (_req, res) => {
   res.json({
-    status: 'ok',
+    status: routesReady ? 'ok' : 'starting',
+    version: APP_VERSION,
+    routesReady,
     clients: Math.max(wss.clients.size, realtimeClients.size),
     transports: { websocket: wss.clients.size, eventStream: realtimeClients.size },
     ts: new Date().toISOString(),
@@ -517,6 +521,8 @@ initDb().then(async () => {
   app.use('/api/notifications', authenticateAgendaRequest, notifications.router);
   app.use('/api/privacy', authenticateAgendaRequest, privacyRouter);
   app.use('/api/ai', authenticateAgendaRequest, aiRouter);
+  routesReady = true;
+  console.log('[ROUTES] Todos os roteadores registrados com sucesso.');
 
   const mcpHttp = await createAgendaMcpHttpHandler(broadcast);
   closeMcp = mcpHttp.close;
@@ -584,9 +590,6 @@ initDb().then(async () => {
     console.log('╚══════════════════════════════════════════════════╝');
   });
 }).catch(err => {
-  console.error('[FATAL] Falha ao inicializar banco de dados:', err);
+  console.error('[FATAL] Falha ao inicializar banco de dados ou registrar rotas:', err);
   process.exit(1);
-}).catch(error => {
-  console.error('[DB] Não foi possível iniciar o PostgreSQL:', error.message);
-  process.exitCode = 1;
 });

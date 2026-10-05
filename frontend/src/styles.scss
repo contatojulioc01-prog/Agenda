@@ -1415,9 +1415,16 @@ app-calendar-page {
 .team-selector button { padding: 6px 9px; border-radius: 8px; color: var(--text-secondary); font-size: 11px; display: flex; align-items: center; gap: 5px; }
 .team-selector button.active { background: var(--bg-active); color: var(--text-brand); }.team-selector span { width: 7px; height: 7px; border-radius: 50%; }
 .team-create-form,.team-management { padding: 18px; overflow-y: auto; }
-.team-create-form { display: grid; gap: 12px; }.team-create-form label { display: flex; flex-direction: column; gap: 5px; }.team-create-form label > span,.member-list h4 { color: var(--text-secondary); font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.team-create-form { display: grid; gap: 12px; }
+.team-create-form label { display: flex; flex-direction: column; gap: 5px; }
+.team-create-form label > span,.member-list h4 { color: var(--text-secondary); font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.team-description-field { display: flex; flex-direction: column; gap: 5px; width: 100%; }
+.description-header { display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 10px; }
+.description-header > span { color: var(--text-secondary); font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.description-header app-ai-text-button { margin-left: auto; display: inline-flex; }
 .team-create-form input,.team-create-form textarea,.invite-row select { border: 1px solid var(--border); border-radius: 8px; background: var(--bg-input); color: var(--text-primary); padding: 8px 10px; outline: none; }
-.team-create-form input[type=color] { width: 58px; height: 36px; padding: 3px; }.team-form-actions { display: flex; justify-content: flex-end; gap: 7px; }
+.team-create-form input[type=color] { width: 58px; height: 36px; padding: 3px; }
+.team-form-actions { display: flex; justify-content: flex-end; gap: 7px; }
 .team-summary { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }.team-summary > div { flex: 1; }.team-summary h3 { font-size: 14px; }.team-summary p { color: var(--text-muted); font-size: 10.5px; }
 .team-logo { width: 39px; height: 39px; border-radius: 11px; color: #fff; display: grid; place-items: center; box-shadow: var(--shadow-brand); }.team-logo mat-icon { font-size: 20px; }
 .invite-row { display: flex; gap: 7px; padding: 11px; border: 1px solid var(--border-light); border-radius: 11px; background: var(--bg-surface-alt); }.invite-row select { flex: 1; min-width: 0; }
@@ -2502,3 +2509,199 @@ body.dragging-active * {
     padding: 0 !important;
   }
 }
+
+/* ══════════════ ANGULAR MATERIAL MURAL MENU ══════════════ */
+.mat-mdc-menu-panel.mural-custom-mat-menu {
+  min-width: 250px !important;
+  max-width: 320px !important;
+  border-radius: 14px !important;
+  border: 1px solid var(--border) !important;
+  background: var(--bg-surface) !important;
+  box-shadow: var(--shadow-lg, 0 10px 25px -5px rgba(0, 0, 0, 0.2)) !important;
+  padding: 6px 0 !important;
+  overflow: hidden !important;
+
+  .mat-mdc-menu-content {
+    padding: 0 !important;
+  }
+
+  .mat-menu-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px 6px;
+    border-bottom: 1px solid var(--border-light);
+    margin-bottom: 4px;
+
+    .menu-header-title {
+      font-size: 11px;
+      font-weight: 750;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .mat-menu-action-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 11px;
+      font-weight: 650;
+      color: var(--brand-500);
+      background: transparent;
+      border: 0;
+      cursor: pointer;
+      padding: 2px 6px;
+      border-radius: 6px;
+      transition: background 0.15s;
+
+      mat-icon {
+        font-size: 14px;
+        width: 14px;
+        height: 14px;
+      }
+
+      &:hover {
+        background: var(--bg-hover);
+      }
+    }
+  }
+
+  .mat-menu-group-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px 2px;
+    font-size: 10.5px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+
+    mat-icon {
+      font-size: 14px;
+      width: 14px;
+      height: 14px;
+    }
+  }
+
+  button.mat-mdc-menu-item {
+    min-height: 40px !important;
+    height: 40px !important;
+    padding: 0 14px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 9px !important;
+    color: var(--text-primary) !important;
+    font-size: 13px !important;
+    font-weight: 550 !important;
+    transition: background 0.15s !important;
+
+    &:hover {
+      background: var(--bg-hover) !important;
+    }
+
+    &.active-item {
+      background: color-mix(in srgb, var(--brand-500) 12%, var(--bg-surface)) !important;
+      color: var(--text-brand, var(--brand-500)) !important;
+      font-weight: 700 !important;
+    }
+
+    .menu-board-dot {
+      width: 9px;
+      height: 9px;
+      min-width: 9px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
+    }
+
+    .menu-board-title {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .menu-board-count {
+      font-size: 10.5px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .menu-check-icon {
+      font-size: 16px !important;
+      width: 16px !important;
+      height: 16px !important;
+      margin-left: auto !important;
+      margin-right: 0 !important;
+      color: var(--brand-500) !important;
+    }
+  }
+}
+
+/* ══════════════ MENU DE CONTEXTO DE ANEXOS DO MURAL ══════════════ */
+.mat-mdc-menu-panel.mural-attachment-context-menu {
+  min-width: 190px !important;
+  max-width: 260px !important;
+  padding: 5px !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 10px !important;
+  background: var(--bg-surface) !important;
+  box-shadow: var(--shadow-lg, 0 10px 25px -5px rgba(0, 0, 0, 0.25)) !important;
+  overflow: hidden !important;
+
+  .mat-mdc-menu-content {
+    padding: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 2px !important;
+  }
+
+  button.mat-mdc-menu-item {
+    width: 100% !important;
+    min-height: 36px !important;
+    height: 36px !important;
+    padding: 0 10px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 9px !important;
+    border-radius: 7px !important;
+    color: var(--text-secondary) !important;
+    font-family: inherit !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    text-align: left !important;
+    transition: all 0.15s ease !important;
+
+    mat-icon {
+      width: 17px !important;
+      height: 17px !important;
+      font-size: 17px !important;
+      margin-right: 0 !important;
+    }
+
+    &:hover {
+      color: var(--text-primary) !important;
+      background: var(--bg-hover) !important;
+    }
+
+    &.menu-item-danger {
+      color: #ef4444 !important;
+
+      mat-icon {
+        color: #ef4444 !important;
+      }
+
+      &:hover {
+        color: #dc2626 !important;
+        background: rgba(239, 68, 68, 0.1) !important;
+      }
+    }
+  }
+
+  .mat-divider {
+    margin: 4px 0 !important;
+    border-top-color: var(--border-light) !important;
+  }
+}

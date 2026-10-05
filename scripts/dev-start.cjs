@@ -46,14 +46,6 @@ async function waitUntilReady(url, attempts = 90) {
   return false;
 }
 
-function openBrowser(url) {
-  if (process.argv.includes('--no-open')) return;
-  const command = isWindows ? 'cmd.exe' : process.platform === 'darwin' ? 'open' : 'xdg-open';
-  const args = isWindows ? ['/c', 'start', '', url] : [url];
-  const opener = spawn(command, args, { detached: true, stdio: 'ignore', windowsHide: true });
-  opener.unref();
-}
-
 process.on('SIGINT', () => stop(0));
 process.on('SIGTERM', () => stop(0));
 
@@ -83,5 +75,5 @@ Promise.all([
   }
   console.log(`\n[DEV] Pronto: ${appUrl}`);
   console.log('[DEV] Pressione Ctrl+C para encerrar os dois servidores.\n');
-  openBrowser(appUrl);
 });
+

@@ -1,9 +1,11 @@
-import { Component, EventEmitter, Input, OnInit, Output, inject, signal } from '@angular/core';
+import { Component, EventEmitter, Input, OnInit, Output, ViewChild, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatMenuModule, MatMenuTrigger } from '@angular/material/menu';
+import { MatDividerModule } from '@angular/material/divider';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { finalize, forkJoin, of } from 'rxjs';
 
@@ -30,6 +32,8 @@ export interface MuralColorOption {
     MatIconModule,
     MatTooltipModule,
     MatProgressSpinnerModule,
+    MatMenuModule,
+    MatDividerModule,
     AiTextButtonComponent,
     MarkdownEditorComponent,
   ],
@@ -37,6 +41,7 @@ export interface MuralColorOption {
   styleUrl: './mural-item-modal.component.scss',
 })
 export class MuralItemModalComponent implements OnInit {
+  @ViewChild(MatMenuTrigger) contextMenuTrigger?: MatMenuTrigger;
   @Input() boardId = '';
   @Input() item: MuralItem | null = null;
   @Input() groups: MuralGroup[] = [];
@@ -73,6 +78,13 @@ export class MuralItemModalComponent implements OnInit {
   loadingSalvar = false;
   loadingExcluir = false;
   loadingUpload = false;
+  readonly errorMessage = signal('');
+  readonly confirmDelete = signal(false);
+
+  // Context menu state (Angular Material)
+  contextMenuPosition = { x: 0, y: 0 };
+  contextAttachment: Attachment | null = null;
+  contextPendingIndex: number | null = null;
 
   previewAttachmentUrl = signal<string | null>(null);
   previewAttachmentName = signal('');
@@ -89,6 +101,8 @@ export class MuralItemModalComponent implements OnInit {
 
   ngOnInit(): void {
     this.pendingFiles = [];
+    this.errorMessage.set('');
+    this.confirmDelete.set(false);
     if (this.item) {
       this.isEdit = true;
       this.title = this.item.title;
@@ -115,6 +129,7 @@ export class MuralItemModalComponent implements OnInit {
   salvar(): void {
     if (this.loadingSalvar || !this.title.trim()) return;
 
+    this.errorMessage.set('');
     this.loadingSalvar = true;
     if (this.isEdit && this.item) {
       this.service.atualizarItem(this.item.id, {
@@ -133,6 +148,7 @@ export class MuralItemModalComponent implements OnInit {
         },
         error: (err) => {
           this.loadingSalvar = false;
+          this.errorMessage.set(err.error?.error || 'Erro ao salvar alterações no cartão.');
           console.error('Erro ao salvar nota do mural:', err);
         }
       });
@@ -156,6 +172,7 @@ export class MuralItemModalComponent implements OnInit {
         },
         error: (err) => {
           this.loadingSalvar = false;
+          this.errorMessage.set(err.error?.error || 'Erro ao criar cartão no mural.');
           console.error('Erro ao criar nota do mural:', err);
         }
       });
@@ -182,6 +199,7 @@ export class MuralItemModalComponent implements OnInit {
       },
       error: (err) => {
         console.error('Erro ao fazer upload de arquivos pendentes:', err);
+        this.errorMessage.set(err.error?.error || 'Não foi possível enviar todos os anexos.');
         callback([]);
       }
     });
@@ -189,7 +207,12 @@ export class MuralItemModalComponent implements OnInit {
 
   excluir(): void {
     if (!this.isEdit || !this.item || this.loadingExcluir) return;
-    if (!confirm('Deseja realmente remover este aviso do mural?')) return;
+    
+    // Confirmação in-app em 2 etapas
+    if (!this.confirmDelete()) {
+      this.confirmDelete.set(true);
+      return;
+    }
 
     this.loadingExcluir = true;
     this.service.excluirItem(this.item.id, this.currentUserId)
@@ -200,15 +223,22 @@ export class MuralItemModalComponent implements OnInit {
           this.fechar();
         },
         error: (err) => {
+          this.errorMessage.set(err.error?.error || 'Erro ao excluir o cartão.');
           console.error('Erro ao excluir nota:', err);
         }
       });
+  }
+
+  cancelarExclusao(): void {
+    this.confirmDelete.set(false);
   }
 
   onFilesSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
     const files = Array.from(input.files || []);
     if (!files.length) return;
+
+    this.errorMessage.set('');
 
     if (this.isEdit && this.item) {
       // Faz upload imediato dos múltiplos arquivos
@@ -225,10 +255,11 @@ export class MuralItemModalComponent implements OnInit {
       ).subscribe({
         next: (uploadedList) => {
           this.attachments.push(...uploadedList);
+          this.saved.emit({ ...this.item!, attachments: [...this.attachments] });
         },
         error: (err) => {
           console.error('Erro ao enviar anexos:', err);
-          alert(err.error?.error || 'Erro ao enviar alguns dos anexos.');
+          this.errorMessage.set(err.error?.error || 'Não foi possível enviar um ou mais anexos. Verifique o limite de 10 MB por arquivo.');
         }
       });
     } else {
@@ -243,12 +274,15 @@ export class MuralItemModalComponent implements OnInit {
   }
 
   removerAnexo(att: Attachment): void {
-    if (!confirm(`Remover anexo "${att.fileName}"?`)) return;
     this.attachmentsService.remove(att.id, this.currentUserId).subscribe({
       next: () => {
         this.attachments = this.attachments.filter(a => a.id !== att.id);
+        if (this.isEdit && this.item) {
+          this.saved.emit({ ...this.item, attachments: [...this.attachments] });
+        }
       },
       error: (err) => {
+        this.errorMessage.set(err.error?.error || 'Não foi possível remover o anexo.');
         console.error('Erro ao remover anexo:', err);
       }
     });
@@ -287,5 +321,27 @@ export class MuralItemModalComponent implements OnInit {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  onAttachmentContextMenu(event: MouseEvent, att: Attachment): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.contextAttachment = att;
+    this.contextPendingIndex = null;
+    this.contextMenuPosition = { x: event.clientX, y: event.clientY };
+    setTimeout(() => {
+      this.contextMenuTrigger?.openMenu();
+    });
+  }
+
+  onPendingContextMenu(event: MouseEvent, index: number): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.contextAttachment = null;
+    this.contextPendingIndex = index;
+    this.contextMenuPosition = { x: event.clientX, y: event.clientY };
+    setTimeout(() => {
+      this.contextMenuTrigger?.openMenu();
+    });
   }
 }

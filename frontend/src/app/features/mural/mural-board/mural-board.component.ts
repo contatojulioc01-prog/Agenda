@@ -5,6 +5,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatMenuModule } from '@angular/material/menu';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { finalize } from 'rxjs';
 
@@ -32,6 +33,7 @@ import { MarkdownEditorComponent } from '../../../shared/components/markdown-edi
     MatIconModule,
     MatTooltipModule,
     MatProgressSpinnerModule,
+    MatMenuModule,
     MuralItemModalComponent,
     MarkdownTextComponent,
     AiTextButtonComponent,
@@ -56,6 +58,9 @@ export class MuralBoardComponent implements OnInit, OnDestroy {
   readonly activeBoard = this.muralService.activeBoard;
   readonly loading = this.muralService.loading;
   readonly teams = this.kanbanService.teams;
+
+  readonly hasPersonalBoards = computed(() => this.boards().some(b => b.scopeType === 'personal'));
+  readonly hasTeamBoards = computed(() => this.boards().some(b => b.scopeType === 'team'));
 
   readonly search = signal('');
   readonly groupFilter = signal<string | 'all'>('all');
@@ -99,6 +104,21 @@ export class MuralBoardComponent implements OnInit, OnDestroy {
   readonly inviteableUsers = computed(() => [...this.auth.allUsers()].sort((first, second) =>
     (first.name || first.email || '').localeCompare(second.name || second.email || '', 'pt-BR', { sensitivity: 'base' })
   ));
+
+  // In-app confirmations & alert states
+  readonly confirmDeleteGroup = signal(false);
+  readonly confirmDeleteTeam = signal(false);
+  readonly errorMessage = signal<string | null>(null);
+
+  private initializedUserId = '';
+  private readonly workspaceInitialization = effect(() => {
+    const user = this.auth.currentUser();
+    if (!user?.id || user.id === this.initializedUserId) return;
+    this.initializedUserId = user.id;
+    const requestedId = this.route.snapshot.paramMap.get('boardId');
+    this.muralService.loadBoards(requestedId || undefined);
+    this.kanbanService.loadTeams();
+  });
 
   readonly currentTeam = computed(() => {
     const active = this.activeBoard();
@@ -159,10 +179,23 @@ export class MuralBoardComponent implements OnInit, OnDestroy {
     return this.itemsByGroup().get('ungrouped') || [];
   });
 
+  constructor() {
+    this.route.paramMap.subscribe(params => {
+      const boardId = params.get('boardId');
+      if (boardId && this.auth.currentUser()?.id) {
+        if (this.activeBoard()?.id !== boardId) {
+          this.muralService.loadBoard(boardId);
+        }
+      }
+    });
+  }
+
   ngOnInit(): void {
     const requestedId = this.route.snapshot.paramMap.get('boardId');
-    this.muralService.loadBoards(requestedId || undefined);
-    this.kanbanService.loadTeams();
+    if (this.auth.currentUser()?.id) {
+      this.muralService.loadBoards(requestedId || undefined);
+      this.kanbanService.loadTeams();
+    }
 
     this.unsubscribeRealtime = this.syncService.subscribe(event => {
       if (event.type === 'mural_updated') {
@@ -264,6 +297,7 @@ export class MuralBoardComponent implements OnInit, OnDestroy {
   fecharGrupoModal(): void {
     this.groupModalOpen.set(false);
     this.editingGroup.set(null);
+    this.confirmDeleteGroup.set(false);
   }
 
   salvarGrupo(): void {
@@ -308,10 +342,17 @@ export class MuralBoardComponent implements OnInit, OnDestroy {
     }
   }
 
-  excluirGrupo(): void {
+  solicitarExclusaoGrupo(): void {
+    this.confirmDeleteGroup.set(true);
+  }
+
+  cancelarExclusaoGrupo(): void {
+    this.confirmDeleteGroup.set(false);
+  }
+
+  confirmarExclusaoGrupo(): void {
     const editGroup = this.editingGroup();
     if (!editGroup || this.loadingExcluirGrupo) return;
-    if (!confirm(`Deseja excluir o grupo "${editGroup.title}"? As notas serão movidas para notas soltas.`)) return;
 
     this.loadingExcluirGrupo = true;
     this.apiService.excluirGrupo(editGroup.id, this.currentUserId)
@@ -439,9 +480,11 @@ export class MuralBoardComponent implements OnInit, OnDestroy {
 
   fecharTimeModal(): void {
     this.teamModalOpen.set(false);
+    this.confirmDeleteTeam.set(false);
   }
 
   trocarTimeNoModal(teamId: string): void {
+    this.confirmDeleteTeam.set(false);
     this.kanbanService.loadTeamMembers(teamId);
     const targetMural = this.boards().find(b => b.teamId === teamId);
     if (targetMural) {
@@ -476,12 +519,20 @@ export class MuralBoardComponent implements OnInit, OnDestroy {
     this.kanbanService.removeTeamMember(team.id, memberId);
   }
 
-  removeTeam(): void {
+  solicitarExclusaoTime(): void {
+    this.confirmDeleteTeam.set(true);
+  }
+
+  cancelarExclusaoTime(): void {
+    this.confirmDeleteTeam.set(false);
+  }
+
+  confirmarExclusaoTime(): void {
     const team = this.currentTeam();
     if (!team) return;
-    if (!confirm(`Deseja realmente excluir o time "${team.name}"?`)) return;
     this.kanbanService.deleteTeam(team.id, (success) => {
       if (success) {
+        this.confirmDeleteTeam.set(false);
         this.teamModalOpen.set(false);
         this.muralService.loadBoards();
       }
@@ -534,10 +585,5 @@ export class MuralBoardComponent implements OnInit, OnDestroy {
     } catch {
       return isoString;
     }
-  }
-
-  pegarPrimeiraImagem(item: MuralItem): Attachment | null {
-    if (!item.attachments || !item.attachments.length) return null;
-    return item.attachments.find(a => a.mimeType.startsWith('image/')) || null;
   }
 }

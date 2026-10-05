@@ -32,7 +32,7 @@
       "process": 13
     },
     "prod": {
-      "process": 1
+      "process": "DC-Agenda"
     }
   }
 }

@@ -108,6 +108,14 @@ router.post('/:ownerType/:ownerId', express.raw({ type: 'application/octet-strea
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
     [attachmentId, ownerType, ownerId, fileName, mimeType, req.body.length, req.body, userId(req), now, diskFilePath]);
 
+  if (ownerType === 'mural_item') {
+    const muralItem = await db.get('SELECT mural_id FROM mural_items WHERE id = $1', [ownerId]);
+    if (muralItem) req.broadcast?.({ type: 'mural_updated', muralId: muralItem.mural_id, itemId: ownerId });
+  } else if (ownerType === 'task') {
+    const task = await db.get('SELECT board_id FROM kanban_tasks WHERE id = $1', [ownerId]);
+    if (task) req.broadcast?.({ type: 'kanban_updated', boardId: task.board_id, taskId: ownerId });
+  }
+
   res.status(201).json(attachmentDto(await db.get('SELECT * FROM attachments WHERE id = $1', [attachmentId])));
 }));
 
@@ -125,6 +133,15 @@ router.delete('/:attachmentId', asyncRoute(async (req, res) => {
   }
   
   await db.run('DELETE FROM attachments WHERE id = $1', [item.id]);
+
+  if (item.owner_type === 'mural_item') {
+    const muralItem = await db.get('SELECT mural_id FROM mural_items WHERE id = $1', [item.owner_id]);
+    if (muralItem) req.broadcast?.({ type: 'mural_updated', muralId: muralItem.mural_id, itemId: item.owner_id });
+  } else if (item.owner_type === 'task') {
+    const task = await db.get('SELECT board_id FROM kanban_tasks WHERE id = $1', [item.owner_id]);
+    if (task) req.broadcast?.({ type: 'kanban_updated', boardId: task.board_id, taskId: item.owner_id });
+  }
+
   res.json({ success: true });
 }));
 

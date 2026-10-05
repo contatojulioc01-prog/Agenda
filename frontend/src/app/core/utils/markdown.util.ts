@@ -96,8 +96,17 @@ export function renderBasicMarkdown(markdown: string): string {
     if (unordered || ordered) {
       const nextList = unordered ? 'ul' : 'ol';
       if (list !== nextList) { closeList(); output.push(`<${nextList}>`); list = nextList; }
-      const item = (unordered || ordered)?.[1] || '';
-      output.push(`<li>${item ? formatInline(item) : '<br>'}</li>`);
+      const rawItem = (unordered || ordered)?.[1] || '';
+      
+      // Suporte a Checklist tipo - [ ] ou - [x]
+      const checkMatch = rawItem.match(/^\[([ xX])\]\s*(.*)$/);
+      if (checkMatch) {
+        const isChecked = checkMatch[1].toLowerCase() === 'x';
+        const checkText = checkMatch[2];
+        output.push(`<li class="checklist-item ${isChecked ? 'is-checked' : ''}"><span class="mat-pseudo-checkbox ${isChecked ? 'mat-pseudo-checkbox-checked' : ''}"><svg viewBox="0 0 24 24" class="mat-pseudo-checkbox-check"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span><span class="checklist-text ${isChecked ? 'done' : ''}">${checkText ? formatInline(checkText) : '<br>'}</span></li>`);
+      } else {
+        output.push(`<li>${rawItem ? formatInline(rawItem) : '<br>'}</li>`);
+      }
       continue;
     }
 

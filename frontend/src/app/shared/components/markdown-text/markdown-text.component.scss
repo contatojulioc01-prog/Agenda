@@ -14,3 +14,74 @@ app-markdown-text { display: block; min-width: 0; }
 .markdown-text table { width: 100%; border-collapse: collapse; font-size: .92em; }
 .markdown-text th, .markdown-text td { padding: 6px 7px; border: 1px solid var(--border-light); text-align: left; vertical-align: top; }
 .markdown-text th { background: var(--bg-surface-alt); font-weight: 750; }
+
+/* ── Checklist padrão Angular Material ── */
+.markdown-text ul:has(.checklist-item) {
+  list-style: none;
+  padding-left: 0;
+}
+
+.markdown-text li.checklist-item {
+  list-style: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 4px 0;
+  padding: 2px 4px;
+  border-radius: 6px;
+  transition: background var(--transition);
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.03);
+  }
+}
+
+.markdown-text .mat-pseudo-checkbox {
+  width: 17px;
+  height: 17px;
+  min-width: 17px;
+  border-radius: 4px;
+  border: 2px solid var(--text-muted, #94a3b8);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  margin-top: 2px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  background: transparent;
+  color: transparent;
+
+  .mat-pseudo-checkbox-check {
+    width: 13px;
+    height: 13px;
+    opacity: 0;
+    transform: scale(0.5);
+    transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  &.mat-pseudo-checkbox-checked {
+    background: var(--brand-500, #6366f1);
+    border-color: var(--brand-500, #6366f1);
+    color: #ffffff;
+    box-shadow: 0 1px 3px rgba(99, 102, 241, 0.35);
+
+    .mat-pseudo-checkbox-check {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+}
+
+.markdown-text .checklist-text {
+  flex: 1;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-primary);
+  transition: all 0.2s ease;
+
+  &.done {
+    text-decoration: line-through;
+    color: var(--text-muted, #94a3b8);
+    opacity: 0.8;
+  }
+}
