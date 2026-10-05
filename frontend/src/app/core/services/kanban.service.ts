@@ -179,8 +179,8 @@ export class KanbanService {
       .subscribe(result => { if (result) { this.activeBoard.set(null); this.loadBoards(); } });
   }
 
-  createColumn(boardId: string, title: string): void {
-    this.http.post<KanbanColumn>(`/api/kanban/boards/${boardId}/columns`, { title }, { headers: this.headers })
+  createColumn(boardId: string, title: string, color?: string): void {
+    this.http.post<KanbanColumn>(`/api/kanban/boards/${boardId}/columns`, { title, ...(color ? { color } : {}) }, { headers: this.headers })
       .pipe(catchError(err => { this.error.set(err.error?.error || 'Erro ao criar lista.'); return of(null); }))
       .subscribe(column => {
         if (column) this.activeBoard.update(board => {

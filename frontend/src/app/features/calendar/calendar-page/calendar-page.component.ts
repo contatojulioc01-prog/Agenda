@@ -27,6 +27,8 @@ import { CalendarManagerComponent } from '../calendar-manager/calendar-manager.c
 import { ThemeService } from '../../../core/services/theme.service';
 import { KanbanBoardComponent } from '../../tasks/kanban-board/kanban-board.component';
 import { KanbanService } from '../../../core/services/kanban.service';
+import { MuralBoardComponent } from '../../mural/mural-board/mural-board.component';
+import { MuralService } from '../../../core/services/mural.service';
 import { NotificationSettingsComponent } from '../../notifications/notification-settings.component';
 import { UserPreferencesService } from '../../../core/services/user-preferences.service';
 import { AppLoadingService } from '../../../core/services/app-loading.service';
@@ -42,13 +44,14 @@ export type CalendarView = 'month' | 'week' | 'day';
   imports: [
     CommonModule, MatDialogModule, MatIconModule, MatTooltipModule,
     MonthViewComponent, WeekViewComponent, DayViewComponent,
-    MiniCalendarComponent, ThemeToggleComponent, CalendarManagerComponent, KanbanBoardComponent, NotificationSettingsComponent, AiAssistantComponent, LivroAbrindoComponent,
+    MiniCalendarComponent, ThemeToggleComponent, CalendarManagerComponent, KanbanBoardComponent, MuralBoardComponent, NotificationSettingsComponent, AiAssistantComponent, LivroAbrindoComponent,
   ],
   templateUrl: './calendar-page.component.html',
   styleUrl: './calendar-page.component.scss',
 })
 export class CalendarPageComponent implements OnInit, OnDestroy {
   @ViewChild(KanbanBoardComponent) private kanbanBoard?: KanbanBoardComponent;
+  @ViewChild(MuralBoardComponent) private muralBoard?: MuralBoardComponent;
   private dialog = inject(MatDialog);
   private eventsService = inject(EventsService);
   private holidaysService = inject(HolidaysService);
@@ -57,6 +60,7 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
   public syncService = inject(SyncService);
   public invitationsService = inject(InvitationsService);
   public kanbanService = inject(KanbanService);
+  public muralService = inject(MuralService);
   public aiService = inject(AiService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
@@ -103,7 +107,7 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
 
   // ── Estado ──
   currentView: CalendarView = this.userPreferences.calendarView();
-  activeSection: 'calendar' | 'tasks' = 'calendar';
+  activeSection: 'calendar' | 'tasks' | 'mural' = 'calendar';
   selectedDate = new Date();
   holidays: Holiday[] = [];
   private selectedDateVersion = signal(0);
@@ -432,7 +436,25 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
     this.userPreferences.setCalendarView(view);
     this.navigateToCalendar();
   }
-  setSection(section: 'calendar' | 'tasks'): void {
+  setSection(section: 'calendar' | 'tasks' | 'mural'): void {
+    if (section === 'tasks') {
+      const boardId = this.kanbanService.activeBoard()?.id;
+      void this.router.navigate(boardId ? ['/tarefas', boardId] : ['/tarefas']);
+      return;
+    }
+    if (section === 'mural') {
+      const boardId = this.muralService.activeBoard()?.id;
+      void this.router.navigate(boardId ? ['/mural', boardId] : ['/mural']);
+      return;
+    }
+    this.navigateToCalendar();
+  }
+  openMuralCreate(): void {
+    const boardId = this.muralService.activeBoard()?.id;
+    void this.router.navigate(boardId ? ['/mural', boardId] : ['/mural']);
+    setTimeout(() => this.muralBoard?.abrirNovoItem());
+  }
+  _oldSetSection(section: any): void {
     if (section === 'tasks') {
       const boardId = this.kanbanService.activeBoard()?.id;
       void this.router.navigate(boardId ? ['/tarefas', boardId] : ['/tarefas']);
@@ -544,6 +566,11 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
     const path = this.router.url.split('?')[0];
     if (path.startsWith('/tarefas')) {
       this.activeSection = 'tasks';
+      return;
+    }
+
+    if (path.startsWith('/mural')) {
+      this.activeSection = 'mural';
       return;
     }
 

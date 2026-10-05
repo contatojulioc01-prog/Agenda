@@ -49,6 +49,7 @@ function validateTaskInput(body, partial = false) {
   const required = key => !partial || body[key] !== undefined;
   if (required('title') && !isNonEmptyString(body.title, 160)) return 'Título inválido (máximo de 160 caracteres)';
   if (!isOptionalString(body.description, 5000)) return 'Descrição inválida (máximo de 5000 caracteres)';
+  if (body.color !== undefined && body.color !== null && body.color !== '' && !isHexColor(body.color)) return 'Cor inválida';
   if (body.priority !== undefined && !TASK_PRIORITIES.has(body.priority)) return 'Prioridade inválida';
   if (body.dueDate !== undefined && body.dueDate !== null && body.dueDate !== '' && !isIsoDate(body.dueDate)) return 'Prazo inválido';
   if (body.archived !== undefined && typeof body.archived !== 'boolean') return 'Estado de arquivamento inválido';

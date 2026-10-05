@@ -7,4 +7,4 @@ export interface Attachment {
   createdAt: string;
 }
 
-export type AttachmentOwner = 'event' | 'task';
+export type AttachmentOwner = 'event' | 'task' | 'mural_item';

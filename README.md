@@ -145,10 +145,13 @@ Acesse a aplicação em: `http://localhost:9900`
 
 | Comando | Descrição |
 | :--- | :--- |
+| `npm run startdev` | Inicia Frontend + Backend em modo Dev apontando automaticamente para o banco `agenda_dev` |
+| `npm run dev` | Inicia em modo Dev apontando para `agenda_dev` com bypass de autenticação local |
+| `npm run db:setup:dev` | Cria e atualiza a estrutura de tabelas no banco de desenvolvimento `agenda_dev` |
+| `npm run db:setup` | Inicializa as tabelas do PostgreSQL no banco padrão |
 | `npm run build` | Compila o frontend Angular para `backend/public/` |
-| `npm test` | Executa a suíte de 38 testes automatizados do backend |
+| `npm test` | Executa a suíte de testes automatizados do backend |
 | `npm run seed:linkedin` | Popula o banco com a agenda, time e tarefas de apresentação do LinkedIn |
-| `npm run db:setup` | Inicializa as tabelas do PostgreSQL |
 
 ---
 

@@ -69,8 +69,8 @@
 }
 
 .app-section-tabs {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  flex-direction: column;
   gap: 4px;
   padding: 4px;
   margin: -6px 0 14px;
@@ -79,7 +79,51 @@
   background: var(--bg-hover);
 }
 
-.app-section-tabs button {
+/* Linha ativa — ocupa toda a largura */
+.app-section-tabs .tab-active-row {
+  width: 100%;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 750;
+  color: var(--text-brand);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-xs), inset 0 1px 0 var(--panel-highlight);
+  transition: all var(--transition);
+  cursor: default;
+
+  mat-icon { font-size: 18px; width: 18px; height: 18px; }
+}
+
+/* Linha secundária — as outras tabs lado a lado */
+.app-section-tabs .tab-secondary-row {
+  display: flex;
+  gap: 4px;
+
+  button {
+    flex: 1;
+    height: 30px;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    color: var(--text-muted);
+    font-size: 10.5px;
+    font-weight: 650;
+    transition: all var(--transition);
+
+    mat-icon { font-size: 15px; width: 15px; height: 15px; }
+    &:hover { color: var(--text-primary); background: var(--bg-surface); }
+  }
+}
+
+/* Fallback: se tiver só um button direto */
+.app-section-tabs > button:not(.tab-active-row) {
   height: 34px;
   border-radius: 8px;
   display: flex;
@@ -90,7 +134,6 @@
   font-size: 11.5px;
   font-weight: 650;
   transition: all var(--transition);
-
   mat-icon { font-size: 17px; width: 17px; height: 17px; }
   &:hover { color: var(--text-primary); }
   &.active {
@@ -516,12 +559,19 @@
   &:hover { background: var(--bg-hover); }
 }
 
-/* ── Rodapé fixo na base da sidebar ── */
+/* ── Rodapé fixo na base da sidebar (canto inferior esquerdo) ── */
 .sidebar-footer {
+  margin-top: auto;
   flex-shrink: 0;
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  z-index: 20;
   background: var(--bg-sidebar);
   border-top: 1px solid var(--border);
   padding-top: 8px;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.04);
 }
 
 /* Botão de tema na base da sidebar */

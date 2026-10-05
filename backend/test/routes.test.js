@@ -490,3 +490,51 @@ test('valida ticket de autenticação SSO com sucesso', async () => {
   assert.equal(result.data.id, 'usr-sso-1');
 });
 
+test('lista e manipula mural pessoal, grupos e notas', async () => {
+  let createdItem = null;
+  await withRouter('../routes/mural', fakeDb => {
+    fakeDb.all = async sql => {
+      if (sql.includes("b.scope_type = 'personal'")) {
+        return [{ id: 'mrl-1', name: 'Meu Mural', color: '#f59e0b', owner_id: 'user-1', scope_type: 'personal', item_count: 1 }];
+      }
+      if (sql.includes("b.scope_type = 'team'")) return [];
+      if (sql.includes('FROM kanban_teams')) return [];
+      if (sql.includes('FROM mural_groups')) return [{ id: 'grp-1', mural_id: 'mrl-1', title: 'Avisos', color: '#f59e0b', position: 0 }];
+      if (sql.includes('FROM mural_items')) return [{ id: 'not-1', mural_id: 'mrl-1', group_id: 'grp-1', title: 'Aviso 1', content: 'Texto', color: '#fef08a', is_pinned: 1, position: 0, created_by: 'user-1' }];
+      if (sql.includes('FROM attachments')) return [];
+      return [];
+    };
+    fakeDb.get = async sql => {
+      if (sql.includes('FROM mural_boards WHERE owner_id')) return { id: 'mrl-1', name: 'Meu Mural', scope_type: 'personal', owner_id: 'user-1' };
+      if (sql.includes('FROM mural_boards WHERE id')) return { id: 'mrl-1', name: 'Meu Mural', scope_type: 'personal', owner_id: 'user-1' };
+      if (sql.includes('MAX(position)')) return { max_p: 0 };
+      if (sql.includes('FROM mural_items WHERE id')) return createdItem || { id: 'not-1', mural_id: 'mrl-1', group_id: 'grp-1', title: 'Nova Nota', content: 'Nota teste', color: '#fef08a', is_pinned: 0, position: 1, created_by: 'user-1' };
+      return null;
+    };
+    fakeDb.run = async (_sql, params) => {
+      createdItem = { id: params[0], mural_id: params[1], group_id: params[2], title: params[3], content: params[4], color: params[5], is_pinned: params[6], position: params[7], created_by: params[9] };
+      return { rowCount: 1 };
+    };
+  }, async baseUrl => {
+    const listRes = await fetch(`${baseUrl}/boards`, { headers: { 'x-user-id': 'user-1' } });
+    assert.equal(listRes.status, 200);
+    const boards = await listRes.json();
+    assert.equal(boards.length, 1);
+    assert.equal(boards[0].name, 'Meu Mural');
+
+    const detailRes = await fetch(`${baseUrl}/boards/mrl-1`, { headers: { 'x-user-id': 'user-1' } });
+    assert.equal(detailRes.status, 200);
+    const detail = await detailRes.json();
+    assert.equal(detail.groups.length, 1);
+    assert.equal(detail.items.length, 1);
+
+    const postRes = await fetch(`${baseUrl}/boards/mrl-1/items`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-user-id': 'user-1' },
+      body: JSON.stringify({ title: 'Nota de Teste', content: 'Conteúdo' })
+    });
+    assert.equal(postRes.status, 201);
+    const item = await postRes.json();
+    assert.equal(item.title, 'Nota de Teste');
+  });
+});

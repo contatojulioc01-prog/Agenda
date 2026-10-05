@@ -25,6 +25,16 @@ export const routes: Routes = [
     canActivate: [authGuard],
   },
   {
+    path: 'mural/:boardId',
+    component: CalendarPageComponent,
+    canActivate: [authGuard],
+  },
+  {
+    path: 'mural',
+    component: CalendarPageComponent,
+    canActivate: [authGuard],
+  },
+  {
     path: '',
     redirectTo: 'calendario',
     pathMatch: 'full',

@@ -4,13 +4,13 @@ import { CalendarsService } from './calendars.service';
 import { EventsService } from './events.service';
 import { InvitationsService } from './invitations.service';
 import { KanbanService } from './kanban.service';
+import { MuralService } from './mural.service';
 import { AuthService } from './auth.service';
 
 export type SyncStatus = 'connected' | 'connecting' | 'disconnected';
 
 function getWsUrl(): string {
   if (typeof window !== 'undefined' && window.location.hostname) {
-    // Usa a mesma porta/hostname do frontend (o proxy da porta 9990 irá encaminhar websockets para 9900)
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const basePath = new URL(document.baseURI).pathname.replace(/\/$/, '');
     return `${protocol}//${window.location.host}${basePath}/ws`;
@@ -23,15 +23,9 @@ function getHttpUrl(): string {
   return new URL(document.baseURI).pathname.replace(/\/$/, '');
 }
 
-/**
- * Sob um subcaminho do IIS, o EventSource é o transporte mais compatível e
- * entrega as mesmas notificações em tempo real sem depender de WebSocket
- * Protocol/Upgrade no servidor. No acesso direto e no dev-server, usamos WS.
- */
 function shouldUseWebSocket(): boolean {
   return getHttpUrl() === '';
 }
-
 
 @Injectable({ providedIn: 'root' })
 export class SyncService implements OnDestroy {
@@ -39,6 +33,7 @@ export class SyncService implements OnDestroy {
   private eventsService = inject(EventsService);
   private invitationsService = inject(InvitationsService);
   private kanbanService = inject(KanbanService);
+  private muralService = inject(MuralService);
   private authService = inject(AuthService);
   private http = inject(HttpClient);
   private ngZone = inject(NgZone);
@@ -50,12 +45,18 @@ export class SyncService implements OnDestroy {
   private ws: WebSocket | null = null;
   private eventSource: EventSource | null = null;
   private recentMessageIds = new Set<string>();
+  private listeners = new Set<(event: any) => void>();
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private healthInterval: ReturnType<typeof setInterval> | null = null;
   private healthOnline = false;
   private shouldReconnect = false;
 
   constructor() {}
+
+  subscribe(listener: (event: any) => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
 
   /** Inicia a conexão WebSocket com o backend */
   connect(): void {
@@ -115,7 +116,7 @@ export class SyncService implements OnDestroy {
         });
       };
 
-      this.ws.onerror = (err) => {
+      this.ws.onerror = () => {
         this.ngZone.run(() => {
           this.status.set(this.isRealtimeConnected() ? 'connected' : (this.healthOnline ? 'connecting' : 'disconnected'));
         });
@@ -185,7 +186,6 @@ export class SyncService implements OnDestroy {
       } catch {}
     };
     this.eventSource.onerror = () => {
-      // O EventSource se reconecta automaticamente; o WebSocket segue em paralelo.
       this.ngZone.run(() => {
         if (!this.isRealtimeConnected()) this.status.set(this.healthOnline ? 'connecting' : 'disconnected');
       });
@@ -202,13 +202,18 @@ export class SyncService implements OnDestroy {
     return this.ws?.readyState === 1 || this.eventSource?.readyState === 1;
   }
 
-  private handleMessage(msg: { type: string; messageId?: string; calendarId?: string; eventId?: string; userId?: string; boardId?: string; taskId?: string; teamId?: string }): void {
+  private handleMessage(msg: { type: string; messageId?: string; calendarId?: string; eventId?: string; userId?: string; boardId?: string; taskId?: string; teamId?: string; muralId?: string }): void {
     if (msg.messageId) {
       if (this.recentMessageIds.has(msg.messageId)) return;
       this.recentMessageIds.add(msg.messageId);
       setTimeout(() => this.recentMessageIds.delete(msg.messageId!), 10000);
     }
     this.lastSyncAt.set(new Date());
+
+    // Notify custom listeners
+    this.listeners.forEach(cb => {
+      try { cb(msg); } catch {}
+    });
 
     switch (msg.type) {
       case 'event_created':
@@ -258,6 +263,17 @@ export class SyncService implements OnDestroy {
         this.kanbanService.loadTeams();
         this.kanbanService.loadTeamInvitations();
         this.kanbanService.loadBoards();
+        this.muralService.loadBoards();
+        break;
+      case 'mural_updated':
+        if (msg.muralId && this.muralService.activeBoard()?.id === msg.muralId) {
+          this.muralService.loadBoard(msg.muralId);
+        } else {
+          this.muralService.loadBoards();
+        }
+        break;
+      case 'mural_deleted':
+        this.muralService.loadBoards();
         break;
     }
   }

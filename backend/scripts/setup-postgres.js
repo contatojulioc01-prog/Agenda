@@ -1,4 +1,11 @@
-require('dotenv').config({ path: require('path').join(__dirname, '..', '..', '.env') });
+const fs = require('fs');
+const path = require('path');
+const dotenv = require('dotenv');
+
+const envPaths = [path.join(__dirname, '..', '..', '.env'), path.join(__dirname, '..', '.env')];
+for (const envPath of envPaths) {
+  if (fs.existsSync(envPath)) dotenv.config({ path: envPath, override: false, quiet: true });
+}
 const { Client } = require('pg');
 
 const identifier = value => {

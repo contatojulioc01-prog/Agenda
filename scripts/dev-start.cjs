@@ -3,7 +3,8 @@ const { spawn } = require('node:child_process');
 const isWindows = process.platform === 'win32';
 const npmCommand = 'npm';
 const token = 'agenda-dev-local';
-const appUrl = `http://127.0.0.1:9990/?token=${encodeURIComponent(token)}`;
+const appHost = process.env.DEV_HOST || '0.0.0.0';
+const appUrl = `http://0.0.0.0:9990/?token=${encodeURIComponent(token)}`;
 const children = [];
 let stopping = false;
 
@@ -39,7 +40,7 @@ async function waitUntilReady(url, attempts = 90) {
     try {
       const response = await fetch(url);
       if (response.ok) return true;
-    } catch {}
+    } catch { }
     await new Promise(resolve => setTimeout(resolve, 1000));
   }
   return false;
@@ -56,21 +57,24 @@ function openBrowser(url) {
 process.on('SIGINT', () => stop(0));
 process.on('SIGTERM', () => stop(0));
 
+const devDb = process.env.PGDATABASE || 'agenda_dev';
 console.log('[DEV] Iniciando Agenda sem autenticação SSO externa...');
-console.log('[DEV] O bypass só funciona em 127.0.0.1 e não é habilitado em produção.');
+console.log('[DEV] O bypass só funciona em 0.0.0.0 e não é habilitado em produção.');
+console.log(`[DEV] Banco de dados: ${devDb}`);
 
 start('backend', ['--prefix', 'backend', 'start'], {
   NODE_ENV: 'development',
   DEV_AUTH_BYPASS: 'true',
   DEV_AUTH_TOKEN: token,
-  HOST: '127.0.0.1',
+  HOST: appHost,
   PORT: '9900',
+  PGDATABASE: devDb,
 });
-start('frontend', ['--prefix', 'frontend', 'run', 'dev:local'], {});
+start('frontend', ['--prefix', 'frontend', 'run', 'dev'], {});
 
 Promise.all([
-  waitUntilReady('http://127.0.0.1:9900/health'),
-  waitUntilReady('http://127.0.0.1:9990/'),
+  waitUntilReady('http://0.0.0.0:9900/health'),
+  waitUntilReady('http://0.0.0.0:9990/'),
 ]).then(([backendReady, frontendReady]) => {
   if (!backendReady || !frontendReady) {
     console.error('[DEV] Os servidores não ficaram prontos dentro do tempo esperado.');

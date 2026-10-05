@@ -6,9 +6,12 @@
   "scripts": {
     "build": "npm --prefix ../frontend run build",
     "start": "node index.js",
-    "dev": "npx nodemon index.js",
+    "startdev": "node -e \"process.env.PGDATABASE='agenda_dev'; process.env.NODE_ENV='development'; process.env.HOST='0.0.0.0'; require('./index.js');\"",
+    "dev": "npx nodemon --watch . --ext js,json --exec node -e \"process.env.PGDATABASE='agenda_dev'; process.env.NODE_ENV='development'; process.env.HOST='0.0.0.0'; require('./index.js');\"",
     "test": "node --test test/*.test.js",
     "db:setup": "node scripts/setup-postgres.js",
+    "db:setup:dev": "node -e \"process.env.PGDATABASE='agenda_dev'; require('./scripts/setup-postgres.js');\"",
+    "seed:dev": "node scripts/seed-dev.js",
     "db:migrate:sqlite": "node scripts/migrate-sqlite-to-postgres.js",
     "seed:linkedin": "node scripts/seed-linkedin.js"
   },

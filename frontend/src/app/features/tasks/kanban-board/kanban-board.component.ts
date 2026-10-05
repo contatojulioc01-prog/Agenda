@@ -61,6 +61,11 @@ export class KanbanBoardComponent implements OnDestroy {
   readonly priorityFilter = signal<TaskPriority | 'all'>('all');
   readonly assigneeFilter = signal('all');
   readonly showArchived = signal(false);
+  readonly viewMode = signal<'kanban' | 'list'>((typeof localStorage !== 'undefined' && localStorage.getItem('dc_kanban_view_mode') as 'kanban' | 'list') || 'kanban');
+  readonly sortOption = signal<'default' | 'dueDate' | 'priority' | 'title' | 'status'>('default');
+  readonly sortDirection = signal<'asc' | 'desc'>('asc');
+  readonly showSortMenu = signal(false);
+  readonly isFullscreen = signal(false);
   readonly modalOpen = signal(false);
   readonly editingId = signal<string | null>(null);
   readonly addingColumn = signal(false);
@@ -134,7 +139,23 @@ export class KanbanBoardComponent implements OnDestroy {
     else this.modalOpen.set(false);
   });
 
+  readonly columnColors = [
+    { value: '#64748b', label: 'Cinza (Padrão)' },
+    { value: '#4f46e5', label: 'Índigo' },
+    { value: '#0284c7', label: 'Azul' },
+    { value: '#0d9488', label: 'Verde-azulado' },
+    { value: '#10b981', label: 'Esmeralda' },
+    { value: '#f59e0b', label: 'Âmbar' },
+    { value: '#f97316', label: 'Laranja' },
+    { value: '#ef4444', label: 'Vermelho' },
+    { value: '#e11d48', label: 'Rosa' },
+    { value: '#9333ea', label: 'Roxo' },
+    { value: '#db2777', label: 'Pink' },
+    { value: '#06b6d4', label: 'Ciano' },
+  ];
+
   newColumnTitle = '';
+  newColumnColor = '#64748b';
   newBoardName = '';
   newTeamDescription = '';
   newTeamColor = '#4f46e5';
@@ -144,6 +165,7 @@ export class KanbanBoardComponent implements OnDestroy {
   pendingFiles: File[] = [];
   attachmentError = '';
   columnTitleDraft = '';
+  columnColorDraft = '#64748b';
   boardNameDraft = '';
 
   draft: KanbanTaskInput = this.emptyDraft('');
@@ -177,7 +199,20 @@ export class KanbanBoardComponent implements OnDestroy {
     this.route.queryParamMap.subscribe(updateRouteState);
   }
 
-  ngOnDestroy(): void { this.closeAttachmentPreview(); }
+  ngOnDestroy(): void {
+    this.closeAttachmentPreview();
+    if (typeof document !== 'undefined') {
+      document.body.classList.remove('kanban-fullscreen-active');
+    }
+  }
+
+  toggleFullscreen(): void {
+    const next = !this.isFullscreen();
+    this.isFullscreen.set(next);
+    if (typeof document !== 'undefined') {
+      document.body.classList.toggle('kanban-fullscreen-active', next);
+    }
+  }
 
   readonly visibleTasks = computed(() => {
     const query = this.search().trim().toLocaleLowerCase('pt-BR');
@@ -190,6 +225,54 @@ export class KanbanBoardComponent implements OnDestroy {
         (priority === 'all' || task.priority === priority) &&
         (assignee === 'all' || task.assigneeIds.includes(assignee));
     });
+  });
+
+  readonly sortedVisibleTasks = computed(() => {
+    const tasks = [...this.visibleTasks()];
+    const option = this.sortOption();
+    const dir = this.sortDirection() === 'asc' ? 1 : -1;
+    const board = this.board();
+
+    if (option === 'default') {
+      const colOrderMap = new Map<string, number>();
+      board?.columns.forEach((col, idx) => colOrderMap.set(col.id, col.position ?? idx));
+      return tasks.sort((a, b) => {
+        const colA = colOrderMap.get(a.columnId) ?? 0;
+        const colB = colOrderMap.get(b.columnId) ?? 0;
+        if (colA !== colB) return colA - colB;
+        return a.position - b.position;
+      });
+    }
+
+    if (option === 'dueDate') {
+      return tasks.sort((a, b) => {
+        if (!a.dueDate && !b.dueDate) return 0;
+        if (!a.dueDate) return 1;
+        if (!b.dueDate) return -1;
+        return a.dueDate.localeCompare(b.dueDate) * dir;
+      });
+    }
+
+    if (option === 'priority') {
+      const priorityWeight: Record<TaskPriority, number> = { urgent: 4, high: 3, medium: 2, low: 1 };
+      return tasks.sort((a, b) => (priorityWeight[b.priority] - priorityWeight[a.priority]) * dir);
+    }
+
+    if (option === 'title') {
+      return tasks.sort((a, b) => a.title.localeCompare(b.title, 'pt-BR', { sensitivity: 'base' }) * dir);
+    }
+
+    if (option === 'status') {
+      const colOrderMap = new Map<string, number>();
+      board?.columns.forEach((col, idx) => colOrderMap.set(col.id, col.position ?? idx));
+      return tasks.sort((a, b) => {
+        const colA = colOrderMap.get(a.columnId) ?? 0;
+        const colB = colOrderMap.get(b.columnId) ?? 0;
+        return (colA - colB) * dir;
+      });
+    }
+
+    return tasks;
   });
 
   readonly tasksByColumn = computed(() => {
@@ -498,9 +581,11 @@ export class KanbanBoardComponent implements OnDestroy {
 
   saveColumn(): void {
     const title = this.newColumnTitle.trim();
+    const color = this.newColumnColor;
     const board = this.board();
-    if (title && board) this.service.createColumn(board.id, title);
+    if (title && board) this.service.createColumn(board.id, title, color);
     this.newColumnTitle = '';
+    this.newColumnColor = '#64748b';
     this.addingColumn.set(false);
   }
 
@@ -512,6 +597,7 @@ export class KanbanBoardComponent implements OnDestroy {
   openColumnDialog(column: KanbanColumn, action: 'rename' | 'delete'): void {
     this.selectedColumn.set(column);
     this.columnTitleDraft = column.title;
+    this.columnColorDraft = column.color || '#64748b';
     this.columnDialog.set(action);
     this.columnMenuId.set(null);
   }
@@ -520,6 +606,7 @@ export class KanbanBoardComponent implements OnDestroy {
     this.columnDialog.set(null);
     this.selectedColumn.set(null);
     this.columnTitleDraft = '';
+    this.columnColorDraft = '#64748b';
   }
 
   confirmColumnDialog(): void {
@@ -528,8 +615,11 @@ export class KanbanBoardComponent implements OnDestroy {
     if (!column || !action) return;
     if (action === 'rename') {
       const title = this.columnTitleDraft.trim();
+      const color = this.columnColorDraft;
       if (!title) return;
-      if (title !== column.title) this.service.updateColumn(column.id, { title });
+      if (title !== column.title || color !== column.color) {
+        this.service.updateColumn(column.id, { title, color });
+      }
     } else {
       if (this.columnHasActiveTasks(column.id)) return;
       this.service.deleteColumn(column.id);
@@ -860,6 +950,77 @@ export class KanbanBoardComponent implements OnDestroy {
 
   formatDate(date: string | null): string {
     return date ? new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' }).format(new Date(`${date}T12:00:00`)) : '';
+  }
+
+  setViewMode(mode: 'kanban' | 'list'): void {
+    this.viewMode.set(mode);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('dc_kanban_view_mode', mode);
+    }
+  }
+
+  toggleSortMenu(event?: Event): void {
+    if (event) event.stopPropagation();
+    this.showSortMenu.update(v => !v);
+  }
+
+  toggleSort(option: 'default' | 'dueDate' | 'priority' | 'title' | 'status'): void {
+    if (this.sortOption() === option) {
+      this.sortDirection.set(this.sortDirection() === 'asc' ? 'desc' : 'asc');
+    } else {
+      this.sortOption.set(option);
+      this.sortDirection.set('asc');
+    }
+    this.showSortMenu.set(false);
+  }
+
+  currentSortLabel(): string {
+    const map: Record<string, string> = {
+      default: 'Ordenação: Padrão',
+      dueDate: 'Ordenação: Prazo',
+      priority: 'Ordenação: Prioridade',
+      title: 'Ordenação: Assunto',
+      status: 'Ordenação: Status',
+    };
+    const label = map[this.sortOption()] || 'Ordenação';
+    return `${label} (${this.sortDirection() === 'asc' ? '↑' : '↓'})`;
+  }
+
+  getColumnTitle(columnId: string): string {
+    const col = this.board()?.columns.find(c => c.id === columnId);
+    return col?.title || 'Sem lista';
+  }
+
+  getColumnColor(columnId: string): string {
+    const col = this.board()?.columns.find(c => c.id === columnId);
+    return col?.color || 'var(--brand-500)';
+  }
+
+  getColumnBg(columnId: string): string {
+    const color = this.getColumnColor(columnId);
+    return `color-mix(in srgb, ${color} 15%, transparent)`;
+  }
+
+  getDemandText(task: KanbanTask): string {
+    if (task.description && task.description.trim()) {
+      const firstLine = task.description.trim().split('\n')[0].replace(/^#+\s*/, '');
+      return firstLine.length > 70 ? firstLine.substring(0, 70) + '...' : firstLine;
+    }
+    if (task.checklist && task.checklist.length) {
+      const done = task.checklist.filter(i => i.done).length;
+      return `Checklist (${done}/${task.checklist.length})`;
+    }
+    return '—';
+  }
+
+  changeTaskColumn(task: KanbanTask, newColumnId: string, event?: Event): void {
+    if (event) event.stopPropagation();
+    if (task.columnId === newColumnId) return;
+    const board = this.board();
+    if (!board) return;
+    const updatedTasks = board.tasks.map(item => item.id === task.id ? { ...item, columnId: newColumnId } : item);
+    this.service.activeBoard.set({ ...board, tasks: updatedTasks });
+    this.service.updateTask(task.id, { columnId: newColumnId });
   }
 
 

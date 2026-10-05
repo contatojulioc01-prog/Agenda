@@ -219,6 +219,43 @@ async function initDb() {
       UNIQUE(device_id, delivery_key)
     );
 
+    CREATE TABLE IF NOT EXISTS mural_boards (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      color TEXT NOT NULL DEFAULT '#f59e0b',
+      owner_id TEXT NOT NULL,
+      scope_type TEXT NOT NULL DEFAULT 'personal',
+      team_id TEXT,
+      created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP::text),
+      updated_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP::text)
+    );
+
+    CREATE TABLE IF NOT EXISTS mural_groups (
+      id TEXT PRIMARY KEY,
+      mural_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      color TEXT NOT NULL DEFAULT '#64748b',
+      position INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP::text)
+    );
+
+    CREATE TABLE IF NOT EXISTS mural_items (
+      id TEXT PRIMARY KEY,
+      mural_id TEXT NOT NULL,
+      group_id TEXT,
+      title TEXT NOT NULL,
+      content TEXT DEFAULT '',
+      color TEXT NOT NULL DEFAULT '#fef08a',
+      is_pinned INTEGER NOT NULL DEFAULT 0,
+      position INTEGER NOT NULL DEFAULT 0,
+      rotation REAL NOT NULL DEFAULT 0,
+      created_by TEXT NOT NULL,
+      created_by_name TEXT,
+      created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP::text),
+      updated_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP::text)
+    );
+
     CREATE TABLE IF NOT EXISTS agenda_migrations (
       id TEXT PRIMARY KEY,
       applied_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP::text)
@@ -231,6 +268,9 @@ async function initDb() {
     CREATE INDEX IF NOT EXISTS idx_attachments_owner ON attachments(owner_type, owner_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_notification_devices_user ON notification_devices(user_id, enabled);
     CREATE INDEX IF NOT EXISTS idx_notification_deliveries_device ON notification_deliveries(device_id, occurrence_date);
+    CREATE INDEX IF NOT EXISTS idx_mural_boards_owner ON mural_boards(owner_id, scope_type, team_id);
+    CREATE INDEX IF NOT EXISTS idx_mural_groups_mural ON mural_groups(mural_id, position);
+    CREATE INDEX IF NOT EXISTS idx_mural_items_mural ON mural_items(mural_id, group_id, position);
 
     ALTER TABLE events ADD COLUMN IF NOT EXISTS end_date TEXT;
     ALTER TABLE calendars ADD COLUMN IF NOT EXISTS is_default INTEGER NOT NULL DEFAULT 0;
@@ -244,6 +284,10 @@ async function initDb() {
     ALTER TABLE kanban_tasks ADD COLUMN IF NOT EXISTS assignee_ids TEXT NOT NULL DEFAULT '[]';
     ALTER TABLE kanban_tasks ADD COLUMN IF NOT EXISTS deleted_at TEXT;
     ALTER TABLE kanban_tasks ADD COLUMN IF NOT EXISTS deleted_by TEXT;
+    ALTER TABLE kanban_tasks ADD COLUMN IF NOT EXISTS color TEXT;
+    ALTER TABLE attachments ADD COLUMN IF NOT EXISTS file_path TEXT;
+    ALTER TABLE attachments ALTER COLUMN content DROP NOT NULL;
+    ALTER TABLE attachments DROP CONSTRAINT IF EXISTS attachments_owner_type_check;
     ALTER TABLE notification_preferences ADD COLUMN IF NOT EXISTS task_days_before INTEGER NOT NULL DEFAULT 1;
     ALTER TABLE notification_preferences ALTER COLUMN task_time SET DEFAULT '08:30';
     WITH applied AS (

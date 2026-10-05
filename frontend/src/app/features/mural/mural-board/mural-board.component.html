@@ -1,0 +1,396 @@
+<div class="mural-shell">
+
+  <!-- ══════════════ TOOLBAR ══════════════ -->
+  <div class="mural-toolbar group-panel">
+
+    <div class="toolbar-left">
+      <!-- Board Selector -->
+      <div class="board-selector-wrapper">
+        <div class="board-mark" [style.background]="activeBoard()?.color || '#f59e0b'">
+          <mat-icon>space_dashboard</mat-icon>
+        </div>
+        <div class="board-heading">
+          <select class="board-select" [ngModel]="activeBoard()?.id" (ngModelChange)="selecionarMural($event)">
+            <optgroup label="Pessoal">
+              <option *ngFor="let b of boards()" [value]="b.id" [hidden]="b.scopeType !== 'personal'">
+                📋 {{ b.name }} ({{ b.itemCount }})
+              </option>
+            </optgroup>
+            <optgroup label="Times & Equipes">
+              <option *ngFor="let b of boards()" [value]="b.id" [hidden]="b.scopeType !== 'team'">
+                👥 {{ b.name }} ({{ b.itemCount }})
+              </option>
+            </optgroup>
+          </select>
+          <span class="board-subtitle" *ngIf="activeBoard()?.scopeType === 'team'">
+            {{ activeBoard()?.teamName || 'Mural do Time' }}
+          </span>
+        </div>
+      </div>
+
+      <!-- Busca -->
+      <div class="search-box">
+        <mat-icon>search</mat-icon>
+        <input type="text" placeholder="Buscar no mural..." [ngModel]="search()" (ngModelChange)="search.set($event)" />
+        <button *ngIf="search()" class="icon-btn" (click)="search.set('')"><mat-icon>close</mat-icon></button>
+      </div>
+
+      <!-- Filtros -->
+      <button class="archive-toggle" [class.active]="filterPinnedOnly()" (click)="filterPinnedOnly.set(!filterPinnedOnly())">
+        <mat-icon>push_pin</mat-icon><span>Fixados</span>
+      </button>
+      <button class="archive-toggle" [class.active]="filterWithAttachments()" (click)="filterWithAttachments.set(!filterWithAttachments())">
+        <mat-icon>attach_file</mat-icon><span>Com Anexos</span>
+      </button>
+    </div>
+
+    <div class="toolbar-actions">
+      <button class="secondary-btn" (click)="abrirCriarTime()" matTooltip="Criar nova equipe com mural e kanban">
+        <mat-icon>group_add</mat-icon><span>Novo Time</span>
+      </button>
+      <button class="secondary-btn" (click)="abrirNovoGrupo()">
+        <mat-icon>create_new_folder</mat-icon><span>Novo Grupo</span>
+      </button>
+      <button class="primary-btn" (click)="abrirNovoItem()">
+        <mat-icon>add</mat-icon><span>Novo Cartão</span>
+      </button>
+      <button *ngIf="activeBoard()?.myRole === 'admin'" class="icon-btn" (click)="abrirEditarMural()" matTooltip="Configurar Mural">
+        <mat-icon>settings</mat-icon>
+      </button>
+      <button *ngIf="activeBoard()?.scopeType === 'team' || teams().length > 0" class="icon-btn" (click)="abrirGerenciarTime()" matTooltip="Gerenciar Time & Membros SSO">
+        <mat-icon>group</mat-icon>
+      </button>
+    </div>
+  </div>
+
+  <!-- ══════════════ CANVAS ══════════════ -->
+  <div class="mural-canvas" [class.is-loading]="loading()" (dragover)="$event.preventDefault()">
+
+    <!-- Grupos -->
+    <div class="mural-groups-row" *ngIf="activeBoard()?.groups?.length">
+      <div
+        *ngFor="let group of activeBoard()?.groups"
+        class="mural-group-frame"
+        [style.--group-color]="group.color"
+        [class.drag-over]="dragOverGroupId === group.id"
+        (dragover)="onGroupDragOver($event, group.id)"
+        (dragleave)="onGroupDragLeave()"
+        (drop)="onDropInGroup($event, group.id)"
+      >
+        <div class="group-header">
+          <div class="group-title-box">
+            <span class="column-accent" [style.background]="group.color" [style.box-shadow]="'0 0 7px ' + group.color"></span>
+            <span class="column-title">{{ group.title }}</span>
+            <span class="column-count">{{ (itemsByGroup().get(group.id) || []).length }}</span>
+          </div>
+          <div class="group-actions">
+            <button class="icon-btn" (click)="abrirNovoItem(group.id)" matTooltip="Adicionar cartão"><mat-icon>add</mat-icon></button>
+            <button *ngIf="activeBoard()?.myRole === 'admin'" class="icon-btn" (click)="abrirEditarGrupo(group, $event)" matTooltip="Opções"><mat-icon>more_vert</mat-icon></button>
+          </div>
+        </div>
+
+        <div class="group-items-grid">
+          <div
+            *ngFor="let item of (itemsByGroup().get(group.id) || [])"
+            class="sticky-card"
+            [style.background]="item.color"
+            [class.pinned]="item.isPinned"
+            [class.dragging]="draggingItemId === item.id"
+            draggable="true"
+            (dragstart)="onDragStart($event, item)"
+            (dragend)="onDragEnd()"
+            (click)="abrirEditarItem(item)"
+          >
+            <div class="card-pin" [class.active]="item.isPinned" (click)="alternarFixacao($event, item)" matTooltip="{{ item.isPinned ? 'Desafixar' : 'Fixar' }}">
+              <mat-icon>push_pin</mat-icon>
+            </div>
+            <div class="card-header-row">
+              <h4 class="card-title">{{ item.title }}</h4>
+            </div>
+            <div class="card-body" *ngIf="item.content">
+              <app-markdown-text [text]="item.content"></app-markdown-text>
+            </div>
+            <div class="card-image-preview" *ngIf="pegarPrimeiraImagem(item) as img" (click)="abrirPreview($event, img)">
+              <img [src]="'/api/attachments/' + img.id + '/content'" [alt]="img.fileName" loading="lazy" />
+            </div>
+            <div class="card-attachments-chips" *ngIf="item.attachments?.length">
+              <span *ngFor="let att of item.attachments" class="att-chip" [class.is-pdf]="att.mimeType === 'application/pdf'" (click)="abrirPreview($event, att)">
+                <mat-icon>{{ att.mimeType === 'application/pdf' ? 'picture_as_pdf' : 'image' }}</mat-icon>
+                <span>{{ att.fileName }}</span>
+              </span>
+            </div>
+            <div class="card-footer">
+              <span class="card-author" *ngIf="item.createdByName">
+                <mat-icon>person</mat-icon>{{ item.createdByName }}
+              </span>
+              <span class="card-date">{{ formatarData(item.createdAt) }}</span>
+            </div>
+          </div>
+
+          <!-- Empty group placeholder (drop target) -->
+          <div class="empty-group-placeholder" *ngIf="!(itemsByGroup().get(group.id) || []).length" (click)="abrirNovoItem(group.id)">
+            <mat-icon>note_add</mat-icon>
+            <span>Clique ou arraste um cartão aqui</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notas Soltas -->
+    <div class="mural-ungrouped-section"
+      *ngIf="ungroupedItems().length || !activeBoard()?.groups?.length"
+      [class.drag-over]="dragOverGroupId === 'ungrouped'"
+      (dragover)="onGroupDragOver($event, 'ungrouped')"
+      (dragleave)="onGroupDragLeave()"
+      (drop)="onDropInGroup($event, null)"
+    >
+      <div class="section-title-divider">
+        <mat-icon>push_pin</mat-icon>
+        <span>Notas & Avisos Soltos no Mural</span>
+        <span class="column-count" *ngIf="ungroupedItems().length">{{ ungroupedItems().length }}</span>
+      </div>
+
+      <div class="ungrouped-wall-grid">
+        <div
+          *ngFor="let item of ungroupedItems()"
+          class="sticky-card loose-card"
+          [style.background]="item.color"
+          [style.transform]="'rotate(' + item.rotation + 'deg)'"
+          [class.pinned]="item.isPinned"
+          [class.dragging]="draggingItemId === item.id"
+          draggable="true"
+          (dragstart)="onDragStart($event, item)"
+          (dragend)="onDragEnd()"
+          (click)="abrirEditarItem(item)"
+        >
+          <div class="card-pin" [class.active]="item.isPinned" (click)="alternarFixacao($event, item)">
+            <mat-icon>push_pin</mat-icon>
+          </div>
+          <div class="card-header-row"><h4 class="card-title">{{ item.title }}</h4></div>
+          <div class="card-body" *ngIf="item.content">
+            <app-markdown-text [text]="item.content"></app-markdown-text>
+          </div>
+          <div class="card-image-preview" *ngIf="pegarPrimeiraImagem(item) as img" (click)="abrirPreview($event, img)">
+            <img [src]="'/api/attachments/' + img.id + '/content'" [alt]="img.fileName" loading="lazy" />
+          </div>
+          <div class="card-attachments-chips" *ngIf="item.attachments?.length">
+            <span *ngFor="let att of item.attachments" class="att-chip" [class.is-pdf]="att.mimeType === 'application/pdf'" (click)="abrirPreview($event, att)">
+              <mat-icon>{{ att.mimeType === 'application/pdf' ? 'picture_as_pdf' : 'image' }}</mat-icon>
+              <span>{{ att.fileName }}</span>
+            </span>
+          </div>
+          <div class="card-footer">
+            <span class="card-author" *ngIf="item.createdByName"><mat-icon>person</mat-icon>{{ item.createdByName }}</span>
+            <span class="card-date">{{ formatarData(item.createdAt) }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Estado Vazio -->
+    <div class="mural-empty-state" *ngIf="!loading() && !filteredItems().length && !activeBoard()?.groups?.length">
+      <div class="empty-icon-box"><mat-icon>sticky_note_2</mat-icon></div>
+      <h2>Mural pronto!</h2>
+      <p>Fixe comunicados, notas, fotos e documentos importantes no seu mural.</p>
+      <button class="primary-btn" (click)="abrirNovoItem()">
+        <mat-icon>add</mat-icon><span>Criar Primeira Nota</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ MODAL DE ITEM ══════════════ -->
+<app-mural-item-modal
+  *ngIf="itemModalOpen()"
+  [boardId]="activeBoard()?.id || ''"
+  [item]="editingItem()"
+  [groups]="activeBoard()?.groups || []"
+  [defaultGroupId]="targetGroupId()"
+  (close)="fecharItemModal()"
+  (saved)="onItemSalvo($event)"
+  (deleted)="onItemExcluido($event)"
+></app-mural-item-modal>
+
+<!-- ══════════════ MODAL DE GRUPO ══════════════ -->
+<div class="modal-overlay" *ngIf="groupModalOpen()" (mousedown)="fecharGrupoModal()">
+  <div class="modal-card modal-sm" (mousedown)="$event.stopPropagation()">
+    <div class="modal-header">
+      <div class="header-main">
+        <div class="header-badge" [style.background]="groupColor || '#64748b'">
+          <mat-icon>{{ editingGroup() ? 'edit' : 'create_new_folder' }}</mat-icon>
+        </div>
+        <div>
+          <h2>{{ editingGroup() ? 'Editar Grupo' : 'Novo Grupo no Mural' }}</h2>
+          <p>{{ editingGroup() ? 'Atualize o título e cor do grupo.' : 'Crie uma seção temática para organizar cartões.' }}</p>
+        </div>
+      </div>
+      <button class="close-btn" (click)="fecharGrupoModal()"><mat-icon>close</mat-icon></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-card">
+        <div class="card-section-header"><mat-icon class="color-blue">folder</mat-icon><h3>Dados do Grupo</h3></div>
+        <div class="form-grid">
+          <div class="form-field">
+            <label>Nome do Grupo <span class="required">*</span></label>
+            <input type="text" [(ngModel)]="groupTitle" name="groupTitle" placeholder="Ex: Quadro de Avisos, Ideias..." autofocus />
+          </div>
+          <div class="form-field">
+            <label>Cor de Destaque</label>
+            <input type="color" [(ngModel)]="groupColor" name="groupColor" class="color-input" />
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button *ngIf="editingGroup()" class="delete-btn" (click)="excluirGrupo()" [disabled]="loadingExcluirGrupo">
+        <mat-progress-spinner *ngIf="loadingExcluirGrupo" mode="indeterminate" diameter="16" class="button-spinner"></mat-progress-spinner>
+        <mat-icon *ngIf="!loadingExcluirGrupo">delete</mat-icon><span>Excluir</span>
+      </button>
+      <button class="cancel-btn" (click)="fecharGrupoModal()">Cancelar</button>
+      <button class="primary-btn" (click)="salvarGrupo()" [disabled]="loadingSalvarGrupo || !groupTitle.trim()">
+        <mat-progress-spinner *ngIf="loadingSalvarGrupo" mode="indeterminate" diameter="16" class="button-spinner"></mat-progress-spinner>
+        <mat-icon *ngIf="!loadingSalvarGrupo">save</mat-icon>
+        <span>{{ loadingSalvarGrupo ? 'Salvando...' : 'Salvar Grupo' }}</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ MODAL CONFIGURAR MURAL ══════════════ -->
+<div class="modal-overlay" *ngIf="boardModalOpen()" (mousedown)="fecharBoardModal()">
+  <div class="modal-card modal-sm" (mousedown)="$event.stopPropagation()">
+    <div class="modal-header">
+      <div class="header-main">
+        <div class="header-badge edit-mode"><mat-icon>space_dashboard</mat-icon></div>
+        <div><h2>Configurar Mural</h2><p>Altere o nome, descrição e cor do mural.</p></div>
+      </div>
+      <button class="close-btn" (click)="fecharBoardModal()"><mat-icon>close</mat-icon></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-card">
+        <div class="card-section-header"><mat-icon class="color-amber">tune</mat-icon><h3>Dados do Mural</h3></div>
+        <div class="form-grid">
+          <div class="form-field">
+            <label>Nome <span class="required">*</span></label>
+            <input type="text" [(ngModel)]="boardName" placeholder="Ex: Mural de Avisos do Time" />
+          </div>
+          <div class="form-field">
+            <label>Descrição</label>
+            <textarea [(ngModel)]="boardDescription" rows="3" class="custom-textarea" placeholder="Descrição opcional..."></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="cancel-btn" (click)="fecharBoardModal()">Cancelar</button>
+      <button class="primary-btn" (click)="salvarMural()" [disabled]="loadingSalvarMural || !boardName.trim()">
+        <mat-progress-spinner *ngIf="loadingSalvarMural" mode="indeterminate" diameter="16" class="button-spinner"></mat-progress-spinner>
+        <mat-icon *ngIf="!loadingSalvarMural">save</mat-icon>
+        <span>{{ loadingSalvarMural ? 'Salvando...' : 'Salvar' }}</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ MODAL DE TIME & SSO (IDÊNTICO AO TAREFAS) ══════════════ -->
+<div class="team-modal-backdrop" *ngIf="teamModalOpen()" (mousedown)="fecharTimeModal()">
+  <section class="team-modal" (mousedown)="$event.stopPropagation()">
+    <header>
+      <div>
+        <h2>{{ creatingTeam() ? 'Criar novo time' : 'Gerenciar time' }}</h2>
+        <p>Times têm murais e quadros compartilhados entre todos os membros vinculados ao SSO.</p>
+      </div>
+      <button class="icon-btn" (click)="fecharTimeModal()"><mat-icon>close</mat-icon></button>
+    </header>
+
+    <div class="team-selector" *ngIf="!creatingTeam() && teams().length > 1">
+      <button *ngFor="let team of teams()" [class.active]="currentTeam()?.id === team.id" (click)="trocarTimeNoModal(team.id)">
+        <span [style.background]="team.color"></span>{{ team.name }}
+      </button>
+    </div>
+
+    <!-- Modo Criar Novo Time -->
+    <form class="team-create-form" *ngIf="creatingTeam()" (ngSubmit)="saveTeam()">
+      <label>
+        <span>Nome do time *</span>
+        <input [(ngModel)]="newTeamName" name="teamName" maxlength="80" placeholder="Ex.: Produto, Marketing, Operações" autofocus required>
+      </label>
+      <div class="team-description-field">
+        <div class="description-header">
+          <span>Descrição</span>
+          <app-ai-text-button [text]="newTeamDescription" (textChange)="newTeamDescription = $event" />
+        </div>
+        <app-markdown-editor [text]="newTeamDescription" (textChange)="newTeamDescription = $event" [maxLength]="1000" placeholder="Objetivo deste time" ariaLabel="Descrição do time" />
+      </div>
+      <label>
+        <span>Cor</span>
+        <input [(ngModel)]="newTeamColor" name="teamColor" type="color">
+      </label>
+      <div class="team-form-actions">
+        <button type="button" class="cancel-btn" (click)="creatingTeam.set(false)" *ngIf="teams().length">Voltar</button>
+        <button class="primary-btn" type="submit" [disabled]="!newTeamName.trim()">Criar time</button>
+      </div>
+    </form>
+
+    <!-- Modo Gerenciar Time Existente -->
+    <div class="team-management" *ngIf="!creatingTeam() && currentTeam() as team">
+      <div class="team-summary">
+        <span class="team-logo" [style.background]="team.color"><mat-icon>groups</mat-icon></span>
+        <div>
+          <h3>{{ team.name }}</h3>
+          <p>{{ kanbanService.teamMembers().length || team.memberCount }} membro{{ (kanbanService.teamMembers().length || team.memberCount) !== 1 ? 's' : '' }} · {{ team.myRole === 'admin' ? 'Você administra este time' : 'Você é membro' }}</p>
+        </div>
+        <button class="danger-icon" *ngIf="team.myRole === 'admin'" (click)="removeTeam()" matTooltip="Excluir time">
+          <mat-icon>delete_outline</mat-icon>
+        </button>
+      </div>
+
+      <!-- Convidar usuário SSO -->
+      <div class="invite-row" *ngIf="team.myRole === 'admin'">
+        <select [(ngModel)]="invitedUserId">
+          <option value="">Selecione uma pessoa (SSO) para convidar</option>
+          <option *ngFor="let user of inviteableUsers()" [value]="user.id">{{ user.name }} · {{ user.email }}</option>
+        </select>
+        <button class="primary-btn" (click)="inviteMember()" [disabled]="!invitedUserId">
+          <mat-icon>person_add</mat-icon>Convidar
+        </button>
+      </div>
+
+      <!-- Lista de membros -->
+      <div class="member-list">
+        <h4>Membros</h4>
+        <div class="member-row" *ngFor="let member of kanbanService.teamMembers()">
+          <img [src]="memberAvatar(member.user_id)" [alt]="memberName(member.user_id)" (error)="$any($event.target).src = defaultAvatar">
+          <div>
+            <strong>{{ memberName(member.user_id) }}</strong>
+            <span>{{ member.role === 'admin' ? 'Administrador' : 'Membro' }}</span>
+          </div>
+          <button *ngIf="team.myRole === 'admin' && member.role !== 'admin'" class="danger-icon" (click)="removeMember(member.id)" matTooltip="Remover do time">
+            <mat-icon>person_remove</mat-icon>
+          </button>
+        </div>
+      </div>
+
+      <button class="new-team-link" (click)="creatingTeam.set(true)">
+        <mat-icon>add</mat-icon>Criar outro time
+      </button>
+    </div>
+  </section>
+</div>
+
+<!-- ══════════════ PREVIEW DE ANEXO ══════════════ -->
+<div class="modal-overlay attachment-overlay" *ngIf="previewAttachmentUrl()" (click)="fecharPreview()">
+  <div class="attachment-preview-card" (click)="$event.stopPropagation()">
+    <div class="preview-header">
+      <div class="preview-title">
+        <mat-icon>{{ previewAttachmentMimeType() === 'application/pdf' ? 'picture_as_pdf' : 'image' }}</mat-icon>
+        <span>{{ previewAttachmentName() }}</span>
+      </div>
+      <button class="close-btn" (click)="fecharPreview()"><mat-icon>close</mat-icon></button>
+    </div>
+    <div class="preview-body">
+      <iframe *ngIf="previewAttachmentMimeType() === 'application/pdf'" [src]="trustedPreviewUrl()" class="pdf-frame"></iframe>
+      <img *ngIf="previewAttachmentMimeType() !== 'application/pdf'" [src]="previewAttachmentUrl()" [alt]="previewAttachmentName()" class="image-frame" />
+    </div>
+  </div>
+</div>

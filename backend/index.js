@@ -19,7 +19,7 @@ const { authenticateSocket } = require('./realtime-auth');
 const PORT = process.env.PORT || 9900;
 const HOST = process.env.HOST || '0.0.0.0';
 const DEV_AUTH_REQUESTED = process.env.NODE_ENV === 'development' && process.env.DEV_AUTH_BYPASS === 'true';
-const DEV_AUTH_ENABLED = DEV_AUTH_REQUESTED && ['127.0.0.1', 'localhost', '::1'].includes(HOST);
+const DEV_AUTH_ENABLED = DEV_AUTH_REQUESTED && ['127.0.0.1', 'localhost', '::1', '0.0.0.0'].includes(HOST);
 const DEV_AUTH_TOKEN = process.env.DEV_AUTH_TOKEN || 'agenda-dev-local';
 const DEV_USER = {
   id: 'dev-local-user',
@@ -489,6 +489,7 @@ initDb().then(async () => {
   const membersRouter   = require('./routes/members');
   const eventsRouter    = require('./routes/events');
   const kanbanRouter    = require('./routes/kanban');
+  const muralRouter     = require('./routes/mural');
   const attachmentsRouter = require('./routes/attachments').router;
   const notifications = require('./routes/notifications');
   const privacyRouter = require('./routes/privacy');
@@ -510,6 +511,7 @@ initDb().then(async () => {
   app.use('/api/calendars', authenticateAgendaRequest, eventsRouter);   // /:calendarId/events
   app.use('/api/events',    authenticateAgendaRequest, eventsRouter);   // /:id (edit/delete)
   app.use('/api/kanban',    authenticateAgendaRequest, kanbanRouter);
+  app.use('/api/mural',     authenticateAgendaRequest, muralRouter);
   app.use('/api/attachments', authenticateAgendaRequest, attachmentsRouter);
   app.use('/api/notifications/device', notifications.deviceRouter);
   app.use('/api/notifications', authenticateAgendaRequest, notifications.router);

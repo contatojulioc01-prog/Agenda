@@ -6,6 +6,9 @@
   "scripts": {
     "start": "node production-start.js",
     "dev": "node scripts/dev-start.cjs",
+    "startdev": "node scripts/dev-start.cjs",
+    "db:setup:dev": "npm --prefix backend run db:setup:dev",
+    "seed:dev": "npm --prefix backend run seed:dev",
     "build": "npm --prefix backend run build",
     "test": "npm --prefix frontend test"
   },

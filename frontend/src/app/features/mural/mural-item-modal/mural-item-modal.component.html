@@ -1,0 +1,244 @@
+<div class="modal-backdrop">
+  <div class="modal-wrapper">
+
+    <!-- Header Fixo -->
+    <div class="modal-header">
+      <div class="header-main">
+        <div class="header-icon-badge" [class.edit-mode]="isEdit" [style.background]="selectedColor">
+          <mat-icon class="material-icon" [style.color]="selectedColor === '#334155' ? '#ffffff' : '#0f172a'">
+            {{ isPinned ? 'push_pin' : (isEdit ? 'edit_note' : 'sticky_note_2') }}
+          </mat-icon>
+        </div>
+        <div class="header-title-box">
+          <h2>{{ isEdit ? 'Editar Cartão do Mural' : 'Novo Cartão no Mural' }}</h2>
+          <p>{{ isEdit ? 'Atualize as informações, anexos ou estilo do aviso.' : 'Adicione uma nota, documento ou comunicado ao mural.' }}</p>
+        </div>
+      </div>
+      <button type="button" class="close-btn" (click)="fechar()" title="Fechar">
+        <mat-icon class="material-icon">close</mat-icon>
+      </button>
+    </div>
+
+    <!-- Scrollable Body -->
+    <div class="modal-body">
+      <form class="form-container" (submit)="salvar(); $event.preventDefault()">
+
+        <!-- GRUPO 1: Conteúdo da Nota -->
+        <div class="form-card">
+          <div class="card-header">
+            <mat-icon class="section-icon color-amber">sticky_note_2</mat-icon>
+            <h3>Conteúdo & Informações</h3>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-field col-span-2">
+              <label>Título / Assunto <span class="required">*</span></label>
+              <input
+                type="text"
+                [(ngModel)]="title"
+                name="title"
+                placeholder="Ex: Reunião Geral de Alinhamento"
+                required
+                autofocus
+              />
+            </div>
+
+            <div class="form-field col-span-2">
+              <div class="field-label-row">
+                <label>Descrição / Texto da Nota</label>
+                <app-ai-text-button [(text)]="content" placeholderContext="conteúdo do aviso"></app-ai-text-button>
+              </div>
+              <app-markdown-editor [text]="content" (textChange)="content = $event" placeholder="Escreva a nota, instruções ou use formatação Markdown..."></app-markdown-editor>
+            </div>
+          </div>
+        </div>
+
+        <!-- GRUPO 2: Organização & Estilo Visual -->
+        <div class="form-card">
+          <div class="card-header">
+            <mat-icon class="section-icon color-blue">palette</mat-icon>
+            <h3>Organização & Visual do Cartão</h3>
+          </div>
+
+          <div class="form-grid">
+            <!-- Grupo / Seção -->
+            <div class="form-field">
+              <label>Grupo / Seção no Mural</label>
+              <select [(ngModel)]="selectedGroupId" name="selectedGroupId" class="custom-select">
+                <option [ngValue]="null">📌 Sem Grupo (Nota Solta no Mural)</option>
+                <option *ngFor="let g of groups" [ngValue]="g.id">{{ g.title }}</option>
+              </select>
+            </div>
+
+            <!-- Fixar no Topo -->
+            <div class="form-field">
+              <label>Destaque / Fixação</label>
+              <div class="pin-toggle-box" (click)="isPinned = !isPinned">
+                <mat-icon class="pin-icon" [class.active]="isPinned">push_pin</mat-icon>
+                <span>{{ isPinned ? 'Fixado em Destaque' : 'Fixação Normal' }}</span>
+                <input type="checkbox" [(ngModel)]="isPinned" name="isPinned" class="hidden-checkbox" />
+              </div>
+            </div>
+
+            <!-- Seletor de Cores -->
+            <div class="form-field col-span-2">
+              <label>Cor do Cartão</label>
+              <div class="color-palette-grid">
+                <button
+                  type="button"
+                  *ngFor="let opt of colorOptions"
+                  class="color-circle"
+                  [class.active]="selectedColor === opt.value"
+                  [style.background]="opt.value"
+                  [style.border-color]="opt.border"
+                  [matTooltip]="opt.name"
+                  (click)="selectedColor = opt.value"
+                >
+                  <mat-icon *ngIf="selectedColor === opt.value" class="check-icon" [style.color]="opt.value === '#334155' ? '#ffffff' : '#0f172a'">check</mat-icon>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- GRUPO 3: Anexos (PDFs e Imagens) -->
+        <div class="form-card">
+          <div class="card-header">
+            <mat-icon class="section-icon color-emerald">attach_file</mat-icon>
+            <h3>Documentos & Anexos (PDFs e Imagens)</h3>
+          </div>
+
+          <div class="attachments-section">
+            <div class="upload-dropzone">
+              <input
+                type="file"
+                #fileInput
+                (change)="onFilesSelected($event)"
+                accept="image/*,application/pdf"
+                multiple
+                style="display: none;"
+              />
+              <button
+                type="button"
+                class="btn-upload"
+                (click)="fileInput.click()"
+                [disabled]="loadingUpload"
+              >
+                <mat-progress-spinner
+                  *ngIf="loadingUpload"
+                  mode="indeterminate"
+                  diameter="18"
+                  class="button-spinner"
+                ></mat-progress-spinner>
+                <mat-icon *ngIf="!loadingUpload">cloud_upload</mat-icon>
+                <span>{{ loadingUpload ? 'Enviando anexos...' : 'Anexar PDFs ou Imagens (Multi-Anexo)' }}</span>
+              </button>
+              <span class="upload-hint">Salvo automaticamente no repositório de rede de anexos</span>
+            </div>
+
+            <!-- Arquivos Pendentes (antes de salvar a nota) -->
+            <div class="pending-attachments-list" *ngIf="pendingFiles.length > 0">
+              <div class="pending-title">Arquivos prontos para envio ao salvar:</div>
+              <div class="attachment-item pending" *ngFor="let file of pendingFiles; let i = index">
+                <div class="attachment-info">
+                  <mat-icon class="att-type-icon" [class.is-pdf]="file.type === 'application/pdf'">
+                    {{ file.type === 'application/pdf' ? 'picture_as_pdf' : 'image' }}
+                  </mat-icon>
+                  <div class="att-text">
+                    <span class="att-name">{{ file.name }}</span>
+                    <span class="att-size">{{ formatarTamanho(file.size) }}</span>
+                  </div>
+                </div>
+                <div class="attachment-actions">
+                  <button type="button" class="btn-icon danger" (click)="removerPendingFile(i)" title="Remover">
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Lista de Anexos Já Salvos -->
+            <div class="attachments-list" *ngIf="attachments.length > 0">
+              <div class="attachment-item" *ngFor="let att of attachments">
+                <div class="attachment-info" (click)="abrirPreview(att)">
+                  <mat-icon class="att-type-icon" [class.is-pdf]="att.mimeType === 'application/pdf'">
+                    {{ att.mimeType === 'application/pdf' ? 'picture_as_pdf' : 'image' }}
+                  </mat-icon>
+                  <div class="att-text">
+                    <span class="att-name" [title]="att.fileName">{{ att.fileName }}</span>
+                    <span class="att-size">{{ formatarTamanho(att.byteSize) }}</span>
+                  </div>
+                </div>
+
+                <div class="attachment-actions">
+                  <button type="button" class="btn-icon" (click)="abrirPreview(att)" title="Visualizar">
+                    <mat-icon>visibility</mat-icon>
+                  </button>
+                  <button type="button" class="btn-icon" (click)="baixarAnexo(att)" title="Baixar">
+                    <mat-icon>download</mat-icon>
+                  </button>
+                  <button type="button" class="btn-icon danger" (click)="removerAnexo(att)" title="Excluir">
+                    <mat-icon>delete</mat-icon>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </form>
+    </div>
+
+    <!-- Fixed Footer -->
+    <div class="modal-footer">
+      <button *ngIf="isEdit" type="button" class="btn-delete" (click)="excluir()" [disabled]="loadingExcluir">
+        <mat-progress-spinner *ngIf="loadingExcluir" mode="indeterminate" diameter="18" class="button-spinner"></mat-progress-spinner>
+        <mat-icon *ngIf="!loadingExcluir">delete</mat-icon>
+        <span>Excluir Cartão</span>
+      </button>
+
+      <button type="button" class="btn-cancel" (click)="fechar()">Cancelar</button>
+
+      <button type="button" class="btn-save" (click)="salvar()" [disabled]="loadingSalvar || !title.trim()">
+        <mat-progress-spinner
+          *ngIf="loadingSalvar"
+          mode="indeterminate"
+          diameter="20"
+          class="button-spinner"
+        ></mat-progress-spinner>
+        <mat-icon *ngIf="!loadingSalvar">save</mat-icon>
+        <span>{{ loadingSalvar ? 'Salvando...' : (isEdit ? 'Salvar Alterações' : 'Adicionar ao Mural') }}</span>
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<!-- Modal de Pré-visualização de Anexo -->
+<div class="attachment-preview-backdrop" *ngIf="previewAttachmentUrl()" (click)="fecharPreview()">
+  <div class="attachment-preview-card" (click)="$event.stopPropagation()">
+    <div class="preview-header">
+      <div class="preview-title">
+        <mat-icon>{{ previewAttachmentMimeType() === 'application/pdf' ? 'picture_as_pdf' : 'image' }}</mat-icon>
+        <span>{{ previewAttachmentName() }}</span>
+      </div>
+      <button type="button" class="close-btn" (click)="fecharPreview()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <div class="preview-body">
+      <iframe
+        *ngIf="previewAttachmentMimeType() === 'application/pdf'"
+        [src]="trustedPreviewUrl()"
+        class="pdf-frame"
+      ></iframe>
+      <img
+        *ngIf="previewAttachmentMimeType() !== 'application/pdf'"
+        [src]="previewAttachmentUrl()"
+        [alt]="previewAttachmentName()"
+        class="image-frame"
+      />
+    </div>
+  </div>
+</div>

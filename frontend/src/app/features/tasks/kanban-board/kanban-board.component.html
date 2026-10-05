@@ -15,7 +15,7 @@
     </div>
   </header>
 
-  <header class="kanban-toolbar group-panel">
+  <header class="kanban-toolbar group-panel" *ngIf="!isFullscreen()">
     <div class="board-heading">
       <span class="board-mark" [style.background]="board()?.color || 'var(--brand-500)'"><mat-icon>view_kanban</mat-icon></span>
       <div>
@@ -28,6 +28,7 @@
     </div>
 
     <div class="toolbar-actions">
+      <button class="secondary-btn fullscreen-btn" [class.active]="isFullscreen()" (click)="toggleFullscreen()" [matTooltip]="isFullscreen() ? 'Restaurar layout (exibir cabeçalho e menu lateral)' : 'Modo expandido (ocultar cabeçalho e menu lateral)'"><mat-icon>{{ isFullscreen() ? 'unfold_less' : 'aspect_ratio' }}</mat-icon>{{ isFullscreen() ? 'Restaurar layout' : 'Tela cheia' }}</button>
       <button class="secondary-btn print-btn-action" (click)="printBoard()" matTooltip="Imprimir quadro Kanban"><mat-icon>print</mat-icon>Imprimir</button>
       <button class="secondary-btn" (click)="openTeamManager()"><mat-icon>groups</mat-icon>Gerenciar times</button>
       <button class="primary-btn" (click)="openCreate()"><mat-icon>add</mat-icon>Nova tarefa</button>
@@ -40,14 +41,22 @@
     </form>
   </header>
 
-  <nav class="workspace-tabs group-panel" aria-label="Kanbans disponíveis">
-    <button *ngIf="personalBoardId() as personalId" [class.active]="board()?.id === personalId" (click)="switchBoard(personalId)">
-      <mat-icon>person</mat-icon><span>Meu Kanban</span>
+  <nav class="workspace-tabs group-panel" *ngIf="!isFullscreen()" aria-label="Kanbans disponíveis">
+    <div class="tabs-list-wrap">
+      <button *ngIf="personalBoardId() as personalId" [class.active]="board()?.id === personalId" (click)="switchBoard(personalId)">
+        <mat-icon>person</mat-icon><span>Meu Kanban</span>
+      </button>
+      <button *ngFor="let team of teams()" [class.active]="board()?.teamId === team.id" (click)="switchBoard(team.boardId)" (contextmenu)="openTeamContextMenu($event, team)">
+        <span class="team-dot" [style.background]="team.color"></span><span>{{ team.name }}</span><small>{{ team.memberCount }}</small>
+      </button>
+      <button class="add-team-tab" (click)="creatingTeam.set(true); teamModalOpen.set(true)"><mat-icon>group_add</mat-icon><span>Novo time</span></button>
+    </div>
+
+    <!-- Botão no canto direito das abas para alternar modo expandido sem F11 -->
+    <button type="button" class="expand-mode-btn" [class.active]="isFullscreen()" (click)="toggleFullscreen()" [matTooltip]="isFullscreen() ? 'Restaurar layout (exibir cabeçalho e menu lateral)' : 'Modo expandido (ocultar cabeçalho e menu lateral)'">
+      <mat-icon>{{ isFullscreen() ? 'unfold_less' : 'aspect_ratio' }}</mat-icon>
+      <span>{{ isFullscreen() ? 'Restaurar layout' : 'Tela cheia' }}</span>
     </button>
-    <button *ngFor="let team of teams()" [class.active]="board()?.teamId === team.id" (click)="switchBoard(team.boardId)" (contextmenu)="openTeamContextMenu($event, team)">
-      <span class="team-dot" [style.background]="team.color"></span><span>{{ team.name }}</span><small>{{ team.memberCount }}</small>
-    </button>
-    <button class="add-team-tab" (click)="creatingTeam.set(true); teamModalOpen.set(true)"><mat-icon>group_add</mat-icon><span>Novo time</span></button>
   </nav>
 
   <nav class="tree-breadcrumb" *ngIf="parentStack().length" aria-label="Navegação de subtarefas">
@@ -58,6 +67,41 @@
   </nav>
 
   <section class="kanban-filters group-panel">
+    <!-- Seletor de Modo de Visualização (Notion Style) -->
+    <div class="notion-view-toggle">
+      <button type="button" class="view-toggle-btn" [class.active]="viewMode() === 'kanban'" (click)="setViewMode('kanban')" matTooltip="Visualização em Quadro (Kanban)">
+        <mat-icon>view_kanban</mat-icon><span>Kanban</span>
+      </button>
+      <button type="button" class="view-toggle-btn" [class.active]="viewMode() === 'list'" (click)="setViewMode('list')" matTooltip="Visualização em Lista (Estilo Notion)">
+        <mat-icon>format_list_bulleted</mat-icon><span>Visão de Lista</span>
+      </button>
+    </div>
+
+    <!-- Dropdown de Ordenação Notion -->
+    <div class="notion-sort-wrapper" *ngIf="viewMode() === 'list'">
+      <button type="button" class="notion-sort-btn" (click)="toggleSortMenu($event)" matTooltip="Alternar ordenação da lista">
+        <mat-icon>swap_vert</mat-icon>
+        <span>{{ currentSortLabel() }}</span>
+      </button>
+      <div class="notion-sort-menu" *ngIf="showSortMenu()" (click)="$event.stopPropagation()">
+        <button type="button" [class.active]="sortOption() === 'default'" (click)="toggleSort('default')">
+          <mat-icon>format_line_spacing</mat-icon><span>Padrão (Posição)</span>
+        </button>
+        <button type="button" [class.active]="sortOption() === 'dueDate'" (click)="toggleSort('dueDate')">
+          <mat-icon>event</mat-icon><span>Prazo</span>
+        </button>
+        <button type="button" [class.active]="sortOption() === 'priority'" (click)="toggleSort('priority')">
+          <mat-icon>flag</mat-icon><span>Prioridade</span>
+        </button>
+        <button type="button" [class.active]="sortOption() === 'title'" (click)="toggleSort('title')">
+          <mat-icon>sort_by_alpha</mat-icon><span>Assunto (Título)</span>
+        </button>
+        <button type="button" [class.active]="sortOption() === 'status'" (click)="toggleSort('status')">
+          <mat-icon>donut_large</mat-icon><span>Status (Coluna)</span>
+        </button>
+      </div>
+    </div>
+
     <label class="search-box"><mat-icon>search</mat-icon><input [ngModel]="search()" (ngModelChange)="setSearch($event)" placeholder="Buscar tarefas, descrições ou etiquetas"></label>
     <select [ngModel]="priorityFilter()" (ngModelChange)="setPriorityFilter($event)">
       <option value="all">Todas as prioridades</option><option value="urgent">Urgente</option><option value="high">Alta</option><option value="medium">Média</option><option value="low">Baixa</option>
@@ -70,86 +114,251 @@
     <button class="archive-toggle" [class.active]="showArchived()" (click)="toggleArchived()"><mat-icon>archive</mat-icon>{{ showArchived() ? 'Ver quadro' : 'Arquivadas' }}</button>
     <button class="archive-toggle trash-open-btn" (click)="openTrash()" matTooltip="Abrir lixeira"><mat-icon>delete_outline</mat-icon>Lixeira<span *ngIf="board()?.trashCount" class="trash-count">{{ board()?.trashCount }}</span></button>
     <div class="filter-stat overdue" *ngIf="overdueCount()"><mat-icon>schedule</mat-icon>{{ overdueCount() }} atrasada{{ overdueCount() > 1 ? 's' : '' }}</div>
+
+    <button type="button" class="archive-toggle fullscreen-filter-btn" [class.active]="isFullscreen()" (click)="toggleFullscreen()" [matTooltip]="isFullscreen() ? 'Restaurar layout (exibir cabeçalho e menu lateral)' : 'Modo expandido (ocultar cabeçalho e menu lateral)'">
+      <mat-icon>{{ isFullscreen() ? 'unfold_less' : 'aspect_ratio' }}</mat-icon>
+      <span>{{ isFullscreen() ? 'Restaurar layout' : 'Tela cheia' }}</span>
+    </button>
   </section>
 
   <div class="loading-state" *ngIf="loading()"><span class="spinner"></span>Carregando quadro...</div>
   <div class="error-banner" *ngIf="service.error()"><mat-icon>error_outline</mat-icon>{{ service.error() }}<button (click)="service.error.set('')"><mat-icon>close</mat-icon></button></div>
 
-  <main class="board-canvas" *ngIf="board() as currentBoard" [hidden]="printingSingleTask()">
-    <section class="kanban-column" *ngFor="let column of currentBoard.columns; let colIndex = index; trackBy: trackById" [style.--col-print-color]="columnPrintColor(column, colIndex)" [style.--col-print-bg]="columnPrintBg(column, colIndex)">
-      <header class="column-header">
-        <span class="column-accent" [style.background]="column.color"></span>
-        <span class="column-title">{{ column.title }}</span>
-        <span class="column-count">{{ tasksFor(column.id).length }}</span>
-        <button class="column-action" (click)="moveColumn(column, -1)" matTooltip="Mover para esquerda"><mat-icon>chevron_left</mat-icon></button>
-        <button class="column-action" (click)="moveColumn(column, 1)" matTooltip="Mover para direita"><mat-icon>chevron_right</mat-icon></button>
-        <div class="column-options-wrap">
-          <button class="column-action" (click)="toggleColumnMenu(column.id, $event)" matTooltip="Opções da lista" [attr.aria-expanded]="columnMenuId() === column.id"><mat-icon>more_horiz</mat-icon></button>
-          <div class="column-options-menu" *ngIf="columnMenuId() === column.id">
-            <button (click)="openColumnDialog(column, 'rename')"><mat-icon>drive_file_rename_outline</mat-icon><span>Renomear lista</span></button>
-            <button class="danger" (click)="openColumnDialog(column, 'delete')"><mat-icon>delete_outline</mat-icon><span>Excluir lista</span></button>
+  <main class="board-canvas" *ngIf="board() as currentBoard" [hidden]="printingSingleTask()" [class.is-list-view]="viewMode() === 'list'">
+    <!-- ══════════════ VISÃO KANBAN ══════════════ -->
+    <ng-container *ngIf="viewMode() === 'kanban'">
+      <section class="kanban-column" *ngFor="let column of currentBoard.columns; let colIndex = index; trackBy: trackById" [style.--col-print-color]="columnPrintColor(column, colIndex)" [style.--col-print-bg]="columnPrintBg(column, colIndex)">
+        <header class="column-header">
+          <span class="column-accent" [style.background]="column.color"></span>
+          <span class="column-title">{{ column.title }}</span>
+          <span class="column-count">{{ tasksFor(column.id).length }}</span>
+          <button class="column-action" (click)="moveColumn(column, -1)" matTooltip="Mover para esquerda"><mat-icon>chevron_left</mat-icon></button>
+          <button class="column-action" (click)="moveColumn(column, 1)" matTooltip="Mover para direita"><mat-icon>chevron_right</mat-icon></button>
+          <div class="column-options-wrap">
+            <button class="column-action" (click)="toggleColumnMenu(column.id, $event)" matTooltip="Opções da lista" [attr.aria-expanded]="columnMenuId() === column.id"><mat-icon>more_horiz</mat-icon></button>
+            <div class="column-options-menu" *ngIf="columnMenuId() === column.id">
+              <button (click)="openColumnDialog(column, 'rename')"><mat-icon>palette</mat-icon><span>Editar lista / cor</span></button>
+              <button class="danger" (click)="openColumnDialog(column, 'delete')"><mat-icon>delete_outline</mat-icon><span>Excluir lista</span></button>
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      <div class="task-list" cdkDropList [id]="column.id" [cdkDropListData]="tasksFor(column.id)" [cdkDropListConnectedTo]="dropListIds" [cdkDropListAutoScrollStep]="18" (cdkDropListEntered)="enterColumn(column.id)" (cdkDropListExited)="leaveColumn(column.id)" (cdkDropListDropped)="dropTask($event, column)">
-        <article class="task-card" *ngFor="let task of tasksFor(column.id); trackBy: trackById" cdkDrag [cdkDragData]="task" [cdkDragDisabled]="showArchived()" [attr.data-priority]="task.priority" tabindex="0" (keydown.enter)="openEdit(task)" (click)="openEdit(task)" (contextmenu)="openTaskContextMenu($event, task)">
-          <div class="drag-placeholder" *cdkDragPlaceholder></div>
-          <div class="card-labels" *ngIf="task.labels.length"><span *ngFor="let label of task.labels | slice:0:4">{{ label }}</span></div>
-          <div class="card-title-row"><h3>{{ task.title }}</h3><button class="child-board-btn" (click)="openChildBoard(task, $event)" [matTooltip]="branchHasContent(task) ? childCount(task) + ' subtarefas ativas' : 'Criar ramificação de subtarefas'"><mat-icon>account_tree</mat-icon><small *ngIf="childCount(task)">{{ childCount(task) }}</small></button><mat-icon class="edit-hint">edit</mat-icon></div>
-          <app-markdown-text class="card-description" *ngIf="task.description" [text]="task.description" />
-          <div class="check-progress" *ngIf="task.checklist.length"><span [style.width.%]="checklistProgress(task)"></span></div>
-          <button class="card-checklist-toggle" *ngIf="task.checklist.length" type="button" (mousedown)="$event.stopPropagation()" (click)="toggleCardChecklist(task.id, $event)" [attr.aria-expanded]="isChecklistExpanded(task.id)">
-            <mat-icon>{{ isChecklistExpanded(task.id) ? 'keyboard_arrow_up' : 'keyboard_arrow_down' }}</mat-icon>
-            <span>Checklist</span>
-            <strong>{{ task.checklist.filter(item => item.done).length }}/{{ task.checklist.length }}</strong>
-          </button>
-          <div class="card-checklist-items" *ngIf="task.checklist.length && isChecklistExpanded(task.id)" (mousedown)="$event.stopPropagation()" (click)="$event.stopPropagation()">
-            <label *ngFor="let item of task.checklist; trackBy: trackById">
-              <input type="checkbox" [checked]="item.done" (change)="toggleCardChecklistItem(task, item.id, $event)">
-              <span [class.done]="item.done">{{ item.text }}</span>
-            </label>
-          </div>
-          <footer class="card-footer">
-            <div class="card-badges">
-              <span class="priority" [class]="task.priority">{{ task.priority === 'urgent' ? 'Urgente' : task.priority === 'high' ? 'Alta' : task.priority === 'low' ? 'Baixa' : 'Média' }}</span>
-              <span class="date-badge" *ngIf="task.dueDate" [class.overdue]="isOverdue(task)" [class.soon]="isDueSoon(task)"><mat-icon>schedule</mat-icon>{{ formatDate(task.dueDate) }}</span>
+        <div class="task-list" cdkDropList [id]="column.id" [cdkDropListData]="tasksFor(column.id)" [cdkDropListConnectedTo]="dropListIds" [cdkDropListAutoScrollStep]="18" (cdkDropListEntered)="enterColumn(column.id)" (cdkDropListExited)="leaveColumn(column.id)" (cdkDropListDropped)="dropTask($event, column)">
+          <article class="task-card" *ngFor="let task of tasksFor(column.id); trackBy: trackById" cdkDrag [cdkDragData]="task" [cdkDragDisabled]="showArchived()" [attr.data-priority]="task.priority" tabindex="0" (keydown.enter)="openEdit(task)" (click)="openEdit(task)" (contextmenu)="openTaskContextMenu($event, task)">
+            <div class="drag-placeholder" *cdkDragPlaceholder></div>
+            <div class="card-labels" *ngIf="task.labels.length"><span *ngFor="let label of task.labels | slice:0:4">{{ label }}</span></div>
+            <div class="card-title-row"><h3>{{ task.title }}</h3><button class="child-board-btn" (click)="openChildBoard(task, $event)" [matTooltip]="branchHasContent(task) ? childCount(task) + ' subtarefas ativas' : 'Criar ramificação de subtarefas'"><mat-icon>account_tree</mat-icon><small *ngIf="childCount(task)">{{ childCount(task) }}</small></button><mat-icon class="edit-hint">edit</mat-icon></div>
+            <app-markdown-text class="card-description" *ngIf="task.description" [text]="task.description" />
+            <div class="check-progress" *ngIf="task.checklist.length"><span [style.width.%]="checklistProgress(task)"></span></div>
+            <button class="card-checklist-toggle" *ngIf="task.checklist.length" type="button" (mousedown)="$event.stopPropagation()" (click)="toggleCardChecklist(task.id, $event)" [attr.aria-expanded]="isChecklistExpanded(task.id)">
+              <mat-icon>{{ isChecklistExpanded(task.id) ? 'keyboard_arrow_up' : 'keyboard_arrow_down' }}</mat-icon>
+              <span>Checklist</span>
+              <strong>{{ task.checklist.filter(item => item.done).length }}/{{ task.checklist.length }}</strong>
+            </button>
+            <div class="card-checklist-items" *ngIf="task.checklist.length && isChecklistExpanded(task.id)" (mousedown)="$event.stopPropagation()" (click)="$event.stopPropagation()">
+              <label *ngFor="let item of task.checklist; trackBy: trackById">
+                <input type="checkbox" [checked]="item.done" (change)="toggleCardChecklistItem(task, item.id, $event)">
+                <span [class.done]="item.done">{{ item.text }}</span>
+              </label>
             </div>
-            <div class="assignee-stack" *ngIf="task.assigneeIds.length"><img *ngFor="let assigneeId of task.assigneeIds | slice:0:3" class="assignee-avatar" [src]="assigneeAvatar(assigneeId)" [alt]="assigneeName(assigneeId)" [matTooltip]="assigneeName(assigneeId)" (error)="$any($event.target).src = defaultAvatar"><span *ngIf="task.assigneeIds.length > 3">+{{ task.assigneeIds.length - 3 }}</span></div>
-          </footer>
+            <footer class="card-footer">
+              <div class="card-badges">
+                <span class="priority" [class]="task.priority">{{ task.priority === 'urgent' ? 'Urgente' : task.priority === 'high' ? 'Alta' : task.priority === 'low' ? 'Baixa' : 'Média' }}</span>
+                <span class="date-badge" *ngIf="task.dueDate" [class.overdue]="isOverdue(task)" [class.soon]="isDueSoon(task)"><mat-icon>schedule</mat-icon>{{ formatDate(task.dueDate) }}</span>
+              </div>
+              <div class="assignee-stack" *ngIf="task.assigneeIds.length"><img *ngFor="let assigneeId of task.assigneeIds | slice:0:3" class="assignee-avatar" [src]="assigneeAvatar(assigneeId)" [alt]="assigneeName(assigneeId)" [matTooltip]="assigneeName(assigneeId)" (error)="$any($event.target).src = defaultAvatar"><span *ngIf="task.assigneeIds.length > 3">+{{ task.assigneeIds.length - 3 }}</span></div>
+            </footer>
 
-          <!-- ── Elementos exclusivos para impressão ── -->
-          <div class="print-card-content">
-            <div class="print-card-title">{{ task.title }}</div>
-            <div class="print-card-meta">
-              <span class="print-priority-badge" [attr.data-priority]="task.priority">{{ task.priority === 'urgent' ? 'Alta' : task.priority === 'high' ? 'Alta' : task.priority === 'low' ? 'Baixa' : 'Média' }}</span>
-              <span class="print-card-date" *ngIf="task.dueDate">{{ formatFullDate(task.dueDate) }}</span>
-            </div>
-            <div class="print-card-assignee" *ngIf="task.assigneeIds.length">
-              {{ assigneeNames(task) }}
-            </div>
-            <div class="print-card-labels" *ngIf="task.labels.length">
-              <span *ngFor="let label of task.labels" class="print-label-tag">#{{ label.startsWith('#') ? label.substring(1) : label }}</span>
-            </div>
-            <div class="print-checklist" *ngIf="task.checklist.length">
-              <div class="print-checklist-item" *ngFor="let item of task.checklist">
-                <span class="print-checklist-box" [class.done]="item.done">{{ item.done ? '☑' : '☐' }}</span>
-                <span class="print-checklist-text" [class.done]="item.done">{{ item.text }}</span>
+            <!-- ── Elementos exclusivos para impressão ── -->
+            <div class="print-card-content">
+              <div class="print-card-title">{{ task.title }}</div>
+              <div class="print-card-meta">
+                <span class="print-priority-badge" [attr.data-priority]="task.priority">{{ task.priority === 'urgent' ? 'Alta' : task.priority === 'high' ? 'Alta' : task.priority === 'low' ? 'Baixa' : 'Média' }}</span>
+                <span class="print-card-date" *ngIf="task.dueDate">{{ formatFullDate(task.dueDate) }}</span>
+              </div>
+              <div class="print-card-assignee" *ngIf="task.assigneeIds.length">
+                {{ assigneeNames(task) }}
+              </div>
+              <div class="print-card-labels" *ngIf="task.labels.length">
+                <span *ngFor="let label of task.labels" class="print-label-tag">#{{ label.startsWith('#') ? label.substring(1) : label }}</span>
+              </div>
+              <div class="print-checklist" *ngIf="task.checklist.length">
+                <div class="print-checklist-item" *ngFor="let item of task.checklist">
+                  <span class="print-checklist-box" [class.done]="item.done">{{ item.done ? '☑' : '☐' }}</span>
+                  <span class="print-checklist-text" [class.done]="item.done">{{ item.text }}</span>
+                </div>
               </div>
             </div>
+          </article>
+          <div class="empty-column" *ngIf="!tasksFor(column.id).length && dragOverColumnId() !== column.id"><mat-icon>inbox</mat-icon><span>{{ showArchived() ? 'Nenhuma arquivada' : 'Arraste uma tarefa para cá' }}</span></div>
+          <div class="print-empty-column" *ngIf="!tasksFor(column.id).length">
+            <span>Nenhum item</span>
           </div>
-        </article>
-        <div class="empty-column" *ngIf="!tasksFor(column.id).length && dragOverColumnId() !== column.id"><mat-icon>inbox</mat-icon><span>{{ showArchived() ? 'Nenhuma arquivada' : 'Arraste uma tarefa para cá' }}</span></div>
-        <div class="print-empty-column" *ngIf="!tasksFor(column.id).length">
-          <span>Nenhum item</span>
+        </div>
+        <button class="add-card-btn" (click)="openCreate(column.id)" *ngIf="!showArchived()"><mat-icon>add</mat-icon>Adicionar tarefa</button>
+      </section>
+
+      <section class="add-column-card">
+        <button *ngIf="!addingColumn()" (click)="addingColumn.set(true)" class="add-column-trigger-btn"><mat-icon>add</mat-icon>Adicionar lista</button>
+        <form *ngIf="addingColumn()" (ngSubmit)="saveColumn()" class="add-column-form">
+          <input [(ngModel)]="newColumnTitle" name="columnTitle" placeholder="Nome da lista" maxlength="60" autofocus>
+          <div class="column-color-picker-box">
+            <span class="color-picker-label">Cor da lista</span>
+            <div class="column-color-swatches">
+              <button type="button" *ngFor="let c of columnColors" class="column-color-swatch" [style.background]="c.value" [class.selected]="newColumnColor === c.value" [matTooltip]="c.label" (click)="newColumnColor = c.value">
+                <mat-icon *ngIf="newColumnColor === c.value">check</mat-icon>
+              </button>
+            </div>
+          </div>
+          <div class="add-column-actions">
+            <button class="primary-btn" type="submit" [disabled]="!newColumnTitle.trim()">Adicionar</button>
+            <button class="icon-btn" type="button" (click)="addingColumn.set(false)"><mat-icon>close</mat-icon></button>
+          </div>
+        </form>
+      </section>
+    </ng-container>
+
+    <!-- ══════════════ VISÃO DE LISTA NOTION ══════════════ -->
+    <section class="notion-list-view" *ngIf="viewMode() === 'list'">
+      <div class="notion-table-container">
+        <table class="notion-table">
+          <thead>
+            <tr>
+              <th class="col-date" (click)="toggleSort('dueDate')">
+                <mat-icon>event</mat-icon> <span>Prazo</span>
+                <mat-icon class="sort-icon" *ngIf="sortOption() === 'dueDate'">{{ sortDirection() === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</mat-icon>
+              </th>
+              <th class="col-sector">
+                <mat-icon>apartment</mat-icon> <span>Setor</span>
+              </th>
+              <th class="col-macro">
+                <mat-icon>folder_open</mat-icon> <span>Tema Macro</span>
+              </th>
+              <th class="col-subject" (click)="toggleSort('title')">
+                <mat-icon>short_text</mat-icon> <span>Assunto</span>
+                <mat-icon class="sort-icon" *ngIf="sortOption() === 'title'">{{ sortDirection() === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</mat-icon>
+              </th>
+              <th class="col-demand">
+                <mat-icon>notes</mat-icon> <span>Demanda</span>
+              </th>
+              <th class="col-execution">
+                <mat-icon>schedule</mat-icon> <span>Execução</span>
+              </th>
+              <th class="col-assignee">
+                <mat-icon>person_outline</mat-icon> <span>Responsável</span>
+              </th>
+              <th class="col-status" (click)="toggleSort('status')">
+                <mat-icon>donut_large</mat-icon> <span>Status</span>
+                <mat-icon class="sort-icon" *ngIf="sortOption() === 'status'">{{ sortDirection() === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</mat-icon>
+              </th>
+              <th class="col-tags">
+                <mat-icon>local_offer</mat-icon> <span>Pedido</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let task of sortedVisibleTasks(); trackBy: trackById"
+                class="notion-row"
+                (click)="openEdit(task)"
+                (contextmenu)="openTaskContextMenu($event, task)">
+              <!-- Prazo -->
+              <td class="col-date">
+                <span *ngIf="task.dueDate" class="notion-date-cell" [class.overdue]="isOverdue(task)" [class.soon]="isDueSoon(task)">
+                  {{ formatDate(task.dueDate) }}
+                </span>
+                <span *ngIf="!task.dueDate" class="notion-empty-cell">—</span>
+              </td>
+
+              <!-- Setor / Lista -->
+              <td class="col-sector">
+                <span class="notion-sector-badge" [style.background]="getColumnBg(task.columnId)" [style.color]="getColumnColor(task.columnId)">
+                  {{ getColumnTitle(task.columnId) }}
+                </span>
+              </td>
+
+              <!-- Tema Macro -->
+              <td class="col-macro">
+                <span class="notion-macro-badge">
+                  <span class="macro-dot" [style.background]="currentBoard.color || 'var(--brand-500)'"></span>
+                  <span>{{ currentBoard.name || 'Gelelê' }}</span>
+                </span>
+              </td>
+
+              <!-- Assunto -->
+              <td class="col-subject">
+                <div class="subject-cell-content">
+                  <span class="task-title-text">{{ task.title }}</span>
+                  <button *ngIf="branchHasContent(task)" class="notion-branch-btn" (click)="openChildBoard(task, $event)" [matTooltip]="childCount(task) + ' subtarefas'">
+                    <mat-icon>account_tree</mat-icon>
+                    <small>{{ childCount(task) }}</small>
+                  </button>
+                </div>
+              </td>
+
+              <!-- Demanda -->
+              <td class="col-demand">
+                <span class="notion-demand-text" [title]="task.description || ''">
+                  {{ getDemandText(task) }}
+                </span>
+              </td>
+
+              <!-- Execução -->
+              <td class="col-execution">
+                <span class="notion-execution-text">
+                  {{ task.dueDate ? formatFullDate(task.dueDate) : '—' }}
+                </span>
+              </td>
+
+              <!-- Responsável -->
+              <td class="col-assignee">
+                <div class="notion-assignees-stack" *ngIf="task.assigneeIds.length">
+                  <span *ngFor="let assigneeId of task.assigneeIds" class="notion-user-tag">
+                    <img [src]="assigneeAvatar(assigneeId)" [alt]="assigneeName(assigneeId)" class="user-tag-avatar" (error)="$any($event.target).src = defaultAvatar">
+                    <span class="user-tag-name">{{ assigneeName(assigneeId) }}</span>
+                  </span>
+                </div>
+                <span *ngIf="!task.assigneeIds.length" class="notion-empty-cell">—</span>
+              </td>
+
+              <!-- Status (Pill com ponto colorido) -->
+              <td class="col-status" (click)="$event.stopPropagation()">
+                <div class="notion-status-pill" [style.--status-color]="getColumnColor(task.columnId)">
+                  <span class="status-bullet"></span>
+                  <span class="status-label-text">{{ getColumnTitle(task.columnId) }}</span>
+                  <select [ngModel]="task.columnId" (change)="changeTaskColumn(task, $any($event.target).value, $event)">
+                    <option *ngFor="let col of currentBoard.columns" [value]="col.id">{{ col.title }}</option>
+                  </select>
+                  <mat-icon class="status-arrow">expand_more</mat-icon>
+                </div>
+              </td>
+
+              <!-- Pedido / Etiquetas -->
+              <td class="col-tags">
+                <div class="notion-tags-group" *ngIf="task.labels.length">
+                  <span *ngFor="let label of task.labels" class="notion-label-tag">
+                    {{ label }}
+                  </span>
+                </div>
+                <span *ngIf="!task.labels.length" class="notion-empty-cell">—</span>
+              </td>
+            </tr>
+
+            <!-- Tabela Vazia -->
+            <tr *ngIf="!sortedVisibleTasks().length">
+              <td colspan="9" class="notion-empty-row">
+                <mat-icon>inbox</mat-icon>
+                <span>Nenhuma tarefa encontrada para os filtros selecionados.</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- Linha rápida para adicionar tarefa estilo Notion -->
+        <div class="notion-add-task-row" (click)="openCreate()">
+          <mat-icon>add</mat-icon>
+          <span>Nova tarefa</span>
         </div>
       </div>
-      <button class="add-card-btn" (click)="openCreate(column.id)" *ngIf="!showArchived()"><mat-icon>add</mat-icon>Adicionar tarefa</button>
-    </section>
-
-    <section class="add-column-card">
-      <button *ngIf="!addingColumn()" (click)="addingColumn.set(true)"><mat-icon>add</mat-icon>Adicionar lista</button>
-      <form *ngIf="addingColumn()" (ngSubmit)="saveColumn()"><input [(ngModel)]="newColumnTitle" name="columnTitle" placeholder="Nome da lista" maxlength="60" autofocus><div><button class="primary-btn" type="submit">Adicionar</button><button class="icon-btn" type="button" (click)="addingColumn.set(false)"><mat-icon>close</mat-icon></button></div></form>
     </section>
   </main>
   
@@ -318,19 +527,39 @@
 <div class="column-dialog-backdrop" *ngIf="columnDialog() && selectedColumn() as column" (mousedown)="closeColumnDialog()">
   <section class="column-dialog" role="dialog" aria-modal="true" (mousedown)="$event.stopPropagation()">
     <header>
-      <span class="column-dialog-icon" [class.delete]="columnDialog() === 'delete'"><mat-icon>{{ columnDialog() === 'rename' ? 'drive_file_rename_outline' : 'delete_outline' }}</mat-icon></span>
-      <div><h2>{{ columnDialog() === 'rename' ? 'Renomear lista' : 'Excluir lista' }}</h2><p>{{ columnDialog() === 'rename' ? 'Escolha um nome claro para esta etapa.' : 'Esta ação remove a lista permanentemente.' }}</p></div>
+      <span class="column-dialog-icon" [class.delete]="columnDialog() === 'delete'" [style.background]="columnDialog() === 'rename' ? columnColorDraft : null">
+        <mat-icon>{{ columnDialog() === 'rename' ? 'palette' : 'delete_outline' }}</mat-icon>
+      </span>
+      <div>
+        <h2>{{ columnDialog() === 'rename' ? 'Editar lista' : 'Excluir lista' }}</h2>
+        <p>{{ columnDialog() === 'rename' ? 'Altere o nome e a cor de destaque desta lista.' : 'Esta ação remove a lista permanentemente.' }}</p>
+      </div>
       <button class="icon-btn" (click)="closeColumnDialog()"><mat-icon>close</mat-icon></button>
     </header>
     <div class="column-dialog-body" *ngIf="columnDialog() === 'rename'">
-      <label><span>Nome da lista</span><input [(ngModel)]="columnTitleDraft" maxlength="60" (keydown.enter)="confirmColumnDialog()" autofocus></label>
+      <label>
+        <span>Nome da lista</span>
+        <input [(ngModel)]="columnTitleDraft" maxlength="60" (keydown.enter)="confirmColumnDialog()" autofocus>
+      </label>
+      <div class="column-dialog-colors">
+        <span class="color-picker-label">Cor da lista</span>
+        <div class="column-color-swatches">
+          <button type="button" *ngFor="let c of columnColors" class="column-color-swatch" [style.background]="c.value" [class.selected]="columnColorDraft === c.value" [matTooltip]="c.label" (click)="columnColorDraft = c.value">
+            <mat-icon *ngIf="columnColorDraft === c.value">check</mat-icon>
+          </button>
+        </div>
+      </div>
     </div>
     <div class="column-dialog-body delete-copy" *ngIf="columnDialog() === 'delete'">
       <p>Deseja excluir <strong>{{ column.title }}</strong>?</p>
       <div class="blocked-warning" *ngIf="columnHasActiveTasks(column.id)"><mat-icon>warning_amber</mat-icon><span>Esta lista possui tarefas ativas. Mova ou arquive os cartões antes de excluí-la.</span></div>
       <p class="safe-hint" *ngIf="!columnHasActiveTasks(column.id)">Tarefas arquivadas nesta lista também serão removidas.</p>
     </div>
-    <footer><button class="cancel-btn" (click)="closeColumnDialog()">Cancelar</button><button *ngIf="columnDialog() === 'rename'" class="primary-btn" [disabled]="!columnTitleDraft.trim()" (click)="confirmColumnDialog()">Salvar nome</button><button *ngIf="columnDialog() === 'delete'" class="delete-confirm-btn" [disabled]="columnHasActiveTasks(column.id)" (click)="confirmColumnDialog()"><mat-icon>delete_outline</mat-icon>Excluir lista</button></footer>
+    <footer>
+      <button class="cancel-btn" (click)="closeColumnDialog()">Cancelar</button>
+      <button *ngIf="columnDialog() === 'rename'" class="primary-btn" [disabled]="!columnTitleDraft.trim()" (click)="confirmColumnDialog()">Salvar alterações</button>
+      <button *ngIf="columnDialog() === 'delete'" class="delete-confirm-btn" [disabled]="columnHasActiveTasks(column.id)" (click)="confirmColumnDialog()"><mat-icon>delete_outline</mat-icon>Excluir lista</button>
+    </footer>
   </section>
 </div>
 
