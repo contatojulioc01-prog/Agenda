@@ -84,29 +84,29 @@
       </div>
 
       <!-- Filtros -->
-      <button class="archive-toggle" [class.active]="filterPinnedOnly()" (click)="filterPinnedOnly.set(!filterPinnedOnly())">
-        <mat-icon>push_pin</mat-icon><span>Fixados</span>
+      <button class="archive-toggle expand-pill-btn size-34" [class.active]="filterPinnedOnly()" (click)="filterPinnedOnly.set(!filterPinnedOnly())" matTooltip="Fixados">
+        <mat-icon>push_pin</mat-icon><span class="pill-label">Fixados</span>
       </button>
-      <button class="archive-toggle" [class.active]="filterWithAttachments()" (click)="filterWithAttachments.set(!filterWithAttachments())">
-        <mat-icon>attach_file</mat-icon><span>Com Anexos</span>
+      <button class="archive-toggle expand-pill-btn size-34" [class.active]="filterWithAttachments()" (click)="filterWithAttachments.set(!filterWithAttachments())" matTooltip="Com Anexos">
+        <mat-icon>attach_file</mat-icon><span class="pill-label">Com Anexos</span>
       </button>
     </div>
 
     <div class="toolbar-actions">
-      <button class="secondary-btn" (click)="abrirCriarTime()" matTooltip="Criar nova equipe com mural e kanban">
-        <mat-icon>group_add</mat-icon><span>Novo Time</span>
+      <button class="secondary-btn expand-pill-btn size-36" (click)="abrirCriarTime()" matTooltip="Criar novo time com mural e kanban">
+        <mat-icon>group_add</mat-icon><span class="pill-label">Novo Time</span>
       </button>
-      <button class="secondary-btn" (click)="abrirNovoGrupo()">
-        <mat-icon>create_new_folder</mat-icon><span>Novo Grupo</span>
+      <button class="secondary-btn expand-pill-btn size-36" (click)="abrirNovoGrupo()" matTooltip="Criar novo grupo de cartões">
+        <mat-icon>create_new_folder</mat-icon><span class="pill-label">Novo Grupo</span>
       </button>
-      <button class="primary-btn" (click)="abrirNovoItem()">
-        <mat-icon>add</mat-icon><span>Novo Cartão</span>
+      <button class="primary-btn expand-pill-btn size-36 primary-pill" (click)="abrirNovoItem()" matTooltip="Novo Cartão no Mural">
+        <mat-icon>add</mat-icon><span class="pill-label">Novo Cartão</span>
       </button>
-      <button *ngIf="activeBoard()?.myRole === 'admin'" class="icon-btn" (click)="abrirEditarMural()" matTooltip="Configurar Mural">
-        <mat-icon>settings</mat-icon>
+      <button *ngIf="activeBoard()?.myRole === 'admin'" class="secondary-btn expand-pill-btn size-36" (click)="abrirEditarMural()" matTooltip="Configurar Mural">
+        <mat-icon>settings</mat-icon><span class="pill-label">Configurações</span>
       </button>
-      <button *ngIf="activeBoard()?.scopeType === 'team' || teams().length > 0" class="icon-btn" (click)="abrirGerenciarTime()" matTooltip="Gerenciar Time & Membros SSO">
-        <mat-icon>group</mat-icon>
+      <button *ngIf="activeBoard()?.scopeType === 'team' || teams().length > 0" class="secondary-btn expand-pill-btn size-36" (click)="abrirGerenciarTime()" matTooltip="Gerenciar Time & Membros SSO">
+        <mat-icon>group</mat-icon><span class="pill-label">Membros</span>
       </button>
     </div>
   </div>

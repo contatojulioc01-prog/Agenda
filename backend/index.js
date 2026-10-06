@@ -494,11 +494,17 @@ initDb().then(async () => {
   const eventsRouter    = require('./routes/events');
   const kanbanRouter    = require('./routes/kanban');
   const muralRouter     = require('./routes/mural');
-  const attachmentsRouter = require('./routes/attachments').router;
+  const { router: attachmentsRouter, migrateAttachmentsToDisk } = require('./routes/attachments');
   const notifications = require('./routes/notifications');
   const privacyRouter = require('./routes/privacy');
   const aiRouter = require('./routes/ai');
   const { createAgendaMcpHttpHandler } = require('./mcp/http-handler');
+
+  try {
+    await migrateAttachmentsToDisk();
+  } catch (error) {
+    console.error('[ATTACHMENTS] Falha na migração automática de anexos para disco:', error);
+  }
 
   try {
     await kanbanRouter.purgeExpiredTrash(broadcast);
@@ -509,6 +515,16 @@ initDb().then(async () => {
     kanbanRouter.purgeExpiredTrash(broadcast).catch(error => console.error('[LIXEIRA] Falha na limpeza automática:', error));
   }, 6 * 60 * 60 * 1000);
   trashCleanupTimer.unref();
+
+  try {
+    await kanbanRouter.autoArchiveColumnTasks(null, broadcast);
+  } catch (error) {
+    console.error('[KANBAN] Falha no auto-arquivamento inicial:', error);
+  }
+  const autoArchiveTimer = setInterval(() => {
+    kanbanRouter.autoArchiveColumnTasks(null, broadcast).catch(error => console.error('[KANBAN] Falha no auto-arquivamento periódico:', error));
+  }, 60 * 1000);
+  autoArchiveTimer.unref();
 
   app.use('/api/calendars', authenticateAgendaRequest, calendarsRouter);
   app.use('/api/calendars', authenticateAgendaRequest, membersRouter);  // /:id/members

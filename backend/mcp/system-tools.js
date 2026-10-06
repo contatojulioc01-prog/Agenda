@@ -1,8 +1,10 @@
 const crypto = require('crypto');
+const fs = require('fs');
 const { z } = require('zod');
 const db = require('../db');
 const kanban = require('../routes/kanban');
 const events = require('../routes/events');
+const mural = require('../routes/mural');
 const { listAttachments } = require('../routes/attachments');
 const { isHexColor, isNonEmptyString, isOptionalString } = require('../validation');
 
@@ -540,9 +542,142 @@ async function executeSystemTool(name, args = {}, context = {}) {
     broadcast({type:'kanban_updated',boardId:task.board_id,taskId:task.id}); return {success:true,subtarefasExcluidas:descendants.length};
   }
 
+  if(name==='listar_murais'){
+    await mural.ensurePersonalMural(userId);
+    const teamMemberships = await db.all(`
+      SELECT t.*, m.role as my_role
+      FROM kanban_teams t
+      JOIN kanban_team_members m ON m.team_id = t.id
+      WHERE m.user_id = $1
+    `, [userId]);
+    for (const team of teamMemberships) {
+      await mural.ensureTeamMural(team);
+    }
+    const personalBoards = await db.all(`
+      SELECT b.*, (SELECT COUNT(*) FROM mural_items i WHERE i.mural_id = b.id) as item_count
+      FROM mural_boards b WHERE b.owner_id = $1 AND b.scope_type = 'personal' ORDER BY b.created_at
+    `, [userId]);
+    const teamBoards = await db.all(`
+      SELECT b.*, t.name as team_name, m.role as my_role,
+        (SELECT COUNT(*) FROM mural_items i WHERE i.mural_id = b.id) as item_count
+      FROM mural_boards b
+      JOIN kanban_teams t ON t.id = b.team_id
+      JOIN kanban_team_members m ON m.team_id = t.id AND m.user_id = $1
+      WHERE b.scope_type = 'team' ORDER BY b.created_at
+    `, [userId]);
+    return [
+      ...personalBoards.map(b => mural.muralDto(b, 'admin', b.item_count)),
+      ...teamBoards.map(b => ({ ...mural.muralDto(b, b.my_role, b.item_count), teamName: b.team_name }))
+    ];
+  }
+
+  if(name==='obter_mural'){
+    const access = await mural.muralAccess(args.muralId, userId);
+    if (!access) fail('Mural não encontrado ou sem permissão de acesso.');
+    const { mural: m, role } = access;
+    const groups = await db.all('SELECT * FROM mural_groups WHERE mural_id = $1 ORDER BY position, created_at', [m.id]);
+    const itemRows = await db.all('SELECT * FROM mural_items WHERE mural_id = $1 ORDER BY is_pinned DESC, position ASC, created_at DESC', [m.id]);
+    const items = [];
+    for (const row of itemRows) {
+      const attachments = await listAttachments('mural_item', row.id);
+      items.push(mural.itemDto(row, attachments));
+    }
+    let teamMembers = [];
+    if (m.scope_type === 'team' && m.team_id) {
+      teamMembers = await db.all('SELECT user_id, role, joined_at FROM kanban_team_members WHERE team_id = $1 ORDER BY joined_at', [m.team_id]);
+    }
+    return {
+      board: mural.muralDto(m, role, items.length),
+      groups: groups.map(mural.groupDto),
+      items,
+      teamMembers,
+    };
+  }
+
+  if(name==='criar_item_mural'){
+    const access = await mural.muralAccess(args.muralId, userId, true);
+    if (!access) fail('Mural não encontrado ou sem permissão de escrita.');
+    if (!args.titulo || !args.titulo.trim()) fail('Título do item do mural é obrigatório.');
+    const itemId = id('not');
+    const now = new Date().toISOString();
+    const itemRotation = (Math.random() * 3 - 1.5).toFixed(1);
+    const maxPos = await db.get('SELECT COALESCE(MAX(position), -1) as max_p FROM mural_items WHERE mural_id = $1', [args.muralId]);
+    await db.run(`
+      INSERT INTO mural_items (id, mural_id, group_id, title, content, color, is_pinned, position, rotation, created_by, created_by_name, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $12)
+    `, [itemId, args.muralId, args.groupId || null, args.titulo.trim(), args.conteudo || '', args.cor || '#fef08a', args.fixado ? 1 : 0, Number(maxPos.max_p) + 1, itemRotation, userId, args.nomeAutor || '', now]);
+    broadcast({ type: 'mural_updated', muralId: args.muralId, itemId });
+    const created = await db.get('SELECT * FROM mural_items WHERE id = $1', [itemId]);
+    return mural.itemDto(created, []);
+  }
+
+  if(name==='atualizar_item_mural'){
+    const item = await db.get('SELECT * FROM mural_items WHERE id = $1', [args.itemId]);
+    if (!item) fail('Item do mural não encontrado.');
+    const access = await mural.muralAccess(item.mural_id, userId, true);
+    if (!access) fail('Sem permissão para alterar o item do mural.');
+    const updates = [];
+    const params = [];
+    let idx = 1;
+    if (args.titulo !== undefined) {
+      if (!args.titulo.trim()) fail('Título inválido.');
+      updates.push(`title = $${idx++}`);
+      params.push(args.titulo.trim());
+    }
+    if (args.conteudo !== undefined) {
+      updates.push(`content = $${idx++}`);
+      params.push(args.conteudo);
+    }
+    if (args.cor !== undefined) {
+      updates.push(`color = $${idx++}`);
+      params.push(args.cor);
+    }
+    if (args.groupId !== undefined) {
+      updates.push(`group_id = $${idx++}`);
+      params.push(args.groupId || null);
+    }
+    if (args.fixado !== undefined) {
+      updates.push(`is_pinned = $${idx++}`);
+      params.push(args.fixado ? 1 : 0);
+    }
+    if (args.posicao !== undefined) {
+      updates.push(`position = $${idx++}`);
+      params.push(Number(args.posicao));
+    }
+    if (updates.length) {
+      updates.push(`updated_at = $${idx++}`);
+      params.push(new Date().toISOString());
+      params.push(item.id);
+      await db.run(`UPDATE mural_items SET ${updates.join(', ')} WHERE id = $${idx}`, params);
+    }
+    broadcast({ type: 'mural_updated', muralId: item.mural_id, itemId: item.id });
+    const updated = await db.get('SELECT * FROM mural_items WHERE id = $1', [item.id]);
+    const attachments = await listAttachments('mural_item', item.id);
+    return mural.itemDto(updated, attachments);
+  }
+
+  if(name==='excluir_item_mural'){
+    if (args.confirmar !== true) fail('A exclusão exige confirmar=true.');
+    const item = await db.get('SELECT * FROM mural_items WHERE id = $1', [args.itemId]);
+    if (!item) fail('Item do mural não encontrado.');
+    const access = await mural.muralAccess(item.mural_id, userId, true);
+    if (!access) fail('Sem permissão para excluir o item do mural.');
+    const atts = await db.all(`SELECT file_path FROM attachments WHERE owner_type = 'mural_item' AND owner_id = $1`, [item.id]);
+    for (const att of atts) {
+      if (att.file_path && fs.existsSync(att.file_path)) {
+        try { await fs.promises.unlink(att.file_path); } catch {}
+      }
+    }
+    await db.run(`DELETE FROM attachments WHERE owner_type = 'mural_item' AND owner_id = $1`, [item.id]);
+    await db.run('DELETE FROM mural_items WHERE id = $1', [item.id]);
+    broadcast({ type: 'mural_updated', muralId: item.mural_id, itemId: item.id });
+    return { success: true, itemId: item.id };
+  }
+
   if(name==='listar_anexos'){
     if(args.tipo==='event') { const event=await db.get('SELECT * FROM events WHERE id=$1',[args.itemId]); if(!event||!(await events.hasAccess(event.calendar_id,userId))) fail('Evento não encontrado ou sem acesso.'); }
-    else { const task=await db.get('SELECT * FROM kanban_tasks WHERE id=$1',[args.itemId]); if(!task||!(await kanban.boardAccess(task.board_id,userId))) fail('Tarefa não encontrada ou sem acesso.'); }
+    else if(args.tipo==='task') { const task=await db.get('SELECT * FROM kanban_tasks WHERE id=$1',[args.itemId]); if(!task||!(await kanban.boardAccess(task.board_id,userId))) fail('Tarefa não encontrada ou sem acesso.'); }
+    else if(args.tipo==='mural_item') { const item=await db.get('SELECT * FROM mural_items WHERE id=$1',[args.itemId]); if(!item||!(await mural.muralAccess(item.mural_id,userId))) fail('Item do mural não encontrado ou sem acesso.'); }
     return listAttachments(args.tipo,args.itemId);
   }
 
@@ -550,7 +685,11 @@ async function executeSystemTool(name, args = {}, context = {}) {
     if(args.confirmar!==true) fail('A exclusão exige confirmar=true.');
     const attachment=await db.get('SELECT * FROM attachments WHERE id=$1',[args.anexoId]); if(!attachment) fail('Anexo não encontrado.');
     if(attachment.owner_type==='event'){const event=await db.get('SELECT * FROM events WHERE id=$1',[attachment.owner_id]);if(!event||!(await events.hasAccess(event.calendar_id,userId,true))) fail('Sem permissão para excluir o anexo.');}
-    else {const task=await db.get('SELECT * FROM kanban_tasks WHERE id=$1',[attachment.owner_id]);if(!task||!(await kanban.boardAccess(task.board_id,userId,true))) fail('Sem permissão para excluir o anexo.');}
+    else if(attachment.owner_type==='task'){const task=await db.get('SELECT * FROM kanban_tasks WHERE id=$1',[attachment.owner_id]);if(!task||!(await kanban.boardAccess(task.board_id,userId,true))) fail('Sem permissão para excluir o anexo.');}
+    else if(attachment.owner_type==='mural_item'){const item=await db.get('SELECT * FROM mural_items WHERE id=$1',[attachment.owner_id]);if(!item||!(await mural.muralAccess(item.mural_id,userId,true))) fail('Sem permissão para excluir o anexo.');}
+    if (attachment.file_path && fs.existsSync(attachment.file_path)) {
+      try { await fs.promises.unlink(attachment.file_path); } catch {}
+    }
     await db.run('DELETE FROM attachments WHERE id=$1',[attachment.id]); return {success:true,anexoId:attachment.id};
   }
 
@@ -592,47 +731,27 @@ const memberSchema = z.object({ userId:z.string().min(1), permissao:z.enum(['edi
 const systemToolDefinitions = [
   {name:'obter_contexto_completo',title:'Obter contexto completo',description:'Retorna estrutura, permissões, agendas, equipes, quadros, convites, notificações e totais do usuário.',schema:z.object({}),annotations:read},
   {name:'obter_agenda',title:'Obter agenda',description:'Obtém uma agenda, seus membros e total de eventos.',schema:z.object({agendaId:z.string()}),annotations:read},
-  {name:'criar_agenda',title:'Criar agenda',description:'Cria agenda e envia convites opcionais.',schema:z.object({nome:z.string().min(1).max(80),cor:z.string().regex(HEX_COLOR).default('#4f46e5'),privada:z.boolean().default(true),membros:z.array(memberSchema).max(200).default([])}),annotations:write},
-  {name:'atualizar_agenda',title:'Atualizar agenda',description:'Atualiza nome, cor ou privacidade conforme a permissão.',schema:z.object({agendaId:z.string(),nome:z.string().min(1).max(80).optional(),cor:z.string().regex(HEX_COLOR).optional(),privada:z.boolean().optional()}),annotations:write},
-  {name:'excluir_agenda',title:'Excluir agenda',description:'Exclui agenda comum, eventos e anexos. A padrão e a de tarefas não podem ser excluídas.',schema:z.object({agendaId:z.string(),confirmar:z.literal(true)}),annotations:destructive},
   {name:'listar_membros_agenda',title:'Listar membros da agenda',description:'Lista IDs e permissões dos membros.',schema:z.object({agendaId:z.string()}),annotations:read},
   {name:'listar_convites_agenda',title:'Listar convites de agenda',description:'Sem agendaId lista convites recebidos; com agendaId lista convites administrados pelo proprietário.',schema:z.object({agendaId:z.string().optional()}),annotations:read},
-  {name:'convidar_membro_agenda',title:'Convidar para agenda',description:'Convida usuário para uma agenda comum.',schema:z.object({agendaId:z.string(),usuarioId:z.string(),permissao:z.enum(['editor','viewer']).default('viewer')}),annotations:write},
-  {name:'responder_convite_agenda',title:'Responder convite de agenda',description:'Aceita ou recusa convite recebido.',schema:z.object({conviteId:z.string(),aceitar:z.boolean()}),annotations:write},
-  {name:'alterar_membro_agenda',title:'Alterar membro da agenda',description:'Altera a permissão de membro não proprietário.',schema:z.object({agendaId:z.string(),membroId:z.string(),permissao:z.enum(['editor','viewer'])}),annotations:write},
-  {name:'remover_membro_agenda',title:'Remover membro da agenda',description:'Remove membro não proprietário.',schema:z.object({agendaId:z.string(),membroId:z.string(),confirmar:z.literal(true)}),annotations:destructive},
   {name:'listar_equipes',title:'Listar equipes',description:'Lista equipes acessíveis e seus quadros.',schema:z.object({}),annotations:read},
   {name:'obter_equipe',title:'Obter equipe',description:'Obtém equipe e membros.',schema:z.object({equipeId:z.string()}),annotations:read},
-  {name:'criar_equipe',title:'Criar equipe',description:'Cria equipe, agenda de tarefas, quadro e colunas padrão.',schema:z.object({nome:z.string().min(1).max(80),descricao:z.string().max(1000).default(''),cor:z.string().regex(HEX_COLOR).default('#4f46e5')}),annotations:write},
-  {name:'atualizar_equipe',title:'Atualizar equipe',description:'Atualiza equipe administrada pelo usuário.',schema:z.object({equipeId:z.string(),nome:z.string().min(1).max(80).optional(),descricao:z.string().max(1000).optional(),cor:z.string().regex(HEX_COLOR).optional()}),annotations:write},
-  {name:'excluir_equipe',title:'Excluir equipe',description:'Exclui equipe, quadro, tarefas, agenda e anexos vinculados.',schema:z.object({equipeId:z.string(),confirmar:z.literal(true)}),annotations:destructive},
   {name:'listar_membros_equipe',title:'Listar membros da equipe',description:'Lista membros e papéis da equipe.',schema:z.object({equipeId:z.string()}),annotations:read},
   {name:'listar_convites_equipe',title:'Listar convites de equipe',description:'Sem equipeId lista recebidos; com equipeId lista os administrados.',schema:z.object({equipeId:z.string().optional()}),annotations:read},
-  {name:'convidar_membro_equipe',title:'Convidar para equipe',description:'Convida usuário para equipe administrada.',schema:z.object({equipeId:z.string(),usuarioId:z.string()}),annotations:write},
-  {name:'responder_convite_equipe',title:'Responder convite de equipe',description:'Aceita ou recusa convite recebido.',schema:z.object({conviteId:z.string(),aceitar:z.boolean()}),annotations:write},
-  {name:'remover_membro_equipe',title:'Remover membro da equipe',description:'Remove membro e suas atribuições de tarefas.',schema:z.object({equipeId:z.string(),membroId:z.string(),confirmar:z.literal(true)}),annotations:destructive},
   {name:'obter_quadro',title:'Obter quadro completo',description:'Retorna quadro, colunas, tarefas, checklist e anexos.',schema:z.object({quadroId:z.string()}),annotations:read},
-  {name:'criar_quadro',title:'Criar quadro pessoal',description:'Cria quadro pessoal com três colunas padrão.',schema:z.object({nome:z.string().min(1).max(80),descricao:z.string().max(1000).default(''),cor:z.string().regex(HEX_COLOR).default('#4f46e5')}),annotations:write},
-  {name:'atualizar_quadro',title:'Atualizar quadro',description:'Atualiza nome, descrição ou cor.',schema:z.object({quadroId:z.string(),nome:z.string().min(1).max(80).optional(),descricao:z.string().max(1000).optional(),cor:z.string().regex(HEX_COLOR).optional()}),annotations:write},
-  {name:'excluir_quadro',title:'Excluir quadro pessoal',description:'Exclui quadro pessoal, tarefas, prazos e anexos.',schema:z.object({quadroId:z.string(),confirmar:z.literal(true)}),annotations:destructive},
-  {name:'criar_coluna',title:'Criar coluna',description:'Adiciona coluna ao quadro.',schema:z.object({quadroId:z.string(),titulo:z.string().min(1).max(60),cor:z.string().regex(HEX_COLOR).default('#64748b')}),annotations:write},
-  {name:'atualizar_coluna',title:'Atualizar coluna',description:'Atualiza título, cor ou posição.',schema:z.object({colunaId:z.string(),titulo:z.string().min(1).max(60).optional(),cor:z.string().regex(HEX_COLOR).optional(),posicao:z.number().int().min(0).optional()}),annotations:write},
-  {name:'excluir_coluna',title:'Excluir coluna',description:'Exclui somente quando todos os cartões e subtarefas estiverem arquivados.',schema:z.object({colunaId:z.string(),confirmar:z.literal(true)}),annotations:destructive},
   {name:'listar_lixeira_tarefas',title:'Listar lixeira de tarefas',description:'Lista raízes excluídas; itens expiram em 30 dias.',schema:z.object({quadroId:z.string()}),annotations:read},
-  {name:'restaurar_tarefa',title:'Restaurar tarefa',description:'Restaura tarefa e subtarefas da lixeira.',schema:z.object({tarefaId:z.string()}),annotations:write},
-  {name:'excluir_tarefa_permanentemente',title:'Excluir tarefa permanentemente',description:'Apaga definitivamente uma tarefa já na lixeira, suas subtarefas e anexos.',schema:z.object({tarefaId:z.string(),confirmar:z.literal(true)}),annotations:destructive},
-  {name:'listar_anexos',title:'Listar anexos',description:'Lista metadados dos anexos de evento ou tarefa; nunca expõe conteúdo binário automaticamente.',schema:z.object({tipo:z.enum(['event','task']),itemId:z.string()}),annotations:read},
-  {name:'excluir_anexo',title:'Excluir anexo',description:'Exclui anexo quando o usuário tem escrita no item.',schema:z.object({anexoId:z.string(),confirmar:z.literal(true)}),annotations:destructive},
+  {name:'listar_murais',title:'Listar murais',description:'Lista os murais de avisos e notas (pessoais e de equipes) acessíveis pelo usuário.',schema:z.object({}),annotations:read},
+  {name:'obter_mural',title:'Obter mural completo',description:'Retorna grupos, notas (post-its) e anexos de um mural.',schema:z.object({muralId:z.string()}),annotations:read},
+  {name:'listar_anexos',title:'Listar anexos',description:'Lista metadados dos anexos de evento, tarefa ou item do mural; nunca expõe conteúdo binário automaticamente.',schema:z.object({tipo:z.enum(['event','task','mural_item']),itemId:z.string()}),annotations:read},
   {name:'obter_configuracao_notificacoes',title:'Obter notificações',description:'Retorna preferências e dispositivos sem segredos de autenticação.',schema:z.object({}),annotations:read},
-  {name:'atualizar_preferencias_notificacoes',title:'Atualizar notificações',description:'Define ativação e antecedência de alertas.',schema:z.object({ativadas:z.boolean(),tarefasAtivadas:z.boolean(),eventosAtivados:z.boolean(),horarioTarefas:z.string().regex(TIME),diasAntesTarefas:z.number().int().min(0).max(30),minutosAntesEventos:z.number().int().min(0).max(1440)}),annotations:write},
   {name:'exportar_meus_dados',title:'Exportar meus dados',description:'Retorna a exportação estruturada do titular conforme a LGPD, sem chaves secretas.',schema:z.object({}),annotations:read},
 ];
 
 const SYSTEM_MANUAL = `# Manual Operacional e Guia Técnico de QA — Agenda Corporativa Doce Brinquedo
 
-## 1. Visão Geral da Arquitetura e Protocolo MCP
-- O sistema é um ecossistema corporativo completo de produtividade integrando Agendas, Eventos, Equipes, Quadros Kanban, Subtarefas, Notificações Desktop e LGPD.
-- Todas as operações MCP são executadas no contexto estrito do usuário autenticado (identificado por ID).
+## 1. Visão Geral da Arquitetura e Diretriz de Somente Leitura (Read-Only)
+- **Modo Estrito de Leitura:** O servidor MCP opera exclusivamente em modo **SOMENTE LEITURA (Read-Only)**. Operações de criação, gravação, edição e exclusão de dados estão desabilitadas no protocolo MCP.
+- O sistema é um ecossistema corporativo completo de produtividade integrando Agendas, Eventos, Equipes, Quadros Kanban, Mural de Avisos & Notas, Subtarefas, Notificações Desktop e LGPD.
+- Todas as operações MCP são executadas no contexto estrito de consulta do usuário autenticado (identificado por ID).
 - O fuso horário de referência é America/Sao_Paulo (ou configurado em AGENDA_TIME_ZONE). Todas as interpretações de datas e horas devem respeitar esse fuso.
 - Toda resposta a consultas deve ser derivada diretamente de dados reais retornados pelas ferramentas MCP ou recursos do sistema. Nunca invente dados.
 
@@ -672,14 +791,15 @@ const SYSTEM_MANUAL = `# Manual Operacional e Guia Técnico de QA — Agenda Cor
   - O criador assume o papel de 'admin'.
   - É criada automaticamente a agenda compartilhada 'Tarefas'.
   - É criado automaticamente o quadro Kanban da equipe ('Kanban · <Nome do Time>') com 3 colunas padrão ('A fazer', 'Em andamento', 'Concluído').
+  - É criado automaticamente o Mural de Avisos da equipe ('Mural - <Nome do Time>') com grupos padrão ('Quadro de Avisos', 'Documentações & Links').
 - Papéis em Equipes:
-  - 'admin': Gerencia equipe, convites, membros, colunas, e ações avançadas/lixeira.
-  - 'member': Cria e move tarefas dentro do quadro da equipe.
+  - 'admin': Gerencia equipe, convites, membros, colunas, mural e ações avançadas/lixeira.
+  - 'member': Cria e move tarefas no Kanban e publica/edita notas no Mural da equipe.
 - Ao remover um membro da equipe:
-  - O membro perde acesso ao quadro e à agenda 'Tarefas'.
+  - O membro perde acesso ao quadro, à agenda 'Tarefas' e ao Mural da equipe.
   - Suas atribuições (assignee_ids) em tarefas da equipe são removidas automaticamente.
 - Exclusão de Equipe:
-  - Ação destrutiva em cascata (remove equipe, quadro, colunas, tarefas, anexos, agenda vinculada e convites). Exige confirmar=true.
+  - Ação destrutiva em cascata (remove equipe, quadro, colunas, tarefas, mural, notas, anexos, agenda vinculada e convites). Exige confirmar=true.
 
 ## 5. Quadros Kanban e Colunas
 - Quadros Pessoais: pertencem ao usuário (scope_type = 'personal') e podem ser criados, renomeados ou excluídos pelo dono.
@@ -698,11 +818,33 @@ const SYSTEM_MANUAL = `# Manual Operacional e Guia Técnico de QA — Agenda Cor
   - 'checklist': Array de itens [{ id, text, done }]. Máximo 200 itens.
   - 'parentTaskId': ID da tarefa pai para subtarefas hierárquicas.
 - Anexos (Attachments):
-  - Suportados em eventos e tarefas.
+  - Suportados em eventos, tarefas e itens do mural.
   - Metadados disponíveis via MCP: fileName, mimeType, byteSize, previewable (imagens e PDFs), createdAt.
-  - Limites de segurança: máx 10 MB por arquivo, máx 10 anexos por item, máx 50 MB total por item.
+  - Armazenamento físico exclusivo no servidor (C:\\PrivateAppDataApplication\\AgendaAnexos). O banco não armazena binários.
+  - Limites de segurança: máx 10 MB por arquivo, máx 15 anexos por item, máx 50 MB total por item.
 
-## 7. Lixeira do Kanban e Ciclo de Vida
+## 7. Mural Corporativo (Avisos, Ideias, Notas e Post-its)
+- **Estrutura dos Murais:**
+  - **Mural Pessoal ("Meu Mural"):** Espaço individual de notas rápidas, ideias, lembretes e anotações do usuário autenticado (\`scope_type = 'personal'\`).
+  - **Mural da Equipe / Time:** Espaço compartilhado vinculado a uma equipe (\`scope_type = 'team'\`). Administradores e membros do time têm acesso para colaborar e compartilhar avisos e documentações.
+- **Grupos e Categorias no Mural:**
+  - Cada mural organiza suas notas em grupos verticais ou seções temáticas (ex.: "Avisos & Lembretes", "Ideias & Projetos", "Documentações & Links").
+  - Grupos possuem título, cor e ordenação. Excluir um grupo desvincula suas notas (sem apagá-las), mantendo as anotações seguras.
+- **Notas e Post-its (\`mural_items\`):**
+  - **Título e Conteúdo:** Conteúdo com suporte completo a Markdown rico (tabelas, listas de tarefas, links e formatação).
+  - **Paleta de Cores de Post-it:** Tons pastéis acolhedores (amarelo \`#fef08a\`, verde \`#bbf7d0\`, azul \`#bae6fd\`, rosa \`#fbcfe8\`, roxo \`#e9d5ff\`, laranja \`#fed7aa\`, etc.).
+  - **Fixação no Topo (\`isPinned\`):** Notas fixadas recebem destaque visual no topo do grupo e do mural com badge de fixação.
+  - **Rotação Estética:** Cada post-it possui uma leve inclinação orgânica simulando uma nota colada em painel físico.
+  - **Autoria:** Registro do criador (\`created_by\`, \`created_by_name\`), permitindo identificar quem publicou o recado.
+- **Anexos no Mural:**
+  - Suporte a imagens (JPG, PNG, WebP) e documentos PDF anexados a cada post-it.
+  - Os arquivos ficam armazenados de forma segura na pasta local/rede de anexos no servidor.
+- **Diretrizes para Assistência via MCP no Mural:**
+  - Ao redigir avisos e comunicados, utilize linguagem clara, objetiva e profissional com formatação Markdown estruturada (títulos curtos, tópicos e destaques em negrito).
+  - Categorize a nota no grupo apropriado ou sugira a criação de um novo grupo temático se necessário.
+  - Ao consultar recados da equipe, utilize \`obter_mural\` para listar os avisos mais recentes e notas fixadas.
+
+## 8. Lixeira do Kanban e Ciclo de Vida
 - Mover para Lixeira (mover_tarefa_para_lixeira):
   - Requer perfil 'admin'.
   - Move a tarefa raiz e todas as suas subtarefas para a lixeira (deleted_at preenchido).
@@ -713,7 +855,7 @@ const SYSTEM_MANUAL = `# Manual Operacional e Guia Técnico de QA — Agenda Cor
 - Exclusão Permanente (excluir_tarefa_permanentemente):
   - Apaga definitivamente a tarefa da lixeira, subtarefas e todos os anexos. Exige confirmar=true.
 
-## 8. Notificações e Agente Desktop (Agenda Notifier)
+## 9. Notificações e Agente Desktop (Agenda Notifier)
 - Preferências do Usuário:
   - enabled: Ativação global das notificações.
   - taskEnabled: Ativação de alertas de tarefas.
@@ -725,11 +867,11 @@ const SYSTEM_MANUAL = `# Manual Operacional e Guia Técnico de QA — Agenda Cor
   - Registro gera um token seguro (chave de dispositivo). O backend armazena estritamente o hash SHA-256 do token.
   - O agente desktop conecta-se autenticado para receber alertas em tempo real.
 
-## 9. Privacidade e LGPD (Lei nº 13.709/2018)
+## 10. Privacidade e LGPD (Lei nº 13.709/2018)
 - Portabilidade (Art. 18, V): A ferramenta exportar_meus_dados gera a exportação completa e estruturada de agendas, eventos, quadros, tarefas, preferências e dispositivos do titular em formato JSON padronizado.
 - Anonimização/Expurgo (Art. 18, VI): Revogação de dispositivos, exclusão de preferências/convites e desvinculação de dados pessoais através da API de privacidade.
 
-## 10. Diretrizes de QA e Execução do MCP
+## 11. Diretrizes de QA e Execução do MCP
 - Respeite estritamente a idempotência e os efeitos colaterais de cada ferramenta.
 - Ferramentas com destructive=true exigem estritamente o parâmetro confirmar=true.
 - Em consultas sobre atividades do usuário, busque os dados nas ferramentas correspondentes e apresente um resumo claro, organizado e profissional em Markdown.

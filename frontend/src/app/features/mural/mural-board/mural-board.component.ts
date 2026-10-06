@@ -120,6 +120,18 @@ export class MuralBoardComponent implements OnInit, OnDestroy {
     this.kanbanService.loadTeams();
   });
 
+  private readonly activeBoardUrlSynchronization = effect(() => {
+    const active = this.activeBoard();
+    if (!active?.id) return;
+    const currentPath = this.router.url.split('?')[0];
+    if (currentPath.startsWith('/mural')) {
+      const expectedUrl = `/mural/${active.id}`;
+      if (currentPath !== expectedUrl) {
+        void this.router.navigate(['/mural', active.id], { replaceUrl: currentPath === '/mural' });
+      }
+    }
+  });
+
   readonly currentTeam = computed(() => {
     const active = this.activeBoard();
     if (!active?.teamId) return this.teams()[0] || null;
@@ -217,6 +229,7 @@ export class MuralBoardComponent implements OnInit, OnDestroy {
   }
 
   selecionarMural(boardId: string): void {
+    void this.router.navigate(['/mural', boardId]);
     this.muralService.loadBoard(boardId);
   }
 

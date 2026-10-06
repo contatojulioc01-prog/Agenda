@@ -156,16 +156,24 @@ export class KanbanBoardComponent implements OnDestroy {
 
   newColumnTitle = '';
   newColumnColor = '#64748b';
+  newColumnAutoArchiveDelay = 'never';
   newBoardName = '';
   newTeamDescription = '';
   newTeamColor = '#4f46e5';
   invitedUserId = '';
   labelText = '';
   checklistText = '';
+  checklistGroupTitle = '';
+  activeChecklistGroup: string | undefined = undefined;
+  customChecklistGroups: string[] = [];
+  quickSectionPresets = ['Preparação', 'Execução', 'Revisão', 'Entrega', 'Aprovações'];
+  sectionItemDrafts: Record<string, string> = {};
+  showAddSectionForm = false;
   pendingFiles: File[] = [];
   attachmentError = '';
   columnTitleDraft = '';
   columnColorDraft = '#64748b';
+  columnAutoArchiveDelayDraft = 'never';
   boardNameDraft = '';
 
   draft: KanbanTaskInput = this.emptyDraft('');
@@ -358,6 +366,11 @@ export class KanbanBoardComponent implements OnDestroy {
     this.draft = this.emptyDraft(first, this.currentParentId());
     this.labelText = '';
     this.checklistText = '';
+    this.checklistGroupTitle = '';
+    this.activeChecklistGroup = undefined;
+    this.customChecklistGroups = [];
+    this.sectionItemDrafts = {};
+    this.showAddSectionForm = false;
     this.pendingFiles = [];
     this.attachmentError = '';
     this.modalOpen.set(true);
@@ -383,6 +396,15 @@ export class KanbanBoardComponent implements OnDestroy {
     };
     this.labelText = task.labels.join(', ');
     this.checklistText = '';
+    this.checklistGroupTitle = '';
+    this.activeChecklistGroup = undefined;
+    const existingGroups = new Set<string>();
+    task.checklist.forEach(item => {
+      if (item.groupTitle) existingGroups.add(item.groupTitle);
+    });
+    this.customChecklistGroups = Array.from(existingGroups);
+    this.sectionItemDrafts = {};
+    this.showAddSectionForm = false;
     this.pendingFiles = [];
     this.attachmentError = '';
     this.modalOpen.set(true);
@@ -501,8 +523,84 @@ export class KanbanBoardComponent implements OnDestroy {
   addChecklistItem(): void {
     const text = this.checklistText.trim();
     if (!text) return;
-    this.draft.checklist.push({ id: `chk-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`, text, done: false });
+    this.draft.checklist.push({
+      id: `chk-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+      text,
+      done: false,
+      groupTitle: this.activeChecklistGroup,
+    });
     this.checklistText = '';
+  }
+
+  addChecklistItemToGroup(groupTitle?: string, text?: string): void {
+    const itemText = (text !== undefined ? text : (groupTitle ? (this.sectionItemDrafts[groupTitle] || '') : this.checklistText)).trim();
+    if (!itemText) return;
+    this.draft.checklist.push({
+      id: `chk-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+      text: itemText,
+      done: false,
+      groupTitle: groupTitle || undefined,
+    });
+    if (groupTitle) {
+      this.sectionItemDrafts[groupTitle] = '';
+    } else {
+      this.checklistText = '';
+    }
+  }
+
+  addChecklistGroup(customTitle?: string): void {
+    const title = (customTitle || this.checklistGroupTitle).trim();
+    if (!title) return;
+    if (!this.customChecklistGroups.includes(title)) {
+      this.customChecklistGroups.push(title);
+    }
+    this.activeChecklistGroup = title;
+    this.checklistGroupTitle = '';
+    this.showAddSectionForm = true;
+  }
+
+  removeChecklistGroup(groupTitle: string): void {
+    this.draft.checklist = this.draft.checklist.filter(item => item.groupTitle !== groupTitle);
+    this.customChecklistGroups = this.customChecklistGroups.filter(g => g !== groupTitle);
+    delete this.sectionItemDrafts[groupTitle];
+    if (this.activeChecklistGroup === groupTitle) this.activeChecklistGroup = undefined;
+  }
+
+  setActiveGroup(groupTitle: string | undefined): void {
+    this.activeChecklistGroup = groupTitle;
+  }
+
+  /** Returns unique group titles in the order created or present in checklist */
+  get checklistGroups(): string[] {
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const group of this.customChecklistGroups) {
+      if (group && !seen.has(group)) {
+        seen.add(group);
+        result.push(group);
+      }
+    }
+    for (const item of this.draft.checklist) {
+      if (item.groupTitle && !seen.has(item.groupTitle)) {
+        seen.add(item.groupTitle);
+        result.push(item.groupTitle);
+      }
+    }
+    return result;
+  }
+
+  /** Ungrouped items (no groupTitle) */
+  get ungroupedChecklistItems() {
+    return this.draft.checklist.filter(item => !item.groupTitle);
+  }
+
+  checklistItemsForGroup(groupTitle: string) {
+    return this.draft.checklist.filter(item => item.groupTitle === groupTitle);
+  }
+
+  groupProgress(groupTitle: string): { done: number; total: number } {
+    const items = this.checklistItemsForGroup(groupTitle);
+    return { done: items.filter(i => i.done).length, total: items.length };
   }
 
   removeChecklistItem(index: number): void { this.draft.checklist.splice(index, 1); }
@@ -582,10 +680,12 @@ export class KanbanBoardComponent implements OnDestroy {
   saveColumn(): void {
     const title = this.newColumnTitle.trim();
     const color = this.newColumnColor;
+    const autoArchiveDelay = this.newColumnAutoArchiveDelay;
     const board = this.board();
-    if (title && board) this.service.createColumn(board.id, title, color);
+    if (title && board) this.service.createColumn(board.id, title, color, autoArchiveDelay);
     this.newColumnTitle = '';
     this.newColumnColor = '#64748b';
+    this.newColumnAutoArchiveDelay = 'never';
     this.addingColumn.set(false);
   }
 
@@ -598,6 +698,7 @@ export class KanbanBoardComponent implements OnDestroy {
     this.selectedColumn.set(column);
     this.columnTitleDraft = column.title;
     this.columnColorDraft = column.color || '#64748b';
+    this.columnAutoArchiveDelayDraft = column.autoArchiveDelay || 'never';
     this.columnDialog.set(action);
     this.columnMenuId.set(null);
   }
@@ -607,6 +708,7 @@ export class KanbanBoardComponent implements OnDestroy {
     this.selectedColumn.set(null);
     this.columnTitleDraft = '';
     this.columnColorDraft = '#64748b';
+    this.columnAutoArchiveDelayDraft = 'never';
   }
 
   confirmColumnDialog(): void {
@@ -616,9 +718,10 @@ export class KanbanBoardComponent implements OnDestroy {
     if (action === 'rename') {
       const title = this.columnTitleDraft.trim();
       const color = this.columnColorDraft;
+      const autoArchiveDelay = this.columnAutoArchiveDelayDraft;
       if (!title) return;
-      if (title !== column.title || color !== column.color) {
-        this.service.updateColumn(column.id, { title, color });
+      if (title !== column.title || color !== column.color || autoArchiveDelay !== (column.autoArchiveDelay || 'never')) {
+        this.service.updateColumn(column.id, { title, color, autoArchiveDelay });
       }
     } else {
       if (this.columnHasActiveTasks(column.id)) return;
@@ -984,6 +1087,20 @@ export class KanbanBoardComponent implements OnDestroy {
     };
     const label = map[this.sortOption()] || 'Ordenação';
     return `${label} (${this.sortDirection() === 'asc' ? '↑' : '↓'})`;
+  }
+
+  autoArchiveLabel(delay?: string): string {
+    switch (delay) {
+      case 'immediate': return 'Imediatamente';
+      case '1h': return 'Após 1 hora';
+      case '6h': return 'Após 6 horas';
+      case '12h': return 'Após 12 horas';
+      case '24h': return 'Após 1 dia';
+      case '48h': return 'Após 2 dias';
+      case '72h': return 'Após 3 dias';
+      case '7d': return 'Após 7 dias';
+      default: return 'Nunca';
+    }
   }
 
   getColumnTitle(columnId: string): string {

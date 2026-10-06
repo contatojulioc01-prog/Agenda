@@ -1,5 +1,6 @@
 const EVENT_COLORS = new Set(['indigo', 'blue', 'teal', 'emerald', 'amber', 'orange', 'rose', 'purple', 'pink', 'slate']);
 const TASK_PRIORITIES = new Set(['low', 'medium', 'high', 'urgent']);
+const AUTO_ARCHIVE_DELAYS = new Set(['never', 'immediate', '1h', '6h', '12h', '24h', '48h', '72h', '7d']);
 
 function isNonEmptyString(value, maxLength) {
   return typeof value === 'string' && value.trim().length > 0 && value.trim().length <= maxLength;
@@ -55,13 +56,14 @@ function validateTaskInput(body, partial = false) {
   if (body.archived !== undefined && typeof body.archived !== 'boolean') return 'Estado de arquivamento inválido';
   if (body.labels !== undefined && (!Array.isArray(body.labels) || body.labels.length > 8 || body.labels.some(label => typeof label !== 'string' || label.length > 50))) return 'Etiquetas inválidas';
   if (body.assigneeIds !== undefined && (!Array.isArray(body.assigneeIds) || body.assigneeIds.length > 100 || body.assigneeIds.some(id => typeof id !== 'string' || !id))) return 'Responsáveis inválidos';
-  if (body.checklist !== undefined && (!Array.isArray(body.checklist) || body.checklist.length > 200 || body.checklist.some(item => !item || typeof item.id !== 'string' || !isNonEmptyString(item.text, 300) || typeof item.done !== 'boolean'))) return 'Checklist inválido';
+  if (body.checklist !== undefined && (!Array.isArray(body.checklist) || body.checklist.length > 200 || body.checklist.some(item => !item || typeof item.id !== 'string' || !isNonEmptyString(item.text, 300) || typeof item.done !== 'boolean' || !isOptionalString(item.groupTitle, 100)))) return 'Checklist inválido';
   return null;
 }
 
 module.exports = {
   EVENT_COLORS,
   TASK_PRIORITIES,
+  AUTO_ARCHIVE_DELAYS,
   isNonEmptyString,
   isOptionalString,
   isIsoDate,

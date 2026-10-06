@@ -489,4 +489,11 @@ router.delete('/teams/:teamId/members/:memberId', asyncRoute(async (req, res) =>
   res.json({ success: true });
 }));
 
+router.ensurePersonalMural = ensurePersonalMural;
+router.ensureTeamMural = ensureTeamMural;
+router.muralAccess = muralAccess;
+router.muralDto = muralDto;
+router.groupDto = groupDto;
+router.itemDto = itemDto;
+
 module.exports = router;

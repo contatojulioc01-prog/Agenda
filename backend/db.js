@@ -290,6 +290,8 @@ async function initDb() {
     ALTER TABLE attachments DROP CONSTRAINT IF EXISTS attachments_owner_type_check;
     ALTER TABLE notification_preferences ADD COLUMN IF NOT EXISTS task_days_before INTEGER NOT NULL DEFAULT 1;
     ALTER TABLE notification_preferences ALTER COLUMN task_time SET DEFAULT '08:30';
+    ALTER TABLE kanban_columns ADD COLUMN IF NOT EXISTS auto_archive_delay TEXT DEFAULT 'never';
+    ALTER TABLE kanban_tasks ADD COLUMN IF NOT EXISTS column_entered_at TEXT;
     WITH applied AS (
       INSERT INTO agenda_migrations (id) VALUES ('notification-task-time-0830-v1')
       ON CONFLICT (id) DO NOTHING

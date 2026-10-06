@@ -6,13 +6,28 @@ const router = express.Router();
 const db = require('../db');
 const asyncRoute = require('../async-route');
 
-const ATTACHMENTS_DIR = process.env.ATTACHMENTS_DIR || '\\\\192.168.13.244\\PrivateAppDataApplication\\AgendaAnexos';
+const ATTACHMENTS_DIR = process.env.ATTACHMENTS_DIR || (
+  process.platform === 'win32'
+    ? 'C:\\PrivateAppDataApplication\\AgendaAnexos'
+    : path.join(__dirname, '..', 'attachments')
+);
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const PREVIEWABLE_IMAGE = /^image\/(?:png|jpe?g|gif|webp|bmp|avif)$/i;
 const isPreviewable = mimeType => PREVIEWABLE_IMAGE.test(mimeType) || mimeType === 'application/pdf';
 const userId = req => String(req.headers['x-user-id'] || '');
 const attachmentDto = row => ({ id: row.id, fileName: row.file_name, mimeType: row.mime_type,
   byteSize: Number(row.byte_size), previewable: isPreviewable(row.mime_type), createdAt: row.created_at });
+
+function ensureAttachmentsDir() {
+  if (!fs.existsSync(ATTACHMENTS_DIR)) {
+    try {
+      fs.mkdirSync(ATTACHMENTS_DIR, { recursive: true });
+      console.log('[ATTACHMENTS] Diretório de anexos criado:', ATTACHMENTS_DIR);
+    } catch (err) {
+      console.error('[ATTACHMENTS] Erro ao criar diretório de anexos:', ATTACHMENTS_DIR, err.message);
+    }
+  }
+}
 
 async function listAttachments(ownerType, ownerId, store = db) {
   const rows = await store.all(`SELECT id, file_name, mime_type, byte_size, created_at FROM attachments
@@ -55,6 +70,39 @@ function safeFileName(value) {
   return decoded.replace(/[\u0000-\u001f\u007f]/g, '').replace(/[\\\/]/g, '_').trim().slice(0, 240);
 }
 
+/**
+ * Migra qualquer anexo que ainda tenha conteúdo binário no PostgreSQL para o disco local/rede
+ * e limpa a coluna `content` (deixando-a NULL).
+ */
+async function migrateAttachmentsToDisk(store = db) {
+  try {
+    ensureAttachmentsDir();
+    const rows = await store.all('SELECT id, file_name, content, file_path FROM attachments WHERE content IS NOT NULL');
+    if (!rows || !rows.length) return;
+
+    console.log(`[ATTACHMENTS] Migrando ${rows.length} anexos do PostgreSQL para ${ATTACHMENTS_DIR}...`);
+    let migrated = 0;
+    for (const row of rows) {
+      if (!row.content) continue;
+      const cleanName = safeFileName(row.file_name).replace(/[^a-zA-Z0-9._-]/g, '_');
+      const safeDiskName = `${row.id}_${cleanName}`;
+      const diskFilePath = path.join(ATTACHMENTS_DIR, safeDiskName);
+      try {
+        if (!fs.existsSync(diskFilePath)) {
+          await fs.promises.writeFile(diskFilePath, row.content);
+        }
+        await store.run('UPDATE attachments SET content = NULL, file_path = $1 WHERE id = $2', [diskFilePath, row.id]);
+        migrated++;
+      } catch (err) {
+        console.error(`[ATTACHMENTS] Falha ao gravar anexo ${row.id} no disco:`, err.message);
+      }
+    }
+    console.log(`[ATTACHMENTS] Migração finalizada: ${migrated} anexos transferidos para disco e liberados do PostgreSQL.`);
+  } catch (error) {
+    console.error('[ATTACHMENTS] Erro na rotina de migração de anexos:', error.message);
+  }
+}
+
 router.get('/:attachmentId/content', asyncRoute(async (req, res) => {
   const item = await db.get('SELECT * FROM attachments WHERE id = $1', [req.params.attachmentId]);
   if (!item) return res.status(404).json({ error: 'Anexo não encontrado' });
@@ -66,12 +114,23 @@ router.get('/:attachmentId/content', asyncRoute(async (req, res) => {
   res.setHeader('Cache-Control', 'private, max-age=300');
   res.setHeader('X-Content-Type-Options', 'nosniff');
 
+  // 1. Tenta pelo caminho registrado no banco
   if (item.file_path && fs.existsSync(item.file_path)) {
     return fs.createReadStream(item.file_path).pipe(res);
   }
+
+  // 2. Tenta pelo caminho padrão no ATTACHMENTS_DIR caso o caminho tenha mudado
+  const expectedDiskName = `${item.id}_${safeFileName(item.file_name).replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+  const fallbackPath = path.join(ATTACHMENTS_DIR, expectedDiskName);
+  if (fs.existsSync(fallbackPath)) {
+    return fs.createReadStream(fallbackPath).pipe(res);
+  }
+
+  // 3. Fallback de contingência caso ainda haja conteúdo no banco
   if (item.content) {
     return res.send(item.content);
   }
+
   return res.status(404).json({ error: 'Arquivo do anexo não encontrado no servidor' });
 }));
 
@@ -92,21 +151,18 @@ router.post('/:ownerType/:ownerId', express.raw({ type: 'application/octet-strea
   const attachmentId = `att-${crypto.randomUUID()}`;
   const now = new Date().toISOString();
 
-  let diskFilePath = null;
-  try {
-    if (!fs.existsSync(ATTACHMENTS_DIR)) {
-      try { fs.mkdirSync(ATTACHMENTS_DIR, { recursive: true }); } catch {}
-    }
-    const safeDiskName = `${attachmentId}_${fileName.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-    diskFilePath = path.join(ATTACHMENTS_DIR, safeDiskName);
-    await fs.promises.writeFile(diskFilePath, req.body);
-  } catch (fsErr) {
-    console.warn('[ATTACHMENTS] Aviso: gravação direta no disco:', fsErr.message);
-  }
+  ensureAttachmentsDir();
+  const cleanName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const safeDiskName = `${attachmentId}_${cleanName}`;
+  const diskFilePath = path.join(ATTACHMENTS_DIR, safeDiskName);
 
+  // Salva o arquivo fisicamente no disco/rede
+  await fs.promises.writeFile(diskFilePath, req.body);
+
+  // Salva no PostgreSQL APENAS os metadados e o file_path (content = NULL)
   await db.run(`INSERT INTO attachments (id, owner_type, owner_id, file_name, mime_type, byte_size, content, created_by, created_at, file_path)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-    [attachmentId, ownerType, ownerId, fileName, mimeType, req.body.length, req.body, userId(req), now, diskFilePath]);
+    VALUES ($1, $2, $3, $4, $5, $6, NULL, $7, $8, $9)`,
+    [attachmentId, ownerType, ownerId, fileName, mimeType, req.body.length, userId(req), now, diskFilePath]);
 
   if (ownerType === 'mural_item') {
     const muralItem = await db.get('SELECT mural_id FROM mural_items WHERE id = $1', [ownerId]);
@@ -148,4 +204,5 @@ router.delete('/:attachmentId', asyncRoute(async (req, res) => {
 router.use((error, _req, res, next) => error?.type === 'entity.too.large'
   ? res.status(413).json({ error: 'O arquivo excede o limite de 10 MB' }) : next(error));
 
-module.exports = { router, listAttachments, ownerAccess };
+module.exports = { router, listAttachments, ownerAccess, migrateAttachmentsToDisk, ATTACHMENTS_DIR };
+

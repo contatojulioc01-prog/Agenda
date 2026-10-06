@@ -21,12 +21,14 @@ export interface KanbanColumn {
   title: string;
   color: string;
   position: number;
+  autoArchiveDelay?: string;
 }
 
 export interface ChecklistItem {
   id: string;
   text: string;
   done: boolean;
+  groupTitle?: string;
 }
 
 export interface KanbanTask {
