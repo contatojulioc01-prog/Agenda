@@ -92,24 +92,37 @@
   </nav>
 
   <section class="kanban-filters group-panel">
-    <!-- Seletor de Modo de Visualização (Notion Style) -->
-    <div class="notion-view-toggle">
-      <button type="button" class="view-toggle-btn expand-pill-btn size-34" [class.active]="viewMode() === 'kanban'"
-        (click)="setViewMode('kanban')" matTooltip="Visualização em Quadro (Kanban)">
-        <mat-icon>view_kanban</mat-icon><span class="pill-label">Kanban</span>
+    <!-- Seletor de Abas Notion: Tarefas do mês | Atividades mês concluído | Tarefas da semana | Kanban -->
+    <div class="notion-tabs-nav">
+      <button type="button" class="notion-nav-tab expand-pill-btn size-34" [class.active]="activeTab() === 'month_tasks'"
+        (click)="setActiveTab('month_tasks')" matTooltip="Tarefas do mês">
+        <mat-icon>table_chart</mat-icon>
+        <span class="pill-label">Tarefas do mês</span>
       </button>
-      <button type="button" class="view-toggle-btn expand-pill-btn size-34" [class.active]="viewMode() === 'list'"
-        (click)="setViewMode('list')" matTooltip="Visualização em Lista (Estilo Notion)">
-        <mat-icon>format_list_bulleted</mat-icon><span class="pill-label">Visão de Lista</span>
+      <button type="button" class="notion-nav-tab expand-pill-btn size-34" [class.active]="activeTab() === 'month_completed'"
+        (click)="setActiveTab('month_completed')" matTooltip="Atividades mês concluído">
+        <mat-icon>done_all</mat-icon>
+        <span class="pill-label">Atividades mês concluído</span>
+      </button>
+      <button type="button" class="notion-nav-tab expand-pill-btn size-34" [class.active]="activeTab() === 'week_tasks'"
+        (click)="setActiveTab('week_tasks')" matTooltip="Tarefas da semana">
+        <mat-icon>date_range</mat-icon>
+        <span class="pill-label">Tarefas da semana</span>
+      </button>
+      <button type="button" class="notion-nav-tab expand-pill-btn size-34" [class.active]="activeTab() === 'kanban'"
+        (click)="setActiveTab('kanban')" matTooltip="Quadro Kanban">
+        <mat-icon>view_kanban</mat-icon>
+        <span class="pill-label">Quadro Kanban</span>
       </button>
     </div>
 
     <!-- Dropdown de Ordenação Notion -->
-    <div class="notion-sort-wrapper" *ngIf="viewMode() === 'list'">
-      <button type="button" class="notion-sort-btn" (click)="toggleSortMenu($event)"
+    <div class="notion-sort-wrapper" *ngIf="activeTab() !== 'kanban'">
+      <button type="button" class="notion-sort-btn expand-pill-btn size-34" (click)="toggleSortMenu($event)"
+        [class.active]="sortOption() !== 'default'"
         matTooltip="Alternar ordenação da lista">
         <mat-icon>swap_vert</mat-icon>
-        <span>{{ currentSortLabel() }}</span>
+        <span class="pill-label">{{ currentSortLabel() }}</span>
       </button>
       <div class="notion-sort-menu" *ngIf="showSortMenu()" (click)="$event.stopPropagation()">
         <button type="button" [class.active]="sortOption() === 'default'" (click)="toggleSort('default')">
@@ -127,6 +140,69 @@
         <button type="button" [class.active]="sortOption() === 'status'" (click)="toggleSort('status')">
           <mat-icon>donut_large</mat-icon><span>Status (Coluna)</span>
         </button>
+      </div>
+    </div>
+
+    <!-- Dropdown de Gerenciamento de Colunas Notion -->
+    <div class="notion-columns-wrapper" *ngIf="activeTab() !== 'kanban'">
+      <button type="button" class="notion-columns-btn expand-pill-btn size-34" (click)="toggleColumnManager($event)"
+        [class.active]="showColumnManager()"
+        matTooltip="Personalizar e gerenciar colunas">
+        <mat-icon>view_column</mat-icon>
+        <span class="pill-label">Colunas ({{ visibleColumnsCount() }}/{{ tableColumns().length }})</span>
+      </button>
+      <div class="notion-columns-menu" *ngIf="showColumnManager()" (click)="$event.stopPropagation()">
+        <div class="notion-columns-menu-header">
+          <span>Colunas da Tabela</span>
+          <div class="col-actions-quick">
+            <button type="button" class="quick-btn" (click)="setAllColumnsVisibility(true, $event)">Todas</button>
+            <button type="button" class="quick-btn" (click)="setAllColumnsVisibility(false, $event)">Mínimo</button>
+          </div>
+        </div>
+        <div class="notion-columns-list">
+          <div *ngFor="let col of tableColumns()" class="notion-column-item-row" [class.is-custom]="isCustomColumn(col)">
+            <label class="notion-column-toggle-item" [class.checked]="col.visible">
+              <input type="checkbox" [checked]="col.visible" (change)="toggleColumnVisibility(col.id, $event)"
+                [disabled]="col.id === 'subject' && col.visible && visibleColumnsCount() <= 1">
+              <mat-icon class="col-item-icon">{{ col.icon }}</mat-icon>
+              <span class="col-item-name">{{ col.label }}</span>
+              <span *ngIf="isCustomColumn(col)" class="custom-badge-tag">Personalizada</span>
+            </label>
+            <button *ngIf="isCustomColumn(col)" type="button" class="btn-delete-custom-col"
+              (click)="removeCustomColumn(col.id, $event)"
+              matTooltip="Excluir coluna personalizada permanentemente">
+              <mat-icon>delete_outline</mat-icon>
+            </button>
+          </div>
+        </div>
+
+        <!-- Adicionar Nova Coluna Personalizada -->
+        <div class="notion-add-column-section">
+          <div class="add-col-toggle-row" *ngIf="!showAddColumnPopover()">
+            <button type="button" class="btn-open-add-col" (click)="showAddColumnPopover.set(true)">
+              <mat-icon>add</mat-icon>
+              <span>Nova coluna personalizada</span>
+            </button>
+          </div>
+          <div class="add-col-popover-form" *ngIf="showAddColumnPopover()">
+            <div class="add-col-form-title">
+              <span>Nova Coluna</span>
+              <button type="button" (click)="showAddColumnPopover.set(false)"><mat-icon>close</mat-icon></button>
+            </div>
+            <input type="text" [(ngModel)]="newCustomColumnLabel" placeholder="Nome da coluna..." class="add-col-input" autofocus />
+            <select [(ngModel)]="newCustomColumnType" class="add-col-select">
+              <option value="text">Texto</option>
+              <option value="date">Data</option>
+              <option value="number">Número</option>
+              <option value="select">Lista de Seleção</option>
+              <option value="checkbox">Caixa de Seleção (Sim/Não)</option>
+            </select>
+            <input *ngIf="newCustomColumnType === 'select'" type="text" [(ngModel)]="newCustomColumnOptions" placeholder="Opções: Opção 1, Opção 2..." class="add-col-input" />
+            <button type="button" class="btn-save-new-col" (click)="addCustomColumn()" [disabled]="!newCustomColumnLabel.trim()">
+              <mat-icon>check</mat-icon> Adicionar Coluna
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -171,13 +247,21 @@
       (click)="service.error.set('')"><mat-icon>close</mat-icon></button></div>
 
   <main class="board-canvas" *ngIf="board() as currentBoard" [hidden]="printingSingleTask()"
-    [class.is-list-view]="viewMode() === 'list'">
+    [class.is-list-view]="activeTab() !== 'kanban'">
     <!-- ══════════════ VISÃO KANBAN ══════════════ -->
-    <ng-container *ngIf="viewMode() === 'kanban'">
+    <ng-container *ngIf="activeTab() === 'kanban'">
       <section class="kanban-column"
         *ngFor="let column of currentBoard.columns; let colIndex = index; trackBy: trackById"
+        [style.width.px]="getKanbanColumnWidth(column.id)"
+        [style.flex-basis.px]="getKanbanColumnWidth(column.id)"
+        [style.min-width.px]="getKanbanColumnWidth(column.id)"
+        [style.max-width.px]="getKanbanColumnWidth(column.id)"
         [style.--col-print-color]="columnPrintColor(column, colIndex)"
         [style.--col-print-bg]="columnPrintBg(column, colIndex)">
+        <div class="kanban-col-resizer"
+          (mousedown)="onKanbanColumnResizeStart($event, column.id)"
+          (dblclick)="resetKanbanColumnWidth(column.id, $event)"
+          title="Arraste para redimensionar (duplo clique para restaurar)"></div>
         <header class="column-header">
           <span class="column-accent" [style.background]="column.color"></span>
           <span class="column-title">{{ column.title }}</span>
@@ -211,7 +295,7 @@
             [cdkDragData]="task" [cdkDragDisabled]="showArchived()" [attr.data-priority]="task.priority" tabindex="0"
             (keydown.enter)="openEdit(task)" (click)="openEdit(task)" (contextmenu)="openTaskContextMenu($event, task)">
             <div class="drag-placeholder" *cdkDragPlaceholder></div>
-            <div class="card-labels" *ngIf="task.labels.length"><span *ngFor="let label of task.labels | slice:0:4">{{
+            <div class="card-labels" *ngIf="getTaskFreeLabels(task).length"><span *ngFor="let label of getTaskFreeLabels(task) | slice:0:4">{{
                 label }}</span></div>
             <div class="card-title-row">
               <h3>{{ task.title }}</h3><button class="child-board-btn" (click)="openChildBoard(task, $event)"
@@ -267,8 +351,8 @@
               <div class="print-card-assignee" *ngIf="task.assigneeIds.length">
                 {{ assigneeNames(task) }}
               </div>
-              <div class="print-card-labels" *ngIf="task.labels.length">
-                <span *ngFor="let label of task.labels" class="print-label-tag">#{{ label.startsWith('#') ?
+              <div class="print-card-labels" *ngIf="getTaskFreeLabels(task).length">
+                <span *ngFor="let label of getTaskFreeLabels(task)" class="print-label-tag">#{{ label.startsWith('#') ?
                   label.substring(1) : label }}</span>
               </div>
               <div class="print-checklist" *ngIf="task.checklist.length">
@@ -313,142 +397,389 @@
       </section>
     </ng-container>
 
-    <!-- ══════════════ VISÃO DE LISTA NOTION ══════════════ -->
-    <section class="notion-list-view" *ngIf="viewMode() === 'list'">
+    <!-- ══════════════ VISÃO DE TABELA NOTION (Tarefas do mês / Atividades concluídas / Tarefas da semana) ══════════════ -->
+    <section class="notion-list-view" *ngIf="activeTab() !== 'kanban'">
       <div class="notion-table-container">
         <table class="notion-table">
           <thead>
             <tr>
-              <th class="col-date" (click)="toggleSort('dueDate')">
-                <mat-icon>event</mat-icon> <span>Prazo</span>
-                <mat-icon class="sort-icon" *ngIf="sortOption() === 'dueDate'">{{ sortDirection() === 'asc' ?
-                  'arrow_upward' : 'arrow_downward' }}</mat-icon>
+              <!-- Assunto / Título -->
+              <th *ngIf="isColumnVisible('subject')" class="col-subject resizable-th"
+                [style.width.px]="getColumnWidth('subject')"
+                [style.min-width.px]="getColumnWidth('subject')"
+                [style.max-width.px]="getColumnWidth('subject')"
+                (click)="toggleSort('title')">
+                <div class="th-content">
+                  <mat-icon>title</mat-icon> <span>Assunto</span>
+                  <mat-icon class="sort-icon" *ngIf="sortOption() === 'title'">{{ sortDirection() === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</mat-icon>
+                </div>
+                <div class="col-resizer"
+                  [class.is-resizing]="resizingColumnId() === 'subject'"
+                  (mousedown)="onColumnResizeStart($event, 'subject')"
+                  (dblclick)="resetColumnWidth('subject', $event)"
+                  (click)="$event.stopPropagation()"
+                  title="Arraste para redimensionar (duplo clique para restaurar)"></div>
               </th>
-              <th class="col-sector">
-                <mat-icon>apartment</mat-icon> <span>Setor</span>
+
+              <!-- Status -->
+              <th *ngIf="isColumnVisible('status')" class="col-status resizable-th"
+                [style.width.px]="getColumnWidth('status')"
+                [style.min-width.px]="getColumnWidth('status')"
+                [style.max-width.px]="getColumnWidth('status')"
+                (click)="toggleSort('status')">
+                <div class="th-content">
+                  <mat-icon>donut_large</mat-icon> <span>Status</span>
+                  <mat-icon class="sort-icon" *ngIf="sortOption() === 'status'">{{ sortDirection() === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</mat-icon>
+                </div>
+                <div class="col-resizer"
+                  [class.is-resizing]="resizingColumnId() === 'status'"
+                  (mousedown)="onColumnResizeStart($event, 'status')"
+                  (dblclick)="resetColumnWidth('status', $event)"
+                  (click)="$event.stopPropagation()"
+                  title="Arraste para redimensionar (duplo clique para restaurar)"></div>
               </th>
-              <th class="col-macro">
-                <mat-icon>folder_open</mat-icon> <span>Tema Macro</span>
+
+              <!-- Prioridade -->
+              <th *ngIf="isColumnVisible('priority')" class="col-priority resizable-th"
+                [style.width.px]="getColumnWidth('priority')"
+                [style.min-width.px]="getColumnWidth('priority')"
+                [style.max-width.px]="getColumnWidth('priority')"
+                (click)="toggleSort('priority')">
+                <div class="th-content">
+                  <mat-icon>flag</mat-icon> <span>Prioridade</span>
+                  <mat-icon class="sort-icon" *ngIf="sortOption() === 'priority'">{{ sortDirection() === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</mat-icon>
+                </div>
+                <div class="col-resizer"
+                  [class.is-resizing]="resizingColumnId() === 'priority'"
+                  (mousedown)="onColumnResizeStart($event, 'priority')"
+                  (dblclick)="resetColumnWidth('priority', $event)"
+                  (click)="$event.stopPropagation()"
+                  title="Arraste para redimensionar (duplo clique para restaurar)"></div>
               </th>
-              <th class="col-subject" (click)="toggleSort('title')">
-                <mat-icon>short_text</mat-icon> <span>Assunto</span>
-                <mat-icon class="sort-icon" *ngIf="sortOption() === 'title'">{{ sortDirection() === 'asc' ?
-                  'arrow_upward' : 'arrow_downward' }}</mat-icon>
+
+              <!-- Responsável -->
+              <th *ngIf="isColumnVisible('assignee')" class="col-assignee resizable-th"
+                [style.width.px]="getColumnWidth('assignee')"
+                [style.min-width.px]="getColumnWidth('assignee')"
+                [style.max-width.px]="getColumnWidth('assignee')">
+                <div class="th-content">
+                  <mat-icon>person</mat-icon> <span>Responsável</span>
+                </div>
+                <div class="col-resizer"
+                  [class.is-resizing]="resizingColumnId() === 'assignee'"
+                  (mousedown)="onColumnResizeStart($event, 'assignee')"
+                  (dblclick)="resetColumnWidth('assignee', $event)"
+                  (click)="$event.stopPropagation()"
+                  title="Arraste para redimensionar (duplo clique para restaurar)"></div>
               </th>
-              <th class="col-demand">
-                <mat-icon>notes</mat-icon> <span>Demanda</span>
+
+              <!-- Prazo -->
+              <th *ngIf="isColumnVisible('date')" class="col-date resizable-th"
+                [style.width.px]="getColumnWidth('date')"
+                [style.min-width.px]="getColumnWidth('date')"
+                [style.max-width.px]="getColumnWidth('date')"
+                (click)="toggleSort('dueDate')">
+                <div class="th-content">
+                  <mat-icon>event</mat-icon> <span>Prazo</span>
+                  <mat-icon class="sort-icon" *ngIf="sortOption() === 'dueDate'">{{ sortDirection() === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</mat-icon>
+                </div>
+                <div class="col-resizer"
+                  [class.is-resizing]="resizingColumnId() === 'date'"
+                  (mousedown)="onColumnResizeStart($event, 'date')"
+                  (dblclick)="resetColumnWidth('date', $event)"
+                  (click)="$event.stopPropagation()"
+                  title="Arraste para redimensionar (duplo clique para restaurar)"></div>
               </th>
-              <th class="col-execution">
-                <mat-icon>schedule</mat-icon> <span>Execução</span>
+
+              <!-- Demanda / Descrição -->
+              <th *ngIf="isColumnVisible('demand')" class="col-demand resizable-th"
+                [style.width.px]="getColumnWidth('demand')"
+                [style.min-width.px]="getColumnWidth('demand')"
+                [style.max-width.px]="getColumnWidth('demand')">
+                <div class="th-content">
+                  <mat-icon>notes</mat-icon> <span>Demanda</span>
+                </div>
+                <div class="col-resizer"
+                  [class.is-resizing]="resizingColumnId() === 'demand'"
+                  (mousedown)="onColumnResizeStart($event, 'demand')"
+                  (dblclick)="resetColumnWidth('demand', $event)"
+                  (click)="$event.stopPropagation()"
+                  title="Arraste para redimensionar (duplo clique para restaurar)"></div>
               </th>
-              <th class="col-assignee">
-                <mat-icon>person_outline</mat-icon> <span>Responsável</span>
+
+              <!-- Etiquetas -->
+              <th *ngIf="isColumnVisible('labels')" class="col-labels resizable-th"
+                [style.width.px]="getColumnWidth('labels')"
+                [style.min-width.px]="getColumnWidth('labels')"
+                [style.max-width.px]="getColumnWidth('labels')">
+                <div class="th-content">
+                  <mat-icon>sell</mat-icon> <span>Etiquetas</span>
+                </div>
+                <div class="col-resizer"
+                  [class.is-resizing]="resizingColumnId() === 'labels'"
+                  (mousedown)="onColumnResizeStart($event, 'labels')"
+                  (dblclick)="resetColumnWidth('labels', $event)"
+                  (click)="$event.stopPropagation()"
+                  title="Arraste para redimensionar (duplo clique para restaurar)"></div>
               </th>
-              <th class="col-status" (click)="toggleSort('status')">
-                <mat-icon>donut_large</mat-icon> <span>Status</span>
-                <mat-icon class="sort-icon" *ngIf="sortOption() === 'status'">{{ sortDirection() === 'asc' ?
-                  'arrow_upward' : 'arrow_downward' }}</mat-icon>
+
+              <!-- Colunas Personalizadas Dinâmicas -->
+              <th *ngFor="let col of activeCustomColumns()" class="col-custom-dyn resizable-th"
+                [style.width.px]="getColumnWidth(col.id)"
+                [style.min-width.px]="getColumnWidth(col.id)"
+                [style.max-width.px]="getColumnWidth(col.id)">
+                <div class="th-content">
+                  <mat-icon>{{ col.icon }}</mat-icon> <span>{{ col.label }}</span>
+                </div>
+                <div class="col-resizer"
+                  [class.is-resizing]="resizingColumnId() === col.id"
+                  (mousedown)="onColumnResizeStart($event, col.id)"
+                  (dblclick)="resetColumnWidth(col.id, $event)"
+                  (click)="$event.stopPropagation()"
+                  title="Arraste para redimensionar (duplo clique para restaurar)"></div>
               </th>
-              <th class="col-tags">
-                <mat-icon>local_offer</mat-icon> <span>Pedido</span>
+
+              <!-- Botão de gerenciar colunas estilo Notion (+) -->
+              <th class="col-add-column" (click)="toggleColumnManager($event)" matTooltip="Adicionar / Ocultar colunas">
+                <mat-icon>add</mat-icon>
               </th>
             </tr>
           </thead>
           <tbody>
             <tr *ngFor="let task of sortedVisibleTasks(); trackBy: trackById" class="notion-row"
               (click)="openEdit(task)" (contextmenu)="openTaskContextMenu($event, task)">
-              <!-- Prazo -->
-              <td class="col-date">
-                <span *ngIf="task.dueDate" class="notion-date-cell" [class.overdue]="isOverdue(task)"
-                  [class.soon]="isDueSoon(task)">
-                  {{ formatDate(task.dueDate) }}
-                </span>
-                <span *ngIf="!task.dueDate" class="notion-empty-cell">—</span>
-              </td>
-
-              <!-- Setor / Lista -->
-              <td class="col-sector">
-                <span class="notion-sector-badge" [style.background]="getColumnBg(task.columnId)"
-                  [style.color]="getColumnColor(task.columnId)">
-                  {{ getColumnTitle(task.columnId) }}
-                </span>
-              </td>
-
-              <!-- Tema Macro -->
-              <td class="col-macro">
-                <span class="notion-macro-badge">
-                  <span class="macro-dot" [style.background]="currentBoard.color || 'var(--brand-500)'"></span>
-                  <span>{{ currentBoard.name || 'Gelelê' }}</span>
-                </span>
-              </td>
 
               <!-- Assunto -->
-              <td class="col-subject">
+              <td *ngIf="isColumnVisible('subject')" class="col-subject"
+                [style.width.px]="getColumnWidth('subject')"
+                [style.min-width.px]="getColumnWidth('subject')"
+                [style.max-width.px]="getColumnWidth('subject')"
+                (click)="$event.stopPropagation(); (inlineEditingCell()?.taskId !== task.id || inlineEditingCell()?.field !== 'title') ? startInlineEdit(task, 'title', $event) : null">
                 <div class="subject-cell-content">
-                  <span class="task-title-text">{{ task.title }}</span>
-                  <button *ngIf="branchHasContent(task)" class="notion-branch-btn"
-                    (click)="openChildBoard(task, $event)" [matTooltip]="childCount(task) + ' subtarefas'">
-                    <mat-icon>account_tree</mat-icon>
-                    <small>{{ childCount(task) }}</small>
-                  </button>
+                  <ng-container *ngIf="inlineEditingCell()?.taskId === task.id && inlineEditingCell()?.field === 'title'; else titleStatic">
+                    <input type="text" class="inline-cell-input title-input" [(ngModel)]="inlineEditValue"
+                      (blur)="saveInlineEdit(task, 'title', $event)"
+                      (keydown.enter)="saveInlineEdit(task, 'title', $event)"
+                      (keydown.escape)="cancelInlineEdit($event)" autofocus />
+                  </ng-container>
+                  <ng-template #titleStatic>
+                    <span class="task-title-text editable-field"
+                      title="Clique para editar o assunto (ou abra o card)">{{ task.title }}</span>
+                    <button *ngIf="branchHasContent(task)" class="notion-branch-btn"
+                      (click)="openChildBoard(task, $event)" [matTooltip]="childCount(task) + ' subtarefas'">
+                      <mat-icon>account_tree</mat-icon>
+                      <small>{{ childCount(task) }}</small>
+                    </button>
+                  </ng-template>
                 </div>
-              </td>
-
-              <!-- Demanda -->
-              <td class="col-demand">
-                <span class="notion-demand-text" [title]="task.description || ''">
-                  {{ getDemandText(task) }}
-                </span>
-              </td>
-
-              <!-- Execução -->
-              <td class="col-execution">
-                <span class="notion-execution-text">
-                  {{ task.dueDate ? formatFullDate(task.dueDate) : '—' }}
-                </span>
-              </td>
-
-              <!-- Responsável -->
-              <td class="col-assignee">
-                <div class="notion-assignees-stack" *ngIf="task.assigneeIds.length">
-                  <span *ngFor="let assigneeId of task.assigneeIds" class="notion-user-tag">
-                    <img [src]="assigneeAvatar(assigneeId)" [alt]="assigneeName(assigneeId)" class="user-tag-avatar"
-                      (error)="$any($event.target).src = defaultAvatar">
-                    <span class="user-tag-name">{{ assigneeName(assigneeId) }}</span>
-                  </span>
-                </div>
-                <span *ngIf="!task.assigneeIds.length" class="notion-empty-cell">—</span>
               </td>
 
               <!-- Status (Pill com ponto colorido) -->
-              <td class="col-status" (click)="$event.stopPropagation()">
-                <div class="notion-status-pill" [style.--status-color]="getColumnColor(task.columnId)">
+              <td *ngIf="isColumnVisible('status')" class="col-status interactive-cell"
+                [style.width.px]="getColumnWidth('status')"
+                [style.min-width.px]="getColumnWidth('status')"
+                [style.max-width.px]="getColumnWidth('status')"
+                (click)="$event.stopPropagation()">
+                <div class="notion-status-pill" [ngClass]="getStatusTheme(task.columnId).className"
+                  [style.--custom-status-color]="getStatusTheme(task.columnId).color"
+                  [style.--custom-status-bg]="getStatusTheme(task.columnId).bg"
+                  [style.--custom-status-dot]="getStatusTheme(task.columnId).dot"
+                  [style.--custom-status-border]="getStatusTheme(task.columnId).border"
+                  title="Clique para alterar status">
                   <span class="status-bullet"></span>
                   <span class="status-label-text">{{ getColumnTitle(task.columnId) }}</span>
-                  <select [ngModel]="task.columnId"
-                    (change)="changeTaskColumn(task, $any($event.target).value, $event)">
-                    <option *ngFor="let col of currentBoard.columns" [value]="col.id">{{ col.title }}</option>
-                  </select>
-                  <mat-icon class="status-arrow">expand_more</mat-icon>
+                </div>
+                <select class="cell-select-overlay" [ngModel]="task.columnId"
+                  (change)="changeTaskColumn(task, $any($event.target).value, $event)"
+                  title="Clique para alterar status">
+                  <option *ngFor="let col of currentBoard.columns" [value]="col.id">{{ col.title }}</option>
+                </select>
+              </td>
+
+              <!-- Prioridade -->
+              <td *ngIf="isColumnVisible('priority')" class="col-priority interactive-cell"
+                [style.width.px]="getColumnWidth('priority')"
+                [style.min-width.px]="getColumnWidth('priority')"
+                [style.max-width.px]="getColumnWidth('priority')"
+                (click)="$event.stopPropagation()">
+                <div class="notion-priority-pill priority" [ngClass]="task.priority" title="Clique para alterar prioridade">
+                  <mat-icon class="p-icon">{{ getPriorityIcon(task.priority) }}</mat-icon>
+                  <span>{{ getPriorityLabel(task.priority) }}</span>
+                </div>
+                <select class="cell-select-overlay" [ngModel]="task.priority"
+                  (change)="updateTaskField(task, 'priority', $any($event.target).value, $event)"
+                  title="Clique para alterar prioridade">
+                  <option value="low">Baixa</option>
+                  <option value="medium">Média</option>
+                  <option value="high">Alta</option>
+                  <option value="urgent">Urgente</option>
+                </select>
+              </td>
+
+              <!-- Responsável -->
+              <td *ngIf="isColumnVisible('assignee')" class="col-assignee interactive-cell"
+                [style.width.px]="getColumnWidth('assignee')"
+                [style.min-width.px]="getColumnWidth('assignee')"
+                [style.max-width.px]="getColumnWidth('assignee')"
+                (click)="$event.stopPropagation()">
+                <div class="notion-assignees-stack" title="Clique para alterar responsável">
+                  <ng-container *ngIf="task.assigneeIds.length">
+                    <span *ngFor="let assigneeId of task.assigneeIds" class="notion-assignee-pill"
+                      [style.color]="getAssigneeBadgeStyle(assigneeName(assigneeId)).color"
+                      [style.background]="getAssigneeBadgeStyle(assigneeName(assigneeId)).bg"
+                      [style.border-color]="getAssigneeBadgeStyle(assigneeName(assigneeId)).border">
+                      {{ assigneeName(assigneeId) }}
+                    </span>
+                  </ng-container>
+                  <span *ngIf="!task.assigneeIds.length" class="notion-empty-cell notion-assignee-placeholder">+ Atribuir</span>
+                </div>
+                <select class="cell-select-overlay" [ngModel]="task.assigneeIds[0] || 'none'"
+                  (change)="updateTaskField(task, 'assignee', $any($event.target).value, $event)"
+                  title="Clique para alterar responsável">
+                  <option value="none">Nenhum responsável</option>
+                  <option [value]="auth.currentUser()?.id">{{ auth.currentUser()?.name || 'Eu' }}</option>
+                  <option *ngFor="let user of assignableUsers()" [value]="user.id">{{ user.name }}</option>
+                </select>
+              </td>
+
+              <!-- Prazo -->
+              <td *ngIf="isColumnVisible('date')" class="col-date"
+                [style.width.px]="getColumnWidth('date')"
+                [style.min-width.px]="getColumnWidth('date')"
+                [style.max-width.px]="getColumnWidth('date')"
+                (click)="$event.stopPropagation()">
+                <div class="notion-date-wrapper" title="Clique para alterar o prazo">
+                  <span *ngIf="task.dueDate" class="notion-date-text" [class.overdue]="isOverdue(task)"
+                    [class.soon]="isDueSoon(task)">
+                    {{ formatFullDate(task.dueDate) }}
+                  </span>
+                  <span *ngIf="!task.dueDate" class="notion-empty-cell notion-assignee-placeholder">+ Data</span>
+                </div>
+                <input type="date" class="cell-date-overlay" [ngModel]="task.dueDate ? task.dueDate.split('T')[0] : ''"
+                  (change)="updateTaskField(task, 'dueDate', $any($event.target).value, $event)"
+                  title="Clique para alterar o prazo">
+              </td>
+
+              <!-- Demanda -->
+              <td *ngIf="isColumnVisible('demand')" class="col-demand"
+                [style.width.px]="getColumnWidth('demand')"
+                [style.min-width.px]="getColumnWidth('demand')"
+                [style.max-width.px]="getColumnWidth('demand')"
+                (click)="$event.stopPropagation(); (inlineEditingCell()?.taskId !== task.id || inlineEditingCell()?.field !== 'demand') ? startInlineEdit(task, 'demand', $event) : null">
+                <div class="notion-demand-wrapper">
+                  <ng-container *ngIf="inlineEditingCell()?.taskId === task.id && inlineEditingCell()?.field === 'demand'; else demandStatic">
+                    <input type="text" class="inline-cell-input demand-input" [(ngModel)]="inlineEditValue"
+                      (blur)="saveInlineEdit(task, 'demand', $event)"
+                      (keydown.enter)="saveInlineEdit(task, 'demand', $event)"
+                      (keydown.escape)="cancelInlineEdit($event)" autofocus placeholder="Descreva a demanda..." />
+                  </ng-container>
+                  <ng-template #demandStatic>
+                    <span class="notion-demand-text editable-field"
+                      [title]="task.description || 'Clique para editar demanda'">
+                      {{ getDemandText(task) || '—' }}
+                    </span>
+                  </ng-template>
                 </div>
               </td>
 
-              <!-- Pedido / Etiquetas -->
-              <td class="col-tags">
-                <div class="notion-tags-group" *ngIf="task.labels.length">
-                  <span *ngFor="let label of task.labels" class="notion-label-tag">
-                    {{ label }}
-                  </span>
+              <!-- Etiquetas -->
+              <td *ngIf="isColumnVisible('labels')" class="col-labels"
+                [style.width.px]="getColumnWidth('labels')"
+                [style.min-width.px]="getColumnWidth('labels')"
+                [style.max-width.px]="getColumnWidth('labels')"
+                (click)="$event.stopPropagation(); (inlineEditingCell()?.taskId !== task.id || inlineEditingCell()?.field !== 'labels') ? startInlineEdit(task, 'labels', $event) : null">
+                <div class="notion-labels-wrapper">
+                  <ng-container *ngIf="inlineEditingCell()?.taskId === task.id && inlineEditingCell()?.field === 'labels'; else labelsStatic">
+                    <input type="text" class="inline-cell-input labels-input" [(ngModel)]="inlineEditValue"
+                      (blur)="saveInlineEdit(task, 'labels', $event)"
+                      (keydown.enter)="saveInlineEdit(task, 'labels', $event)"
+                      (keydown.escape)="cancelInlineEdit($event)" autofocus placeholder="Separe por vírgula..." />
+                  </ng-container>
+                  <ng-template #labelsStatic>
+                    <ng-container *ngIf="getTaskFreeLabels(task).length; else labelsEmpty">
+                      <span *ngFor="let label of getTaskFreeLabels(task).slice(0, 3)" class="notion-label-tag">
+                        {{ label }}
+                      </span>
+                      <span *ngIf="getTaskFreeLabels(task).length > 3" class="notion-label-more">+{{ getTaskFreeLabels(task).length - 3 }}</span>
+                    </ng-container>
+                    <ng-template #labelsEmpty>
+                      <span class="notion-empty-cell notion-assignee-placeholder">+ Etiqueta</span>
+                    </ng-template>
+                  </ng-template>
                 </div>
-                <span *ngIf="!task.labels.length" class="notion-empty-cell">—</span>
+              </td>
+
+              <!-- Células das Colunas Personalizadas -->
+              <td *ngFor="let col of activeCustomColumns()" class="col-custom-cell"
+                [style.width.px]="getColumnWidth(col.id)"
+                [style.min-width.px]="getColumnWidth(col.id)"
+                [style.max-width.px]="getColumnWidth(col.id)"
+                [class.interactive-cell]="col.type === 'date' || col.type === 'select'"
+                [class.interactive-check-cell]="col.type === 'checkbox'"
+                (click)="$event.stopPropagation();
+                  col.type === 'checkbox' ? toggleCustomCheckbox(task, col, $event) :
+                  (col.type === 'text' || col.type === 'number') && (inlineEditingCell()?.taskId !== task.id || inlineEditingCell()?.field !== col.id) ? startInlineEdit(task, col.id, $event) : null">
+
+                <!-- Texto ou Número com Inline Edit -->
+                <div *ngIf="col.type === 'text' || col.type === 'number'" class="notion-custom-text-wrap">
+                  <ng-container *ngIf="inlineEditingCell()?.taskId === task.id && inlineEditingCell()?.field === col.id; else customTextStatic">
+                    <input [type]="col.type === 'number' ? 'number' : 'text'" class="inline-cell-input" [(ngModel)]="inlineEditValue"
+                      (blur)="saveInlineEdit(task, col.id, $event)"
+                      (keydown.enter)="saveInlineEdit(task, col.id, $event)"
+                      (keydown.escape)="cancelInlineEdit($event)" autofocus [placeholder]="col.label + '...'" />
+                  </ng-container>
+                  <ng-template #customTextStatic>
+                    <span class="editable-field" [title]="'Clique para editar ' + col.label">
+                      {{ getCustomFieldValue(task, col) || '—' }}
+                    </span>
+                  </ng-template>
+                </div>
+
+                <!-- Data com Datepicker Overlay Cobrindo 100% da Célula -->
+                <ng-container *ngIf="col.type === 'date'">
+                  <div class="notion-date-wrapper" [title]="'Clique para alterar ' + col.label">
+                    <span class="notion-date-text" *ngIf="getCustomFieldValue(task, col)">{{ formatFullDate(getCustomFieldValue(task, col)) }}</span>
+                    <span class="notion-empty-cell notion-assignee-placeholder" *ngIf="!getCustomFieldValue(task, col)">+ Data</span>
+                  </div>
+                  <input type="date" class="cell-date-overlay" [ngModel]="getCustomFieldValue(task, col)"
+                    (change)="updateCustomField(task, col, $any($event.target).value, $event)"
+                    [title]="'Clique para alterar ' + col.label">
+                </ng-container>
+
+                <!-- Select Interativo com Overlay Cobrindo 100% da Célula -->
+                <ng-container *ngIf="col.type === 'select'">
+                  <div class="notion-custom-select-wrap" [title]="'Clique para alterar ' + col.label">
+                    <span class="custom-select-val">{{ getCustomFieldValue(task, col) || '— Vazio —' }}</span>
+                  </div>
+                  <select class="cell-select-overlay" [ngModel]="getCustomFieldValue(task, col) || ''"
+                    (change)="updateCustomField(task, col, $any($event.target).value, $event)"
+                    [title]="'Clique para alterar ' + col.label">
+                    <option value="">— Vazio —</option>
+                    <option *ngFor="let opt of col.options" [value]="opt">{{ opt }}</option>
+                  </select>
+                </ng-container>
+
+                <!-- Checkbox Interativo -->
+                <div *ngIf="col.type === 'checkbox'" class="notion-custom-check-wrap" [title]="'Clique para alternar ' + col.label">
+                  <input type="checkbox" [checked]="getCustomFieldValue(task, col)"
+                    (change)="updateCustomField(task, col, $any($event.target).checked, $event)"
+                    (click)="$event.stopPropagation()" />
+                </div>
+              </td>
+
+              <!-- Coluna de Ações rápidas / Espaçador -->
+              <td class="col-add-column-cell" (click)="$event.stopPropagation()">
+                <button type="button" class="row-open-modal-btn" (click)="openEdit(task)" matTooltip="Abrir detalhes da tarefa">
+                  <mat-icon>open_in_new</mat-icon>
+                </button>
               </td>
             </tr>
 
             <!-- Tabela Vazia -->
             <tr *ngIf="!sortedVisibleTasks().length">
-              <td colspan="9" class="notion-empty-row">
+              <td [attr.colspan]="visibleColumnsCount() + 1" class="notion-empty-row">
                 <mat-icon>inbox</mat-icon>
-                <span>Nenhuma tarefa encontrada para os filtros selecionados.</span>
+                <span>Nenhuma tarefa encontrada para esta visualização.</span>
               </td>
             </tr>
           </tbody>
@@ -843,50 +1174,201 @@
 <div class="task-modal-backdrop" *ngIf="modalOpen()" (mousedown)="closeTaskModal()">
   <section class="task-modal" role="dialog" aria-modal="true" aria-labelledby="task-modal-title"
     (mousedown)="$event.stopPropagation()">
-    <header>
-      <div class="modal-icon"><mat-icon>{{ editingId() ? 'edit_note' : 'add_task' }}</mat-icon></div>
-      <div>
-        <h2 id="task-modal-title">{{ editingId() ? 'Detalhes da tarefa' : 'Nova tarefa' }}</h2>
-        <p>Organize informações e acompanhe o progresso.</p>
-      </div><button class="icon-btn" type="button" (click)="printSingleTask()"
-        matTooltip="Imprimir esta tarefa"><mat-icon>print</mat-icon></button><button class="icon-btn"
-        (click)="closeTaskModal()"><mat-icon>close</mat-icon></button>
+    
+    <!-- Modal Header -->
+    <header class="task-modal-header">
+      <div class="modal-header-left">
+        <div class="modal-icon">
+          <mat-icon>{{ editingId() ? 'edit_note' : 'add_task' }}</mat-icon>
+        </div>
+        <div class="modal-title-group">
+          <div class="modal-breadcrumb">
+            <span class="board-badge">{{ board()?.name || 'Quadro' }}</span>
+            <mat-icon class="bc-sep">chevron_right</mat-icon>
+            <span class="status-chip-badge" [ngClass]="getStatusTheme(draft.columnId).className"
+              [style.color]="getStatusTheme(draft.columnId).color"
+              [style.background]="getStatusTheme(draft.columnId).bg"
+              [style.border-color]="getStatusTheme(draft.columnId).border">
+              <span class="chip-dot" [style.background]="getStatusTheme(draft.columnId).dot"></span>
+              {{ getColumnTitle(draft.columnId) }}
+            </span>
+          </div>
+          <h2 id="task-modal-title">{{ editingId() ? 'Detalhes da Tarefa' : 'Nova Tarefa' }}</h2>
+        </div>
+      </div>
+
+      <div class="modal-header-actions">
+        <button class="icon-btn" type="button" (click)="printSingleTask()" matTooltip="Imprimir esta tarefa">
+          <mat-icon>print</mat-icon>
+        </button>
+        <button class="icon-btn close-btn" type="button" (click)="closeTaskModal()" matTooltip="Fechar">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
     </header>
-    <div class="modal-body">
-      <label class="field full"><span>Título *</span><input [(ngModel)]="draft.title" maxlength="160"
-          placeholder="O que precisa ser feito?" autofocus></label>
-      <div class="field full">
-        <div class="description-header"><span>Descrição</span><app-ai-text-button [text]="draft.description"
-            (textChange)="draft.description = $event" /></div><app-markdown-editor [text]="draft.description"
-          (textChange)="draft.description = $event" [maxLength]="5000"
+
+    <!-- Modal Body -->
+    <div class="modal-body task-modal-body">
+      
+      <!-- Título Principal -->
+      <div class="task-title-section">
+        <input [(ngModel)]="draft.title" maxlength="180" class="task-title-main-input"
+          placeholder="O que precisa ser feito? (Título da tarefa)" autofocus />
+      </div>
+
+      <!-- Grade de Propriedades (Estilo Notion/Linear) -->
+      <div class="task-properties-card">
+        <div class="props-header">
+          <span class="props-title"><mat-icon>tune</mat-icon> Propriedades da Tarefa</span>
+          <button type="button" class="btn-add-prop-inline" (click)="showAddPropertyInModal.set(!showAddPropertyInModal())">
+            <mat-icon>{{ showAddPropertyInModal() ? 'close' : 'add' }}</mat-icon>
+            <span>{{ showAddPropertyInModal() ? 'Cancelar' : 'Adicionar Campo' }}</span>
+          </button>
+        </div>
+
+        <!-- Form Inline para Adicionar Nova Propriedade no Modal -->
+        <div class="modal-add-property-form" *ngIf="showAddPropertyInModal()">
+          <div class="add-prop-fields">
+            <input type="text" [(ngModel)]="newPropertyLabelInModal" placeholder="Nome do campo (ex: Cliente, Valor...)" class="prop-input-name" />
+            <select [(ngModel)]="newPropertyTypeInModal" class="prop-select-type">
+              <option value="text">Texto</option>
+              <option value="date">Data</option>
+              <option value="number">Número</option>
+              <option value="select">Lista de Seleção</option>
+              <option value="checkbox">Caixa de Seleção (Sim/Não)</option>
+            </select>
+            <input *ngIf="newPropertyTypeInModal === 'select'" type="text" [(ngModel)]="newPropertyOptionsInModal" placeholder="Opções separadas por vírgula..." class="prop-input-options" />
+          </div>
+          <div class="add-prop-actions">
+            <button type="button" class="btn-confirm-add-prop" (click)="addPropertyInModal()" [disabled]="!newPropertyLabelInModal.trim()">
+              <mat-icon>check</mat-icon> Criar Propriedade
+            </button>
+          </div>
+        </div>
+
+        <div class="props-grid">
+          <!-- Status / Lista -->
+          <div class="prop-item">
+            <div class="prop-label">
+              <mat-icon>donut_large</mat-icon>
+              <span>Status</span>
+            </div>
+            <div class="prop-value">
+              <div class="modal-status-select-wrap">
+                <span class="status-dot-indicator" [style.background]="getStatusTheme(draft.columnId).dot"></span>
+                <select [(ngModel)]="draft.columnId" class="modal-select-input">
+                  <option *ngFor="let column of board()?.columns" [value]="column.id">{{ column.title }}</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Prioridade -->
+          <div class="prop-item">
+            <div class="prop-label">
+              <mat-icon>flag</mat-icon>
+              <span>Prioridade</span>
+            </div>
+            <div class="prop-value">
+              <div class="modal-priority-wrap priority" [ngClass]="draft.priority">
+                <mat-icon class="p-icon">{{ getPriorityIcon(draft.priority) }}</mat-icon>
+                <select [(ngModel)]="draft.priority" class="modal-select-input">
+                  <option value="low">Baixa</option>
+                  <option value="medium">Média</option>
+                  <option value="high">Alta</option>
+                  <option value="urgent">Urgente</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Prazo -->
+          <div class="prop-item">
+            <div class="prop-label">
+              <mat-icon>event</mat-icon>
+              <span>Prazo</span>
+            </div>
+            <div class="prop-value">
+              <input type="date" [(ngModel)]="draft.dueDate" class="modal-date-input" />
+            </div>
+          </div>
+
+          <!-- Responsáveis -->
+          <div class="prop-item prop-item-full">
+            <div class="prop-label">
+              <mat-icon>person</mat-icon>
+              <span>Responsáveis</span>
+            </div>
+            <div class="prop-value assignees-prop-value">
+              <div class="assignee-options">
+                <button type="button"
+                  [class.selected]="isDraftAssignee(auth.currentUser()?.id || '')"
+                  (click)="toggleDraftAssignee(auth.currentUser()?.id || '')">
+                  <img [src]="auth.currentUser()?.avatar || defaultAvatar" (error)="$any($event.target).src = defaultAvatar">
+                  <span>{{ auth.currentUser()?.name || 'Eu' }}</span>
+                  <mat-icon>{{ isDraftAssignee(auth.currentUser()?.id || '') ? 'check_circle' : 'add_circle_outline' }}</mat-icon>
+                </button>
+                <button type="button" *ngFor="let user of assignableUsers()"
+                  [class.selected]="isDraftAssignee(user.id)" (click)="toggleDraftAssignee(user.id)">
+                  <img [src]="user.avatar || defaultAvatar" (error)="$any($event.target).src = defaultAvatar">
+                  <span>{{ user.name }}</span>
+                  <mat-icon>{{ isDraftAssignee(user.id) ? 'check_circle' : 'add_circle_outline' }}</mat-icon>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Etiquetas -->
+          <div class="prop-item prop-item-full">
+            <div class="prop-label">
+              <mat-icon>sell</mat-icon>
+              <span>Etiquetas</span>
+            </div>
+            <div class="prop-value">
+              <input [(ngModel)]="labelText" placeholder="Ex.: Produto, Cliente, Bloqueado (separadas por vírgula)" class="modal-text-input" />
+            </div>
+          </div>
+
+          <!-- Campos Personalizados Dinâmicos -->
+          <ng-container *ngFor="let col of customColumns()">
+            <div class="prop-item" [class.prop-item-full]="col.type === 'text' && (col.label.length > 15)">
+              <div class="prop-label">
+                <mat-icon>{{ col.icon }}</mat-icon>
+                <span>{{ col.label }}</span>
+                <button type="button" class="btn-remove-custom-prop" (click)="removeCustomColumn(col.id, $event)" matTooltip="Excluir este campo">
+                  <mat-icon>close</mat-icon>
+                </button>
+              </div>
+              <div class="prop-value">
+                <input *ngIf="col.type === 'text'" type="text" [(ngModel)]="draftCustomFields[col.id]" [placeholder]="col.label + '...'" class="modal-text-input" />
+                <input *ngIf="col.type === 'number'" type="number" [(ngModel)]="draftCustomFields[col.id]" placeholder="0" class="modal-text-input" />
+                <input *ngIf="col.type === 'date'" type="date" [(ngModel)]="draftCustomFields[col.id]" class="modal-date-input" />
+                <label *ngIf="col.type === 'checkbox'" class="modal-checkbox-toggle">
+                  <input type="checkbox" [(ngModel)]="draftCustomFields[col.id]" />
+                  <span>{{ draftCustomFields[col.id] ? 'Sim / Concluído' : 'Não / Pendente' }}</span>
+                </label>
+                <select *ngIf="col.type === 'select'" [(ngModel)]="draftCustomFields[col.id]" class="modal-select-input">
+                  <option value="">— Selecione —</option>
+                  <option *ngFor="let opt of col.options" [value]="opt">{{ opt }}</option>
+                </select>
+              </div>
+            </div>
+          </ng-container>
+        </div>
+      </div>
+
+      <!-- Demanda / Descrição -->
+      <div class="task-description-card full">
+        <div class="description-header">
+          <div class="desc-heading-title">
+            <mat-icon>notes</mat-icon>
+            <span>Descrição & Demanda</span>
+          </div>
+          <app-ai-text-button [text]="draft.description" (textChange)="draft.description = $event" />
+        </div>
+        <app-markdown-editor [text]="draft.description" (textChange)="draft.description = $event" [maxLength]="5000"
           placeholder="Adicione contexto, links ou critérios de aceite..." ariaLabel="Descrição da tarefa" />
       </div>
-      <label class="field"><span>Lista</span><select [(ngModel)]="draft.columnId">
-          <option *ngFor="let column of board()?.columns" [value]="column.id">{{ column.title }}</option>
-        </select></label>
-      <label class="field"><span>Prioridade</span><select [(ngModel)]="draft.priority">
-          <option value="low">Baixa</option>
-          <option value="medium">Média</option>
-          <option value="high">Alta</option>
-          <option value="urgent">Urgente</option>
-        </select></label>
-      <label class="field"><span>Prazo</span><input type="date" [(ngModel)]="draft.dueDate"></label>
-      <div class="field assignees-field"><span>Responsáveis <small>{{ draft.assigneeIds.length || 'Nenhum'
-            }}</small></span>
-        <div class="assignee-options"><button type="button"
-            [class.selected]="isDraftAssignee(auth.currentUser()?.id || '')"
-            (click)="toggleDraftAssignee(auth.currentUser()?.id || '')"><img
-              [src]="auth.currentUser()?.avatar || defaultAvatar"
-              (error)="$any($event.target).src = defaultAvatar"><span>{{ auth.currentUser()?.name || 'Eu'
-              }}</span><mat-icon>{{ isDraftAssignee(auth.currentUser()?.id || '') ? 'check_circle' :
-              'add_circle_outline' }}</mat-icon></button><button type="button" *ngFor="let user of assignableUsers()"
-            [class.selected]="isDraftAssignee(user.id)" (click)="toggleDraftAssignee(user.id)"><img
-              [src]="user.avatar || defaultAvatar" (error)="$any($event.target).src = defaultAvatar"><span>{{ user.name
-              }}</span><mat-icon>{{ isDraftAssignee(user.id) ? 'check_circle' : 'add_circle_outline'
-              }}</mat-icon></button></div>
-      </div>
-      <label class="field full"><span>Etiquetas <small>separadas por vírgula</small></span><input
-          [(ngModel)]="labelText" placeholder="Ex.: Produto, Cliente, Bloqueado"></label>
       <div class='task-attachments full'>
         <div class='attachment-heading'><span><mat-icon>attach_file</mat-icon>Anexos</span><strong>{{
             taskAttachments.length + pendingFiles.length }}/10</strong></div>
@@ -1121,9 +1603,22 @@
         <div class="member-row" *ngFor="let member of service.teamMembers()"><img [src]="memberAvatar(member.user_id)"
             [alt]="memberName(member.user_id)" (error)="$any($event.target).src = defaultAvatar">
           <div><strong>{{ memberName(member.user_id) }}</strong><span>{{ member.role === 'admin' ? 'Administrador' :
-              'Membro' }}</span></div><button *ngIf="team.myRole === 'admin' && member.role !== 'admin'"
-            class="danger-icon" (click)="removeMember(member.id)"
-            matTooltip="Remover do time"><mat-icon>person_remove</mat-icon></button>
+              'Membro' }}</span></div>
+          <span *ngIf="isTeamOwner(member.user_id)" class="owner-badge" matTooltip="Criador do time">
+            <mat-icon>shield</mat-icon>
+          </span>
+          <ng-container *ngIf="team.myRole === 'admin' && !isTeamOwner(member.user_id)">
+            <button *ngIf="member.role !== 'admin'" class="icon-btn promote-btn"
+              (click)="changeMemberRole(member.id, 'admin')" matTooltip="Promover a administrador">
+              <mat-icon>manage_accounts</mat-icon>
+            </button>
+            <button *ngIf="member.role === 'admin'" class="icon-btn"
+              (click)="changeMemberRole(member.id, 'member')" matTooltip="Rebaixar a membro">
+              <mat-icon>person_outline</mat-icon>
+            </button>
+            <button class="danger-icon" (click)="removeMember(member.id)"
+              matTooltip="Remover do time"><mat-icon>person_remove</mat-icon></button>
+          </ng-container>
         </div>
       </div>
       <button class="new-team-link" (click)="creatingTeam.set(true)"><mat-icon>add</mat-icon>Criar outro time</button>

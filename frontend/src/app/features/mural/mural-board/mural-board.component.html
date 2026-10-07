@@ -28,51 +28,90 @@
         </button>
 
         <mat-menu #muralMenu="matMenu" class="mural-custom-mat-menu" xPosition="after">
-          <!-- Cabeçalho do Menu / Ação Rápida -->
+          <!-- Cabeçalho do Menu / Ações Rápidas -->
           <div class="mat-menu-header" (click)="$event.stopPropagation()">
             <span class="menu-header-title">Murais & Espaços</span>
-            <button type="button" class="mat-menu-action-btn" (click)="abrirCriarTime()">
-              <mat-icon>add</mat-icon><span>Novo Time</span>
-            </button>
+            <div class="mat-menu-header-actions">
+              <button type="button" class="mat-menu-action-btn" (click)="abrirNovoMural('personal')" matTooltip="Criar novo mural pessoal">
+                <mat-icon>dashboard_customize</mat-icon><span>Novo Mural</span>
+              </button>
+              <button type="button" class="mat-menu-action-btn" (click)="abrirCriarTime()" matTooltip="Criar novo time">
+                <mat-icon>add</mat-icon><span>Novo Time</span>
+              </button>
+            </div>
           </div>
 
-          <!-- Murais Pessoais -->
-          <div class="mat-menu-group-label" *ngIf="hasPersonalBoards()">
-            <mat-icon>person</mat-icon>
-            <span>Pessoal</span>
-          </div>
-          <ng-container *ngFor="let b of boards()">
-            <button
-              mat-menu-item
-              *ngIf="b.scopeType === 'personal'"
-              [class.active-item]="b.id === activeBoard()?.id"
-              (click)="selecionarMural(b.id)"
-            >
-              <span class="menu-board-dot" [style.background]="b.color"></span>
-              <span class="menu-board-title">{{ b.name }}</span>
-              <span class="menu-board-count" *ngIf="b.itemCount">({{ b.itemCount }})</span>
-              <mat-icon *ngIf="b.id === activeBoard()?.id" class="menu-check-icon">check</mat-icon>
-            </button>
-          </ng-container>
+          <div class="menu-dnd-list" cdkDropList (cdkDropListDropped)="onBoardDropped($event)">
+            <!-- Murais Pessoais -->
+            <div class="mat-menu-group-label" *ngIf="hasPersonalBoards()">
+              <mat-icon>person</mat-icon>
+              <span>Pessoal</span>
+            </div>
+            <ng-container *ngFor="let b of boards()">
+              <div
+                class="menu-board-row"
+                *ngIf="b.scopeType === 'personal'"
+                cdkDrag
+                [cdkDragData]="b"
+                [class.active-row]="b.id === activeBoard()?.id"
+              >
+                <mat-icon class="menu-drag-icon" cdkDragHandle matTooltip="Arraste para reordenar">drag_indicator</mat-icon>
+                <button
+                  type="button"
+                  class="menu-board-btn"
+                  (click)="selecionarMural(b.id)"
+                >
+                  <span class="menu-board-dot" [style.background]="b.color"></span>
+                  <span class="menu-board-title">{{ b.name }}</span>
+                  <span class="menu-board-count" *ngIf="b.itemCount">({{ b.itemCount }})</span>
+                  <mat-icon *ngIf="b.id === activeBoard()?.id" class="menu-check-icon">check</mat-icon>
+                </button>
+                <div class="menu-row-actions" (click)="$event.stopPropagation()">
+                  <button type="button" class="menu-action-btn" (click)="selecionarMural(b.id); abrirEditarMural()" matTooltip="Configurar Mural">
+                    <mat-icon>settings</mat-icon>
+                  </button>
+                  <button type="button" class="menu-action-btn danger" *ngIf="boards().length > 1" (click)="excluirMuralPorId(b, $event)" matTooltip="Excluir Mural">
+                    <mat-icon>delete_outline</mat-icon>
+                  </button>
+                </div>
+              </div>
+            </ng-container>
 
-          <!-- Murais de Time -->
-          <div class="mat-menu-group-label" *ngIf="hasTeamBoards()">
-            <mat-icon>groups</mat-icon>
-            <span>Times & Equipes</span>
+            <!-- Murais de Time -->
+            <div class="mat-menu-group-label" *ngIf="hasTeamBoards()">
+              <mat-icon>groups</mat-icon>
+              <span>Times & Equipes</span>
+            </div>
+            <ng-container *ngFor="let b of boards()">
+              <div
+                class="menu-board-row"
+                *ngIf="b.scopeType === 'team'"
+                cdkDrag
+                [cdkDragData]="b"
+                [class.active-row]="b.id === activeBoard()?.id"
+              >
+                <mat-icon class="menu-drag-icon" cdkDragHandle matTooltip="Arraste para reordenar">drag_indicator</mat-icon>
+                <button
+                  type="button"
+                  class="menu-board-btn"
+                  (click)="selecionarMural(b.id)"
+                >
+                  <span class="menu-board-dot" [style.background]="b.color"></span>
+                  <span class="menu-board-title">{{ b.name }}</span>
+                  <span class="menu-board-count" *ngIf="b.itemCount">({{ b.itemCount }})</span>
+                  <mat-icon *ngIf="b.id === activeBoard()?.id" class="menu-check-icon">check</mat-icon>
+                </button>
+                <div class="menu-row-actions" (click)="$event.stopPropagation()">
+                  <button type="button" class="menu-action-btn" *ngIf="b.myRole === 'admin'" (click)="selecionarMural(b.id); abrirEditarMural()" matTooltip="Configurar Mural">
+                    <mat-icon>settings</mat-icon>
+                  </button>
+                  <button type="button" class="menu-action-btn danger" *ngIf="b.myRole === 'admin'" (click)="excluirMuralPorId(b, $event)" matTooltip="Excluir Mural">
+                    <mat-icon>delete_outline</mat-icon>
+                  </button>
+                </div>
+              </div>
+            </ng-container>
           </div>
-          <ng-container *ngFor="let b of boards()">
-            <button
-              mat-menu-item
-              *ngIf="b.scopeType === 'team'"
-              [class.active-item]="b.id === activeBoard()?.id"
-              (click)="selecionarMural(b.id)"
-            >
-              <span class="menu-board-dot" [style.background]="b.color"></span>
-              <span class="menu-board-title">{{ b.name }}</span>
-              <span class="menu-board-count" *ngIf="b.itemCount">({{ b.itemCount }})</span>
-              <mat-icon *ngIf="b.id === activeBoard()?.id" class="menu-check-icon">check</mat-icon>
-            </button>
-          </ng-container>
         </mat-menu>
       </div>
 
@@ -93,16 +132,16 @@
     </div>
 
     <div class="toolbar-actions">
-      <button class="secondary-btn expand-pill-btn size-36" (click)="abrirCriarTime()" matTooltip="Criar novo time com mural e kanban">
-        <mat-icon>group_add</mat-icon><span class="pill-label">Novo Time</span>
+      <button class="secondary-btn expand-pill-btn size-36" (click)="abrirNovoMural('personal')" matTooltip="Criar novo mural pessoal">
+        <mat-icon>dashboard_customize</mat-icon><span class="pill-label">Novo Mural</span>
       </button>
-      <button class="secondary-btn expand-pill-btn size-36" (click)="abrirNovoGrupo()" matTooltip="Criar novo grupo de cartões">
-        <mat-icon>create_new_folder</mat-icon><span class="pill-label">Novo Grupo</span>
+      <button class="secondary-btn expand-pill-btn size-36" (click)="abrirNovoGrupo()" matTooltip="Criar novo quadro de cartões">
+        <mat-icon>create_new_folder</mat-icon><span class="pill-label">Novo Quadro</span>
       </button>
       <button class="primary-btn expand-pill-btn size-36 primary-pill" (click)="abrirNovoItem()" matTooltip="Novo Cartão no Mural">
         <mat-icon>add</mat-icon><span class="pill-label">Novo Cartão</span>
       </button>
-      <button *ngIf="activeBoard()?.myRole === 'admin'" class="secondary-btn expand-pill-btn size-36" (click)="abrirEditarMural()" matTooltip="Configurar Mural">
+      <button *ngIf="activeBoard()?.myRole === 'admin'" class="secondary-btn expand-pill-btn size-36" (click)="abrirEditarMural()" matTooltip="Configurar / Excluir Mural">
         <mat-icon>settings</mat-icon><span class="pill-label">Configurações</span>
       </button>
       <button *ngIf="activeBoard()?.scopeType === 'team' || teams().length > 0" class="secondary-btn expand-pill-btn size-36" (click)="abrirGerenciarTime()" matTooltip="Gerenciar Time & Membros SSO">
@@ -114,26 +153,39 @@
   <!-- ══════════════ CANVAS ══════════════ -->
   <div class="mural-canvas" [class.is-loading]="loading()" (dragover)="$event.preventDefault()">
 
-    <!-- Grupos -->
-    <div class="mural-groups-row" *ngIf="activeBoard()?.groups?.length">
+    <!-- Grupos / Quadros do Mural Reordenáveis por Drag & Drop -->
+    <div
+      class="mural-groups-row"
+      *ngIf="activeBoard()?.groups?.length"
+      cdkDropList
+      cdkDropListOrientation="horizontal"
+      (cdkDropListDropped)="onGroupDropped($event)"
+    >
       <div
         *ngFor="let group of activeBoard()?.groups"
         class="mural-group-frame"
+        cdkDrag
+        [cdkDragData]="group"
         [style.--group-color]="group.color"
         [class.drag-over]="dragOverGroupId === group.id"
         (dragover)="onGroupDragOver($event, group.id)"
         (dragleave)="onGroupDragLeave()"
         (drop)="onDropInGroup($event, group.id)"
       >
+        <div class="drag-placeholder group-drag-placeholder" *cdkDragPlaceholder></div>
         <div class="group-header">
           <div class="group-title-box">
+            <mat-icon class="group-drag-handle" cdkDragHandle matTooltip="Arraste para reordenar este quadro">drag_indicator</mat-icon>
             <span class="column-accent" [style.background]="group.color" [style.box-shadow]="'0 0 7px ' + group.color"></span>
             <span class="column-title">{{ group.title }}</span>
             <span class="column-count">{{ (itemsByGroup().get(group.id) || []).length }}</span>
           </div>
           <div class="group-actions">
+            <button class="icon-btn" (click)="moverGrupo(group, -1, $event)" [disabled]="isFirstGroup(group)" matTooltip="Mover para esquerda"><mat-icon>chevron_left</mat-icon></button>
+            <button class="icon-btn" (click)="moverGrupo(group, 1, $event)" [disabled]="isLastGroup(group)" matTooltip="Mover para direita"><mat-icon>chevron_right</mat-icon></button>
             <button class="icon-btn" (click)="abrirNovoItem(group.id)" matTooltip="Adicionar cartão"><mat-icon>add</mat-icon></button>
-            <button *ngIf="activeBoard()?.myRole === 'admin'" class="icon-btn" (click)="abrirEditarGrupo(group, $event)" matTooltip="Opções"><mat-icon>more_vert</mat-icon></button>
+            <button *ngIf="activeBoard()?.myRole === 'admin'" class="icon-btn" (click)="abrirEditarGrupo(group, $event)" matTooltip="Editar quadro"><mat-icon>edit</mat-icon></button>
+            <button *ngIf="activeBoard()?.myRole === 'admin'" class="icon-btn danger-hover" (click)="solicitarExclusaoGrupoDireto(group, $event)" matTooltip="Excluir quadro"><mat-icon>delete_outline</mat-icon></button>
           </div>
         </div>
 
@@ -253,7 +305,7 @@
   (deleted)="onItemExcluido($event)"
 ></app-mural-item-modal>
 
-<!-- ══════════════ MODAL DE GRUPO ══════════════ -->
+<!-- ══════════════ MODAL DE GRUPO / QUADRO ══════════════ -->
 <div class="modal-overlay" *ngIf="groupModalOpen()" (mousedown)="fecharGrupoModal()">
   <div class="modal-card modal-sm" (mousedown)="$event.stopPropagation()">
     <div class="modal-header">
@@ -262,23 +314,28 @@
           <mat-icon>{{ editingGroup() ? 'edit' : 'create_new_folder' }}</mat-icon>
         </div>
         <div>
-          <h2>{{ editingGroup() ? 'Editar Grupo' : 'Novo Grupo no Mural' }}</h2>
-          <p>{{ editingGroup() ? 'Atualize o título e cor do grupo.' : 'Crie uma seção temática para organizar cartões.' }}</p>
+          <h2>{{ editingGroup() ? 'Editar Quadro' : 'Novo Quadro no Mural' }}</h2>
+          <p>{{ editingGroup() ? 'Atualize o título e cor deste quadro.' : 'Crie uma seção temática para organizar cartões.' }}</p>
         </div>
       </div>
       <button class="close-btn" (click)="fecharGrupoModal()"><mat-icon>close</mat-icon></button>
     </div>
     <div class="modal-body">
       <div class="form-card">
-        <div class="card-section-header"><mat-icon class="color-blue">folder</mat-icon><h3>Dados do Grupo</h3></div>
+        <div class="card-section-header"><mat-icon class="color-blue">folder</mat-icon><h3>Dados do Quadro</h3></div>
         <div class="form-grid">
           <div class="form-field">
-            <label>Nome do Grupo <span class="required">*</span></label>
-            <input type="text" [(ngModel)]="groupTitle" name="groupTitle" placeholder="Ex: Quadro de Avisos, Ideias..." autofocus />
+            <label>Nome do Quadro <span class="required">*</span></label>
+            <input type="text" [(ngModel)]="groupTitle" name="groupTitle" placeholder="Ex: Quadro de Avisos, Ideias, Documentações..." autofocus />
           </div>
           <div class="form-field">
             <label>Cor de Destaque</label>
-            <input type="color" [(ngModel)]="groupColor" name="groupColor" class="color-input" />
+            <div class="color-presets-row">
+              <button type="button" *ngFor="let c of colorPresets" class="color-swatch-btn" [style.background]="c.value" [class.selected]="groupColor === c.value" [matTooltip]="c.label" (click)="groupColor = c.value">
+                <mat-icon *ngIf="groupColor === c.value">check</mat-icon>
+              </button>
+              <input type="color" [(ngModel)]="groupColor" name="groupColor" class="color-input-custom" matTooltip="Cor personalizada" />
+            </div>
           </div>
         </div>
       </div>
@@ -286,20 +343,20 @@
     <div class="modal-footer">
       <ng-container *ngIf="!confirmDeleteGroup()">
         <button *ngIf="editingGroup()" class="delete-btn" (click)="solicitarExclusaoGrupo()" [disabled]="loadingExcluirGrupo">
-          <mat-icon>delete</mat-icon><span>Excluir</span>
+          <mat-icon>delete</mat-icon><span>Excluir Quadro</span>
         </button>
         <button class="cancel-btn" (click)="fecharGrupoModal()">Cancelar</button>
         <button class="primary-btn" (click)="salvarGrupo()" [disabled]="loadingSalvarGrupo || !groupTitle.trim()">
           <mat-progress-spinner *ngIf="loadingSalvarGrupo" mode="indeterminate" diameter="16" class="button-spinner"></mat-progress-spinner>
           <mat-icon *ngIf="!loadingSalvarGrupo">save</mat-icon>
-          <span>{{ loadingSalvarGrupo ? 'Salvando...' : 'Salvar Grupo' }}</span>
+          <span>{{ loadingSalvarGrupo ? 'Salvando...' : 'Salvar Quadro' }}</span>
         </button>
       </ng-container>
 
       <div class="delete-confirm-box" *ngIf="confirmDeleteGroup()">
         <div class="confirm-text">
           <mat-icon class="warn-icon">warning</mat-icon>
-          <span>Excluir grupo? As notas serão mantidas como notas soltas.</span>
+          <span>Excluir este quadro? As notas existentes serão mantidas como notas soltas no mural.</span>
         </div>
         <div class="confirm-actions">
           <button class="cancel-btn" (click)="cancelarExclusaoGrupo()">Voltar</button>
@@ -313,13 +370,63 @@
   </div>
 </div>
 
+<!-- ══════════════ MODAL NOVO MURAL ══════════════ -->
+<div class="modal-overlay" *ngIf="createBoardModalOpen()" (mousedown)="fecharNovoMuralModal()">
+  <div class="modal-card modal-sm" (mousedown)="$event.stopPropagation()">
+    <div class="modal-header">
+      <div class="header-main">
+        <div class="header-badge" [style.background]="newBoardColor || '#f59e0b'">
+          <mat-icon>dashboard_customize</mat-icon>
+        </div>
+        <div>
+          <h2>Novo Mural</h2>
+          <p>Crie um novo espaço de notas, avisos e ideias.</p>
+        </div>
+      </div>
+      <button class="close-btn" (click)="fecharNovoMuralModal()"><mat-icon>close</mat-icon></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-card">
+        <div class="card-section-header"><mat-icon class="color-amber">space_dashboard</mat-icon><h3>Dados do Mural</h3></div>
+        <div class="form-grid">
+          <div class="form-field">
+            <label>Nome do Mural <span class="required">*</span></label>
+            <input type="text" [(ngModel)]="newBoardName" placeholder="Ex: Projetos Pessoais, Planejamento..." autofocus />
+          </div>
+          <div class="form-field">
+            <label>Descrição</label>
+            <textarea [(ngModel)]="newBoardDescription" rows="2" class="custom-textarea" placeholder="Descrição opcional..."></textarea>
+          </div>
+          <div class="form-field">
+            <label>Cor do Mural</label>
+            <div class="color-presets-row">
+              <button type="button" *ngFor="let c of colorPresets" class="color-swatch-btn" [style.background]="c.value" [class.selected]="newBoardColor === c.value" [matTooltip]="c.label" (click)="newBoardColor = c.value">
+                <mat-icon *ngIf="newBoardColor === c.value">check</mat-icon>
+              </button>
+              <input type="color" [(ngModel)]="newBoardColor" class="color-input-custom" matTooltip="Cor personalizada" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="cancel-btn" (click)="fecharNovoMuralModal()">Cancelar</button>
+      <button class="primary-btn" (click)="salvarNovoMural()" [disabled]="loadingCriarMural || !newBoardName.trim()">
+        <mat-progress-spinner *ngIf="loadingCriarMural" mode="indeterminate" diameter="16" class="button-spinner"></mat-progress-spinner>
+        <mat-icon *ngIf="!loadingCriarMural">save</mat-icon>
+        <span>{{ loadingCriarMural ? 'Criando...' : 'Criar Mural' }}</span>
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════════ MODAL CONFIGURAR MURAL ══════════════ -->
 <div class="modal-overlay" *ngIf="boardModalOpen()" (mousedown)="fecharBoardModal()">
   <div class="modal-card modal-sm" (mousedown)="$event.stopPropagation()">
     <div class="modal-header">
       <div class="header-main">
-        <div class="header-badge edit-mode"><mat-icon>space_dashboard</mat-icon></div>
-        <div><h2>Configurar Mural</h2><p>Altere o nome, descrição e cor do mural.</p></div>
+        <div class="header-badge edit-mode" [style.background]="boardColor || '#f59e0b'"><mat-icon>space_dashboard</mat-icon></div>
+        <div><h2>Configurar Mural</h2><p>Altere o nome, descrição, cor ou exclua o mural.</p></div>
       </div>
       <button class="close-btn" (click)="fecharBoardModal()"><mat-icon>close</mat-icon></button>
     </div>
@@ -329,22 +436,50 @@
         <div class="form-grid">
           <div class="form-field">
             <label>Nome <span class="required">*</span></label>
-            <input type="text" [(ngModel)]="boardName" placeholder="Ex: Mural de Avisos do Time" />
+            <input type="text" [(ngModel)]="boardName" placeholder="Ex: Mural de Avisos" />
           </div>
           <div class="form-field">
             <label>Descrição</label>
             <textarea [(ngModel)]="boardDescription" rows="3" class="custom-textarea" placeholder="Descrição opcional..."></textarea>
           </div>
+          <div class="form-field">
+            <label>Cor de Destaque</label>
+            <div class="color-presets-row">
+              <button type="button" *ngFor="let c of colorPresets" class="color-swatch-btn" [style.background]="c.value" [class.selected]="boardColor === c.value" [matTooltip]="c.label" (click)="boardColor = c.value">
+                <mat-icon *ngIf="boardColor === c.value">check</mat-icon>
+              </button>
+              <input type="color" [(ngModel)]="boardColor" class="color-input-custom" matTooltip="Cor personalizada" />
+            </div>
+          </div>
         </div>
       </div>
     </div>
     <div class="modal-footer">
-      <button class="cancel-btn" (click)="fecharBoardModal()">Cancelar</button>
-      <button class="primary-btn" (click)="salvarMural()" [disabled]="loadingSalvarMural || !boardName.trim()">
-        <mat-progress-spinner *ngIf="loadingSalvarMural" mode="indeterminate" diameter="16" class="button-spinner"></mat-progress-spinner>
-        <mat-icon *ngIf="!loadingSalvarMural">save</mat-icon>
-        <span>{{ loadingSalvarMural ? 'Salvando...' : 'Salvar' }}</span>
-      </button>
+      <ng-container *ngIf="!confirmDeleteBoard()">
+        <button *ngIf="activeBoard()?.myRole === 'admin'" class="delete-btn" (click)="solicitarExclusaoMural()" [disabled]="loadingExcluirMural">
+          <mat-icon>delete_outline</mat-icon><span>Excluir Mural</span>
+        </button>
+        <button class="cancel-btn" (click)="fecharBoardModal()">Cancelar</button>
+        <button class="primary-btn" (click)="salvarMural()" [disabled]="loadingSalvarMural || !boardName.trim()">
+          <mat-progress-spinner *ngIf="loadingSalvarMural" mode="indeterminate" diameter="16" class="button-spinner"></mat-progress-spinner>
+          <mat-icon *ngIf="!loadingSalvarMural">save</mat-icon>
+          <span>{{ loadingSalvarMural ? 'Salvando...' : 'Salvar Alterações' }}</span>
+        </button>
+      </ng-container>
+
+      <div class="delete-confirm-box" *ngIf="confirmDeleteBoard()">
+        <div class="confirm-text">
+          <mat-icon class="warn-icon">warning</mat-icon>
+          <span>Excluir este mural e todas as suas notas? Esta ação não poderá ser desfeita.</span>
+        </div>
+        <div class="confirm-actions">
+          <button class="cancel-btn" (click)="cancelarExclusaoMural()">Voltar</button>
+          <button class="danger-btn" (click)="confirmarExclusaoMural()" [disabled]="loadingExcluirMural">
+            <mat-progress-spinner *ngIf="loadingExcluirMural" mode="indeterminate" diameter="16" class="button-spinner"></mat-progress-spinner>
+            <span>Confirmar Exclusão</span>
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -434,9 +569,22 @@
             <strong>{{ memberName(member.user_id) }}</strong>
             <span>{{ member.role === 'admin' ? 'Administrador' : 'Membro' }}</span>
           </div>
-          <button *ngIf="team.myRole === 'admin' && member.role !== 'admin'" class="danger-icon" (click)="removeMember(member.id)" matTooltip="Remover do time">
-            <mat-icon>person_remove</mat-icon>
-          </button>
+          <span *ngIf="isTeamOwner(member.user_id)" class="owner-badge" matTooltip="Criador do time">
+            <mat-icon>shield</mat-icon>
+          </span>
+          <ng-container *ngIf="team.myRole === 'admin' && !isTeamOwner(member.user_id)">
+            <button *ngIf="member.role !== 'admin'" class="icon-btn promote-btn"
+              (click)="changeMemberRole(member.id, 'admin')" matTooltip="Promover a administrador">
+              <mat-icon>manage_accounts</mat-icon>
+            </button>
+            <button *ngIf="member.role === 'admin'" class="icon-btn"
+              (click)="changeMemberRole(member.id, 'member')" matTooltip="Rebaixar a membro">
+              <mat-icon>person_outline</mat-icon>
+            </button>
+            <button *ngIf="team.myRole === 'admin'" class="danger-icon" (click)="removeMember(member.id)" matTooltip="Remover do time">
+              <mat-icon>person_remove</mat-icon>
+            </button>
+          </ng-container>
         </div>
       </div>
 

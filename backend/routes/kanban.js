@@ -459,7 +459,9 @@ router.delete('/teams/:teamId/members/:memberId', asyncRoute(async (req, res) =>
   const access = await teamAccess(req.params.teamId, userId(req), true);
   if (!access) return res.status(403).json({ error: 'Somente o administrador pode remover pessoas' });
   const member = await db.get('SELECT * FROM kanban_team_members WHERE id = $1 AND team_id = $2', [req.params.memberId, access.team.id]);
-  if (!member || member.role === 'admin') return res.status(400).json({ error: 'Administrador não pode ser removido' });
+  if (!member) return res.status(404).json({ error: 'Membro não encontrado' });
+  // Impede remoção do dono original do time
+  if (member.user_id === access.team.owner_id) return res.status(400).json({ error: 'O criador do time não pode ser removido' });
   const calendar = await ensureTeamCalendar(access.team.id, req.broadcast);
   await db.transaction(async tx => {
     await tx.run('DELETE FROM kanban_team_members WHERE id = $1', [member.id]);
@@ -475,6 +477,21 @@ router.delete('/teams/:teamId/members/:memberId', asyncRoute(async (req, res) =>
   req.broadcast({ type: 'kanban_team_updated', teamId: access.team.id, userId: member.user_id });
   if (calendar) req.broadcast({ type: 'member_removed', calendarId: calendar.id, userId: member.user_id });
   res.json({ success: true });
+}));
+
+// Alterar role de um membro (promover/rebaixar)
+router.put('/teams/:teamId/members/:memberId/role', asyncRoute(async (req, res) => {
+  const access = await teamAccess(req.params.teamId, userId(req), true);
+  if (!access) return res.status(403).json({ error: 'Somente o administrador pode alterar roles' });
+  const role = String(req.body.role || '');
+  if (!['admin', 'member'].includes(role)) return res.status(400).json({ error: 'Role inválido. Use admin ou member' });
+  const member = await db.get('SELECT * FROM kanban_team_members WHERE id = $1 AND team_id = $2', [req.params.memberId, access.team.id]);
+  if (!member) return res.status(404).json({ error: 'Membro não encontrado' });
+  // Impede rebaixar o dono original
+  if (member.user_id === access.team.owner_id && role !== 'admin') return res.status(400).json({ error: 'O criador do time deve manter o role de admin' });
+  await db.run('UPDATE kanban_team_members SET role = $1 WHERE id = $2', [role, member.id]);
+  req.broadcast({ type: 'kanban_team_updated', teamId: access.team.id });
+  res.json({ success: true, role });
 }));
 
 router.get('/team-invitations', asyncRoute(async (req, res) => {

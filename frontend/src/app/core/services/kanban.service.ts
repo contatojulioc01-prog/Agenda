@@ -115,6 +115,12 @@ export class KanbanService {
       .subscribe(result => { if (result) { this.loadTeamMembers(teamId); this.loadTeams(); } });
   }
 
+  changeTeamMemberRole(teamId: string, memberId: string, role: 'admin' | 'member'): void {
+    this.http.put(`/api/kanban/teams/${teamId}/members/${memberId}/role`, { role }, { headers: this.headers })
+      .pipe(catchError(err => { this.error.set(err.error?.error || 'Erro ao alterar papel do membro.'); return of(null); }))
+      .subscribe(result => { if (result) this.loadTeamMembers(teamId); });
+  }
+
   loadTeamInvitations(): void {
     if (this.headers['x-user-id'] === 'anonymous') return;
     this.http.get<KanbanTeamInvitation[]>('/api/kanban/team-invitations', { headers: this.headers })

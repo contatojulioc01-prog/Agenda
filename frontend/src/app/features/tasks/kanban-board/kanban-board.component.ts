@@ -17,6 +17,28 @@ import { AiTextButtonComponent } from '../../../shared/components/ai-text-button
 import { MarkdownTextComponent } from '../../../shared/components/markdown-text/markdown-text.component';
 import { MarkdownEditorComponent } from '../../../shared/components/markdown-editor/markdown-editor.component';
 
+export type ColumnFieldType = 'text' | 'date' | 'number' | 'select' | 'checkbox' | 'person' | 'system';
+
+export interface TableColumnDef {
+  id: string;
+  label: string;
+  icon: string;
+  visible: boolean;
+  type?: ColumnFieldType;
+  options?: string[];
+  isCustom?: boolean;
+}
+
+export const DEFAULT_TABLE_COLUMNS: TableColumnDef[] = [
+  { id: 'subject', label: 'Assunto', icon: 'title', visible: true, type: 'system' },
+  { id: 'status', label: 'Status', icon: 'donut_large', visible: true, type: 'system' },
+  { id: 'priority', label: 'Prioridade', icon: 'flag', visible: true, type: 'system' },
+  { id: 'assignee', label: 'Responsável', icon: 'person', visible: true, type: 'system' },
+  { id: 'date', label: 'Prazo', icon: 'event', visible: true, type: 'system' },
+  { id: 'demand', label: 'Demanda', icon: 'notes', visible: true, type: 'system' },
+  { id: 'labels', label: 'Etiquetas', icon: 'sell', visible: true, type: 'system' },
+];
+
 @Component({
   selector: 'app-kanban-board',
   standalone: true,
@@ -61,13 +83,83 @@ export class KanbanBoardComponent implements OnDestroy {
   readonly priorityFilter = signal<TaskPriority | 'all'>('all');
   readonly assigneeFilter = signal('all');
   readonly showArchived = signal(false);
-  readonly viewMode = signal<'kanban' | 'list'>((typeof localStorage !== 'undefined' && localStorage.getItem('dc_kanban_view_mode') as 'kanban' | 'list') || 'kanban');
+  readonly activeTab = signal<'month_tasks' | 'month_completed' | 'week_tasks' | 'kanban'>((typeof localStorage !== 'undefined' && localStorage.getItem('dc_kanban_active_tab') as any) || 'month_tasks');
+  readonly viewMode = signal<'kanban' | 'list'>('list');
   readonly sortOption = signal<'default' | 'dueDate' | 'priority' | 'title' | 'status'>('default');
   readonly sortDirection = signal<'asc' | 'desc'>('asc');
   readonly showSortMenu = signal(false);
+  readonly showColumnManager = signal(false);
+  readonly tableColumns = signal<TableColumnDef[]>(this.loadInitialTableColumns());
+  readonly customColumns = computed(() => this.tableColumns().filter(c => c.isCustom));
+  readonly activeCustomColumns = computed(() => this.tableColumns().filter(c => c.isCustom && c.visible));
+  readonly visibleColumnsCount = computed(() => this.tableColumns().filter(c => c.visible).length);
+  readonly inlineEditingCell = signal<{ taskId: string; field: string } | null>(null);
+  inlineEditValue = '';
   readonly isFullscreen = signal(false);
   readonly modalOpen = signal(false);
   readonly editingId = signal<string | null>(null);
+
+  // Column Resizing & Persistence in LocalStorage
+  readonly resizingColumnId = signal<string | null>(null);
+  readonly columnWidths = signal<Record<string, number>>(this.loadInitialColumnWidths());
+  readonly kanbanColumnWidths = signal<Record<string, number>>(this.loadInitialKanbanColumnWidths());
+  private resizeMoveListener: ((e: MouseEvent) => void) | null = null;
+  private resizeUpListener: ((e: MouseEvent) => void) | null = null;
+
+  private readonly defaultTableWidths: Record<string, number> = {
+    subject: 260,
+    status: 140,
+    priority: 115,
+    assignee: 135,
+    date: 115,
+    demand: 220,
+    labels: 160,
+  };
+  private readonly defaultKanbanColumnWidth = 304;
+
+  // Dynamic Custom Columns Management
+  newCustomColumnLabel = '';
+  newCustomColumnType: ColumnFieldType = 'text';
+  newCustomColumnOptions = '';
+  readonly showAddColumnPopover = signal(false);
+
+  // Modal Custom Properties state
+  draftCustomFields: Record<string, any> = {};
+  readonly showAddPropertyInModal = signal(false);
+  newPropertyLabelInModal = '';
+  newPropertyTypeInModal: ColumnFieldType = 'text';
+  newPropertyOptionsInModal = '';
+
+  draftSector = '';
+  draftMacroTheme = '';
+  draftExecutionDate = '';
+  draftOrder = '';
+  draftNetworkPath = '';
+
+  readonly predefinedSectors = [
+    'Gráfico - P&D',
+    'Compras / Impressão',
+    'PCP / Produção',
+    'Gráfico - Arte final',
+    'Social Media - Gráfica',
+    'Licenças / Royalties',
+    'Comercial',
+    'Financeiro',
+    'Diretoria'
+  ];
+
+  readonly predefinedMacroThemes = [
+    'Compras',
+    'Galeroca',
+    'PCP',
+    'Enlace Rei Leão Massinha',
+    'Enlace Rei Leão Slime Crunch',
+    'Enlace Rei Leão Slime Metalizado',
+    'Gelelé Venom',
+    'Maria Clara & JP',
+    'Gelelê',
+    'Geral'
+  ];
   readonly addingColumn = signal(false);
   readonly addingBoard = signal(false);
   readonly teamModalOpen = signal(false);
@@ -209,8 +301,11 @@ export class KanbanBoardComponent implements OnDestroy {
 
   ngOnDestroy(): void {
     this.closeAttachmentPreview();
+    this.cleanupResizeListeners();
     if (typeof document !== 'undefined') {
       document.body.classList.remove('kanban-fullscreen-active');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
     }
   }
 
@@ -235,8 +330,51 @@ export class KanbanBoardComponent implements OnDestroy {
     });
   });
 
+  readonly tabFilteredTasks = computed(() => {
+    const tasks = this.visibleTasks();
+    const tab = this.activeTab();
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+
+    if (tab === 'month_completed') {
+      return tasks.filter(t => {
+        const title = this.getColumnTitle(t.columnId).toLowerCase();
+        return title.includes('finaliz') || title.includes('conclu') || title.includes('done');
+      });
+    }
+
+    if (tab === 'week_tasks') {
+      const day = now.getDay();
+      const diffToMonday = (day === 0 ? -6 : 1) - day;
+      const monday = new Date(now);
+      monday.setDate(now.getDate() + diffToMonday);
+      monday.setHours(0, 0, 0, 0);
+
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      sunday.setHours(23, 59, 59, 999);
+
+      return tasks.filter(t => {
+        if (!t.dueDate) return true;
+        const d = new Date(t.dueDate.includes('T') ? t.dueDate : `${t.dueDate}T12:00:00`);
+        return d >= monday && d <= sunday;
+      });
+    }
+
+    if (tab === 'month_tasks') {
+      return tasks.filter(t => {
+        if (!t.dueDate) return true;
+        const d = new Date(t.dueDate.includes('T') ? t.dueDate : `${t.dueDate}T12:00:00`);
+        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+      });
+    }
+
+    return tasks;
+  });
+
   readonly sortedVisibleTasks = computed(() => {
-    const tasks = [...this.visibleTasks()];
+    const tasks = [...this.tabFilteredTasks()];
     const option = this.sortOption();
     const dir = this.sortDirection() === 'asc' ? 1 : -1;
     const board = this.board();
@@ -364,13 +502,26 @@ export class KanbanBoardComponent implements OnDestroy {
     if (!first) return false;
     this.editingId.set(null);
     this.draft = this.emptyDraft(first, this.currentParentId());
+    this.draftSector = this.board()?.teamName || this.currentTeam()?.name || '';
+    this.draftMacroTheme = this.board()?.name || '';
+    this.draftExecutionDate = '';
+    this.draftOrder = '';
+    this.draftNetworkPath = '';
     this.labelText = '';
+    
+    // Initialize custom fields
+    this.draftCustomFields = {};
+    for (const col of this.customColumns()) {
+      this.draftCustomFields[col.id] = col.type === 'checkbox' ? false : '';
+    }
+
     this.checklistText = '';
     this.checklistGroupTitle = '';
     this.activeChecklistGroup = undefined;
     this.customChecklistGroups = [];
     this.sectionItemDrafts = {};
     this.showAddSectionForm = false;
+    this.showAddPropertyInModal.set(false);
     this.pendingFiles = [];
     this.attachmentError = '';
     this.modalOpen.set(true);
@@ -394,7 +545,22 @@ export class KanbanBoardComponent implements OnDestroy {
       dueDate: task.dueDate, labels: [...task.labels], assigneeIds: [...task.assigneeIds],
       checklist: task.checklist.map(item => ({ ...item })), parentTaskId: task.parentTaskId,
     };
-    this.labelText = task.labels.join(', ');
+    this.draftSector = this.getSectorText(task);
+    this.draftMacroTheme = this.getMacroTheme(task, false);
+    this.draftExecutionDate = this.getExecutionDateRaw(task);
+    this.draftOrder = this.getOrderText(task);
+    this.draftNetworkPath = this.getNetworkPath(task);
+    
+    // Extract custom properties into draftCustomFields
+    this.draftCustomFields = {};
+    for (const col of this.customColumns()) {
+      this.draftCustomFields[col.id] = this.getCustomFieldValue(task, col);
+    }
+
+    // Filter out structured tags from labelText for clean display in tags field
+    const freeLabels = task.labels.filter(l => !l.startsWith('cx_') && !/^(setor|macro|exec|ped|pedido|rede):/i.test(l));
+    this.labelText = freeLabels.join(', ');
+
     this.checklistText = '';
     this.checklistGroupTitle = '';
     this.activeChecklistGroup = undefined;
@@ -405,6 +571,7 @@ export class KanbanBoardComponent implements OnDestroy {
     this.customChecklistGroups = Array.from(existingGroups);
     this.sectionItemDrafts = {};
     this.showAddSectionForm = false;
+    this.showAddPropertyInModal.set(false);
     this.pendingFiles = [];
     this.attachmentError = '';
     this.modalOpen.set(true);
@@ -415,7 +582,32 @@ export class KanbanBoardComponent implements OnDestroy {
     const board = this.board();
     if (!title || !board) return;
     this.draft.title = title;
-    this.draft.labels = this.labelText.split(',').map(value => value.trim()).filter(Boolean).slice(0, 8);
+    
+    const manualLabels = this.labelText
+      .split(',')
+      .map(value => value.trim())
+      .filter(value => Boolean(value) && !value.startsWith('cx_') && !/^(setor|macro|exec|ped|pedido|rede):/i.test(value));
+    
+    const finalLabels: string[] = [...manualLabels];
+
+    // Collect custom properties
+    for (const col of this.customColumns()) {
+      const val = this.draftCustomFields[col.id];
+      if (col.type === 'checkbox') {
+        if (val) finalLabels.push(`cx_${col.id}:true`);
+      } else if (val !== undefined && val !== null && String(val).trim() !== '') {
+        finalLabels.push(`cx_${col.id}:${String(val).trim()}`);
+      }
+    }
+
+    // Retain legacy tags if fields are filled
+    if (this.draftSector) finalLabels.push(`setor:${this.draftSector}`);
+    if (this.draftMacroTheme) finalLabels.push(`macro:${this.draftMacroTheme}`);
+    if (this.draftExecutionDate) finalLabels.push(`exec:${this.draftExecutionDate}`);
+    if (this.draftOrder) finalLabels.push(`ped:${this.draftOrder}`);
+    if (this.draftNetworkPath) finalLabels.push(`rede:${this.draftNetworkPath}`);
+
+    this.draft.labels = finalLabels.slice(0, 30);
     const editing = this.editingId();
     this.savingTask.set(true);
     const completed = (task: KanbanTask | null) => {
@@ -879,6 +1071,16 @@ export class KanbanBoardComponent implements OnDestroy {
     this.memberRemovalTarget.set(null);
   }
 
+  changeMemberRole(memberId: string, role: 'admin' | 'member'): void {
+    const team = this.currentTeam();
+    if (!team) return;
+    this.service.changeTeamMemberRole(team.id, memberId, role);
+  }
+
+  isTeamOwner(userId: string): boolean {
+    return this.currentTeam()?.owner_id === userId;
+  }
+
   removeTeam(): void {
     const team = this.currentTeam();
     if (team?.myRole === 'admin') this.requestTeamDeletion(team);
@@ -1077,6 +1279,498 @@ export class KanbanBoardComponent implements OnDestroy {
     this.showSortMenu.set(false);
   }
 
+  private loadInitialColumnWidths(): Record<string, number> {
+    const defaults = { ...this.defaultTableWidths };
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('dc_table_column_widths');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          return { ...defaults, ...parsed };
+        }
+      } catch {}
+    }
+    return defaults;
+  }
+
+  private loadInitialKanbanColumnWidths(): Record<string, number> {
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('dc_kanban_column_widths');
+        if (saved) {
+          return JSON.parse(saved);
+        }
+      } catch {}
+    }
+    return {};
+  }
+
+  getColumnWidth(colId: string): number {
+    return this.columnWidths()[colId] || this.defaultTableWidths[colId] || 150;
+  }
+
+  getKanbanColumnWidth(colId: string): number {
+    return this.kanbanColumnWidths()[colId] || this.defaultKanbanColumnWidth;
+  }
+
+  onColumnResizeStart(event: MouseEvent, colId: string): void {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const startX = event.clientX;
+    const startWidth = this.getColumnWidth(colId);
+    const minWidth = colId === 'subject' || colId === 'demand' ? 100 : 70;
+
+    this.resizingColumnId.set(colId);
+    if (typeof document !== 'undefined') {
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    }
+
+    this.cleanupResizeListeners();
+
+    this.resizeMoveListener = (e: MouseEvent) => {
+      const diff = e.clientX - startX;
+      const newWidth = Math.max(minWidth, Math.min(800, Math.round(startWidth + diff)));
+      this.columnWidths.update(widths => ({ ...widths, [colId]: newWidth }));
+    };
+
+    this.resizeUpListener = () => {
+      this.resizingColumnId.set(null);
+      if (typeof document !== 'undefined') {
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      }
+      this.cleanupResizeListeners();
+      this.saveColumnWidths();
+    };
+
+    window.addEventListener('mousemove', this.resizeMoveListener);
+    window.addEventListener('mouseup', this.resizeUpListener);
+  }
+
+  resetColumnWidth(colId: string, event?: Event): void {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    const def = this.defaultTableWidths[colId] || 150;
+    this.columnWidths.update(widths => ({ ...widths, [colId]: def }));
+    this.saveColumnWidths();
+  }
+
+  private saveColumnWidths(): void {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      localStorage.setItem('dc_table_column_widths', JSON.stringify(this.columnWidths()));
+    } catch {}
+  }
+
+  onKanbanColumnResizeStart(event: MouseEvent, colId: string): void {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const startX = event.clientX;
+    const startWidth = this.getKanbanColumnWidth(colId);
+    const minWidth = 220;
+    const maxWidth = 700;
+
+    this.resizingColumnId.set(`kanban_${colId}`);
+    if (typeof document !== 'undefined') {
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    }
+
+    this.cleanupResizeListeners();
+
+    this.resizeMoveListener = (e: MouseEvent) => {
+      const diff = e.clientX - startX;
+      const newWidth = Math.max(minWidth, Math.min(maxWidth, Math.round(startWidth + diff)));
+      this.kanbanColumnWidths.update(widths => ({ ...widths, [colId]: newWidth }));
+    };
+
+    this.resizeUpListener = () => {
+      this.resizingColumnId.set(null);
+      if (typeof document !== 'undefined') {
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      }
+      this.cleanupResizeListeners();
+      this.saveKanbanColumnWidths();
+    };
+
+    window.addEventListener('mousemove', this.resizeMoveListener);
+    window.addEventListener('mouseup', this.resizeUpListener);
+  }
+
+  resetKanbanColumnWidth(colId: string, event?: Event): void {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    this.kanbanColumnWidths.update(widths => {
+      const updated = { ...widths };
+      delete updated[colId];
+      return updated;
+    });
+    this.saveKanbanColumnWidths();
+  }
+
+  private saveKanbanColumnWidths(): void {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      localStorage.setItem('dc_kanban_column_widths', JSON.stringify(this.kanbanColumnWidths()));
+    } catch {}
+  }
+
+  private cleanupResizeListeners(): void {
+    if (this.resizeMoveListener) {
+      window.removeEventListener('mousemove', this.resizeMoveListener);
+      this.resizeMoveListener = null;
+    }
+    if (this.resizeUpListener) {
+      window.removeEventListener('mouseup', this.resizeUpListener);
+      this.resizeUpListener = null;
+    }
+  }
+
+  private loadInitialTableColumns(): TableColumnDef[] {
+    let customCols: TableColumnDef[] = [];
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const savedCustom = localStorage.getItem('dc_table_custom_columns');
+        if (savedCustom) {
+          customCols = JSON.parse(savedCustom);
+        }
+      } catch {
+        customCols = [];
+      }
+    }
+
+    const allBase = [...DEFAULT_TABLE_COLUMNS, ...customCols];
+
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const savedVis = localStorage.getItem('dc_table_visible_columns');
+        if (savedVis) {
+          const parsedVis = JSON.parse(savedVis) as Record<string, boolean>;
+          return allBase.map(col => ({
+            ...col,
+            visible: parsedVis[col.id] !== undefined ? parsedVis[col.id] : col.visible,
+          }));
+        }
+      } catch {}
+    }
+    return allBase;
+  }
+
+  saveTableColumnsState(): void {
+    if (typeof localStorage === 'undefined') return;
+    const current = this.tableColumns();
+    const custom = current.filter(c => c.isCustom);
+    localStorage.setItem('dc_table_custom_columns', JSON.stringify(custom));
+    const visMap: Record<string, boolean> = {};
+    current.forEach(c => (visMap[c.id] = c.visible));
+    localStorage.setItem('dc_table_visible_columns', JSON.stringify(visMap));
+  }
+
+  addCustomColumn(label?: string, type?: ColumnFieldType, optionsStr?: string): void {
+    const colLabel = (label || this.newCustomColumnLabel).trim();
+    if (!colLabel) return;
+    const colType = type || this.newCustomColumnType || 'text';
+    const id = 'col_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 6);
+    
+    let icon = 'text_fields';
+    if (colType === 'date') icon = 'calendar_today';
+    else if (colType === 'number') icon = 'tag';
+    else if (colType === 'select') icon = 'list';
+    else if (colType === 'checkbox') icon = 'check_box';
+    else if (colType === 'person') icon = 'person';
+
+    const options = (optionsStr !== undefined ? optionsStr : this.newCustomColumnOptions)
+      ? (optionsStr !== undefined ? optionsStr : this.newCustomColumnOptions).split(',').map(o => o.trim()).filter(Boolean)
+      : undefined;
+
+    const newCol: TableColumnDef = {
+      id,
+      label: colLabel,
+      icon,
+      visible: true,
+      type: colType,
+      options,
+      isCustom: true,
+    };
+
+    const updated = [...this.tableColumns(), newCol];
+    this.tableColumns.set(updated);
+    this.saveTableColumnsState();
+
+    this.newCustomColumnLabel = '';
+    this.newCustomColumnType = 'text';
+    this.newCustomColumnOptions = '';
+    this.showAddColumnPopover.set(false);
+  }
+
+  addPropertyInModal(): void {
+    const label = this.newPropertyLabelInModal.trim();
+    if (!label) return;
+    this.addCustomColumn(label, this.newPropertyTypeInModal, this.newPropertyOptionsInModal);
+    this.newPropertyLabelInModal = '';
+    this.newPropertyTypeInModal = 'text';
+    this.newPropertyOptionsInModal = '';
+    this.showAddPropertyInModal.set(false);
+  }
+
+  isCustomColumn(col: TableColumnDef): boolean {
+    return !!col.isCustom || col.id.startsWith('col_') || !DEFAULT_TABLE_COLUMNS.some(d => d.id === col.id);
+  }
+
+  removeCustomColumn(colId: string, event?: Event): void {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    const target = this.tableColumns().find(c => c.id === colId);
+    if (!target) return;
+
+    // Remove from tableColumns
+    const updated = this.tableColumns().filter(c => c.id !== colId);
+    this.tableColumns.set(updated);
+    this.saveTableColumnsState();
+
+    // Clean up columnWidths from localStorage
+    this.columnWidths.update(widths => {
+      const next = { ...widths };
+      delete next[colId];
+      return next;
+    });
+    this.saveColumnWidths();
+
+    // Clean up task custom labels if any
+    const board = this.board();
+    if (board) {
+      const prefix = `cx_${colId}:`;
+      const simplePrefix = `${colId}:`;
+      const updatedTasks = board.tasks.map(t => {
+        if (!t.labels || !t.labels.some(l => l.startsWith(prefix) || l.startsWith(simplePrefix))) {
+          return t;
+        }
+        return {
+          ...t,
+          labels: t.labels.filter(l => !l.startsWith(prefix) && !l.startsWith(simplePrefix)),
+        };
+      });
+      this.service.activeBoard.set({ ...board, tasks: updatedTasks });
+    }
+  }
+
+  isColumnVisible(colId: string): boolean {
+    const col = this.tableColumns().find(c => c.id === colId);
+    return col ? col.visible : true;
+  }
+
+  toggleColumnVisibility(colId: string, event?: Event): void {
+    if (event) event.stopPropagation();
+    const current = this.tableColumns();
+    const target = current.find(c => c.id === colId);
+    if (!target) return;
+
+    if (target.visible && this.visibleColumnsCount() <= 1) {
+      return;
+    }
+
+    const updated = current.map(col => {
+      if (col.id === colId) {
+        return { ...col, visible: !col.visible };
+      }
+      return col;
+    });
+
+    this.tableColumns.set(updated);
+    this.saveTableColumnsState();
+  }
+
+  setAllColumnsVisibility(visible: boolean, event?: Event): void {
+    if (event) event.stopPropagation();
+    const updated = this.tableColumns().map(col => ({
+      ...col,
+      visible: !visible && col.id === 'subject' ? true : visible,
+    }));
+    this.tableColumns.set(updated);
+    this.saveTableColumnsState();
+  }
+
+  toggleColumnManager(event?: Event): void {
+    if (event) event.stopPropagation();
+    this.showColumnManager.update(v => !v);
+    if (this.showColumnManager()) {
+      this.showSortMenu.set(false);
+    }
+  }
+
+  getCustomFieldValue(task: KanbanTask, col: TableColumnDef): any {
+    if (!task || !task.labels) return col.type === 'checkbox' ? false : '';
+    const prefix = `cx_${col.id}:`;
+    const labelMatch = task.labels.find(l => l.startsWith(prefix));
+    if (labelMatch) {
+      const val = labelMatch.substring(prefix.length);
+      if (col.type === 'checkbox') return val === 'true';
+      return val;
+    }
+    const simpleMatch = task.labels.find(l => l.startsWith(`${col.id}:`));
+    if (simpleMatch) {
+      const val = simpleMatch.substring(col.id.length + 1);
+      if (col.type === 'checkbox') return val === 'true';
+      return val;
+    }
+    if (col.type === 'checkbox') return false;
+    return '';
+  }
+
+  updateCustomField(task: KanbanTask, col: TableColumnDef, value: any, event?: Event): void {
+    if (event) event.stopPropagation();
+    const board = this.board();
+    if (!board) return;
+
+    const prefix = `cx_${col.id}:`;
+    const simplePrefix = `${col.id}:`;
+    const cleanLabels = (task.labels || []).filter(l => !l.startsWith(prefix) && !l.startsWith(simplePrefix));
+
+    const stringVal = col.type === 'checkbox'
+      ? (value ? 'true' : 'false')
+      : (typeof value === 'string' ? value.trim() : (value !== null && value !== undefined ? String(value) : ''));
+
+    if (stringVal && stringVal !== 'false') {
+      cleanLabels.push(`${prefix}${stringVal}`);
+    }
+
+    this.service.updateTask(task.id, { labels: cleanLabels.slice(0, 30) });
+  }
+
+  toggleCustomCheckbox(task: KanbanTask, col: TableColumnDef, event?: Event): void {
+    if (event) event.stopPropagation();
+    const current = !!this.getCustomFieldValue(task, col);
+    this.updateCustomField(task, col, !current);
+  }
+
+  startInlineEdit(task: KanbanTask, field: string, event?: Event): void {
+    if (event) event.stopPropagation();
+    let initial = '';
+    if (field === 'title') initial = task.title;
+    else if (field === 'demand') initial = task.description || '';
+    else if (field === 'labels') initial = this.getTaskFreeLabels(task).join(', ');
+    else if (field === 'ped') initial = this.getOrderText(task);
+    else if (field === 'rede') initial = this.getNetworkPath(task);
+    else if (field === 'exec') initial = this.getExecutionDateRaw(task);
+    else if (field === 'dueDate') initial = task.dueDate ? task.dueDate.split('T')[0] : '';
+    else if (field.startsWith('col_')) {
+      const col = this.customColumns().find(c => c.id === field);
+      if (col) initial = String(this.getCustomFieldValue(task, col) || '');
+    }
+
+    this.inlineEditValue = initial;
+    this.inlineEditingCell.set({ taskId: task.id, field });
+  }
+
+  cancelInlineEdit(event?: Event): void {
+    if (event) event.stopPropagation();
+    this.inlineEditingCell.set(null);
+  }
+
+  saveInlineEdit(task: KanbanTask, field: string, event?: Event): void {
+    if (event) event.stopPropagation();
+    if (field.startsWith('col_')) {
+      const col = this.customColumns().find(c => c.id === field);
+      if (col) this.updateCustomField(task, col, this.inlineEditValue);
+    } else {
+      this.updateTaskField(task, field, this.inlineEditValue);
+    }
+    this.inlineEditingCell.set(null);
+  }
+
+  updateTaskField(task: KanbanTask, field: string, value: any, event?: Event): void {
+    if (event) event.stopPropagation();
+    const board = this.board();
+    if (!board) return;
+
+    if (field === 'dueDate') {
+      const dateVal = value ? value : null;
+      this.service.updateTask(task.id, { dueDate: dateVal });
+      return;
+    }
+
+    if (field === 'title') {
+      const titleVal = (value || '').trim();
+      if (titleVal && titleVal !== task.title) {
+        this.service.updateTask(task.id, { title: titleVal });
+      }
+      return;
+    }
+
+    if (field === 'demand' || field === 'description') {
+      this.service.updateTask(task.id, { description: value || '' });
+      return;
+    }
+
+    if (field === 'labels') {
+      const freeParts = typeof value === 'string'
+        ? value.split(',').map(s => s.trim()).filter(Boolean)
+        : [];
+      const nonFree = (task.labels || []).filter(l => l.startsWith('cx_') || /^(setor|macro|exec|ped|pedido|rede):/i.test(l));
+      this.service.updateTask(task.id, { labels: [...freeParts, ...nonFree].slice(0, 30) });
+      return;
+    }
+
+    if (field === 'assignee') {
+      const userId = value;
+      let newAssignees: string[] = [];
+      if (userId === 'none' || !userId) {
+        newAssignees = [];
+      } else {
+        newAssignees = [userId];
+      }
+      this.service.updateTask(task.id, { assigneeIds: newAssignees });
+      return;
+    }
+
+    // Label-based fields: setor, macro, exec, ped, rede
+    const cleanLabels = (task.labels || []).filter(l => {
+      if (field === 'setor') return !/^setor:/i.test(l) && !this.predefinedSectors.some(s => s.toLowerCase() === l.toLowerCase().replace(/^#/, ''));
+      if (field === 'macro') return !/^macro:/i.test(l) && !this.predefinedMacroThemes.some(m => m.toLowerCase() === l.toLowerCase().replace(/^#/, ''));
+      if (field === 'exec') return !/^exec:/i.test(l);
+      if (field === 'ped') return !/^(ped|pedido|ped-|ord-|#ped):?/i.test(l);
+      if (field === 'rede') return !/^rede:/i.test(l);
+      return true;
+    });
+
+    const val = typeof value === 'string' ? value.trim() : '';
+    if (val) {
+      cleanLabels.push(`${field}:${val}`);
+    }
+
+    this.service.updateTask(task.id, { labels: cleanLabels.slice(0, 30) });
+  }
+
+  getPriorityLabel(priority?: TaskPriority | string): string {
+    switch (priority) {
+      case 'urgent': return 'Urgente';
+      case 'high': return 'Alta';
+      case 'medium': return 'Média';
+      case 'low': return 'Baixa';
+      default: return 'Média';
+    }
+  }
+
+  getPriorityIcon(priority?: TaskPriority | string): string {
+    switch (priority) {
+      case 'urgent': return 'error_outline';
+      case 'high': return 'flag';
+      case 'medium': return 'outlined_flag';
+      case 'low': return 'arrow_downward';
+      default: return 'outlined_flag';
+    }
+  }
+
   currentSortLabel(): string {
     const map: Record<string, string> = {
       default: 'Ordenação: Padrão',
@@ -1130,6 +1824,145 @@ export class KanbanBoardComponent implements OnDestroy {
     return '—';
   }
 
+  setActiveTab(tab: 'month_tasks' | 'month_completed' | 'week_tasks' | 'kanban'): void {
+    this.activeTab.set(tab);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('dc_kanban_active_tab', tab);
+    }
+  }
+
+  getSectorText(task: KanbanTask): string {
+    const sectorLabel = task.labels?.find(l => l.toLowerCase().startsWith('setor:') || l.toLowerCase().startsWith('setor '));
+    if (sectorLabel) {
+      return sectorLabel.replace(/^setor:?\s*/i, '').trim();
+    }
+    const match = task.labels?.find(l => this.predefinedSectors.some(s => s.toLowerCase() === l.toLowerCase().replace(/^#/, '')));
+    if (match) return match.replace(/^#/, '');
+
+    const board = this.board();
+    if (board?.teamName) return board.teamName;
+    const currentTeam = this.currentTeam();
+    if (currentTeam?.name) return currentTeam.name;
+    return 'Gráfico - P&D';
+  }
+
+  getSectorTheme(sector: string): { color: string; bg: string; border: string } {
+    const s = (sector || '').toLowerCase();
+    if (s.includes('gráfico') || s.includes('grafico') || s.includes('p&d') || s.includes('arte final')) {
+      return { color: '#fbbf24', bg: 'rgba(245, 158, 11, 0.18)', border: 'rgba(245, 158, 11, 0.35)' };
+    }
+    if (s.includes('compra') || s.includes('impress')) {
+      return { color: '#d6d3d1', bg: 'rgba(120, 113, 108, 0.25)', border: 'rgba(120, 113, 108, 0.4)' };
+    }
+    if (s.includes('pcp') || s.includes('produç') || s.includes('produc')) {
+      return { color: '#cbd5e1', bg: 'rgba(100, 116, 139, 0.25)', border: 'rgba(100, 116, 139, 0.4)' };
+    }
+    if (s.includes('social') || s.includes('mídia') || s.includes('midia')) {
+      return { color: '#e879f9', bg: 'rgba(217, 70, 239, 0.18)', border: 'rgba(217, 70, 239, 0.35)' };
+    }
+    if (s.includes('licen') || s.includes('royal')) {
+      return { color: '#5eead4', bg: 'rgba(20, 184, 166, 0.18)', border: 'rgba(20, 184, 166, 0.35)' };
+    }
+    return { color: '#e2e8f0', bg: 'rgba(148, 163, 184, 0.18)', border: 'rgba(148, 163, 184, 0.3)' };
+  }
+
+  getMacroTheme(task: KanbanTask, withEmoji = true): string {
+    const macroLabel = task.labels?.find(l => l.toLowerCase().startsWith('macro:') || l.toLowerCase().startsWith('macro '));
+    let name = macroLabel ? macroLabel.replace(/^macro:?\s*/i, '').trim() : '';
+    if (!name) {
+      const match = task.labels?.find(l => this.predefinedMacroThemes.some(m => m.toLowerCase() === l.toLowerCase().replace(/^#/, '')));
+      if (match) name = match.replace(/^#/, '');
+    }
+    if (!name) {
+      name = this.board()?.name || 'Galeroca';
+    }
+    if (!withEmoji) return name;
+
+    const n = name.toLowerCase();
+    if (n.includes('compra')) return `🛒 ${name}`;
+    if (n.includes('galeroca')) return `⚱️ ${name}`;
+    if (n.includes('pcp')) return `🔀 ${name}`;
+    if (n.includes('reil leão') || n.includes('rei leao') || n.includes('enlace')) return `🏆 ${name}`;
+    if (n.includes('venom') || n.includes('gelelé venom') || n.includes('gelele')) return `★ ${name}`;
+    if (n.includes('maria')) return `📁 ${name}`;
+    return `📁 ${name}`;
+  }
+
+  getExecutionDate(task: KanbanTask): string {
+    const execLabel = task.labels?.find(l => l.toLowerCase().startsWith('exec:'));
+    if (execLabel) {
+      return this.formatFullDate(execLabel.replace(/^exec:\s*/i, '').trim());
+    }
+    const colTitle = this.getColumnTitle(task.columnId).toLowerCase();
+    const isCompleted = colTitle.includes('finaliz') || colTitle.includes('conclu') || colTitle.includes('done');
+    if (isCompleted && task.updatedAt) {
+      return this.formatFullDate(task.updatedAt);
+    }
+    return '';
+  }
+
+  getExecutionDateRaw(task: KanbanTask): string {
+    const execLabel = task.labels?.find(l => l.toLowerCase().startsWith('exec:'));
+    if (execLabel) return execLabel.replace(/^exec:\s*/i, '').trim();
+    return '';
+  }
+
+  getOrderText(task: KanbanTask): string {
+    const orderLabel = task.labels?.find(l => /^(ped|pedido|ped-|ord-|#ped):?/i.test(l));
+    if (orderLabel) {
+      return orderLabel.replace(/^(ped|pedido|ped-|ord-|#ped):?\s*/i, '').replace(/^#/, '');
+    }
+    return '';
+  }
+
+  getNetworkPath(task: KanbanTask): string {
+    const redeLabel = task.labels?.find(l => l.toLowerCase().startsWith('rede:'));
+    if (redeLabel) {
+      return redeLabel.replace(/^rede:\s*/i, '').trim();
+    }
+    return '';
+  }
+
+  getAssigneeBadgeStyle(assigneeName: string): { bg: string; color: string; border: string } {
+    const n = (assigneeName || '').toLowerCase();
+    if (n.includes('emily')) return { bg: 'rgba(244, 114, 182, 0.2)', color: '#f472b6', border: 'rgba(244, 114, 182, 0.4)' };
+    if (n.includes('eduardo')) return { bg: 'rgba(74, 222, 128, 0.2)', color: '#4ade80', border: 'rgba(74, 222, 128, 0.4)' };
+    if (n.includes('marcus')) return { bg: 'rgba(96, 165, 250, 0.2)', color: '#60a5fa', border: 'rgba(96, 165, 250, 0.4)' };
+    if (n.includes('luisa')) return { bg: 'rgba(251, 146, 60, 0.2)', color: '#fb923c', border: 'rgba(251, 146, 60, 0.4)' };
+    if (n.includes('giovanna')) return { bg: 'rgba(248, 113, 113, 0.2)', color: '#f87171', border: 'rgba(248, 113, 113, 0.4)' };
+    if (n.includes('felix')) return { bg: 'rgba(167, 139, 250, 0.2)', color: '#a78bfa', border: 'rgba(167, 139, 250, 0.4)' };
+    if (n.includes('leticia')) return { bg: 'rgba(148, 163, 184, 0.2)', color: '#94a3b8', border: 'rgba(148, 163, 184, 0.4)' };
+    if (n.includes('fornecedor')) return { bg: 'rgba(192, 132, 252, 0.2)', color: '#c084fc', border: 'rgba(192, 132, 252, 0.4)' };
+    return { bg: 'rgba(244, 114, 182, 0.15)', color: '#f472b6', border: 'rgba(244, 114, 182, 0.3)' };
+  }
+
+  getStatusTheme(columnId: string): { className: string; color: string; bg: string; dot: string; border: string } {
+    const title = this.getColumnTitle(columnId).toLowerCase();
+    if (title.includes('finaliz') || title.includes('conclu') || title.includes('done')) {
+      return { className: 'status-done', color: '#4ade80', bg: 'rgba(34, 197, 94, 0.18)', dot: '#22c55e', border: 'rgba(34, 197, 94, 0.4)' };
+    }
+    if (title.includes('não finalizado') || title.includes('nao finalizado') || title.includes('andamento') || title.includes('doing') || title.includes('fazendo')) {
+      return { className: 'status-in-progress', color: '#60a5fa', bg: 'rgba(59, 130, 246, 0.18)', dot: '#3b82f6', border: 'rgba(59, 130, 246, 0.4)' };
+    }
+    if (title.includes('cancelad') || title.includes('bloquead')) {
+      return { className: 'status-canceled', color: '#f87171', bg: 'rgba(239, 68, 68, 0.18)', dot: '#ef4444', border: 'rgba(239, 68, 68, 0.4)' };
+    }
+    if (title.includes('espera') || title.includes('aguard') || title.includes('pendent') || title.includes('pausa')) {
+      return { className: 'status-waiting', color: '#fbbf24', bg: 'rgba(245, 158, 11, 0.18)', dot: '#f59e0b', border: 'rgba(245, 158, 11, 0.4)' };
+    }
+    if (title.includes('fazer') || title.includes('backlog') || title.includes('abert') || title.includes('todo')) {
+      return { className: 'status-todo', color: '#94a3b8', bg: 'rgba(148, 163, 184, 0.18)', dot: '#94a3b8', border: 'rgba(148, 163, 184, 0.4)' };
+    }
+    const color = this.getColumnColor(columnId);
+    return {
+      className: 'status-custom',
+      color: color || '#94a3b8',
+      bg: `color-mix(in srgb, ${color || '#94a3b8'} 18%, transparent)`,
+      dot: color || '#94a3b8',
+      border: `color-mix(in srgb, ${color || '#94a3b8'} 35%, transparent)`
+    };
+  }
+
   changeTaskColumn(task: KanbanTask, newColumnId: string, event?: Event): void {
     if (event) event.stopPropagation();
     if (task.columnId === newColumnId) return;
@@ -1158,11 +1991,16 @@ export class KanbanBoardComponent implements OnDestroy {
     return this.draft.assigneeIds.map(id => this.assigneeName(id)).filter(Boolean).join(', ');
   }
 
+  getTaskFreeLabels(task: KanbanTask): string[] {
+    if (!task || !task.labels) return [];
+    return task.labels.filter(l => !l.startsWith('cx_') && !/^(setor|macro|exec|ped|pedido|rede):/i.test(l));
+  }
+
   draftLabels(): string[] {
     if (this.labelText) {
       return this.labelText.split(',').map(s => s.trim()).filter(Boolean);
     }
-    return this.draft.labels || [];
+    return (this.draft.labels || []).filter(l => !l.startsWith('cx_') && !/^(setor|macro|exec|ped|pedido|rede):/i.test(l));
   }
 
   printBoard(): void {
@@ -1182,8 +2020,14 @@ export class KanbanBoardComponent implements OnDestroy {
 
   formatFullDate(date: string | null): string {
     if (!date) return '';
-    const d = new Date(`${date}T12:00:00`);
-    return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(d);
+    try {
+      const cleanDate = date.includes('T') ? date : `${date}T12:00:00`;
+      const d = new Date(cleanDate);
+      if (isNaN(d.getTime())) return '';
+      return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(d);
+    } catch {
+      return '';
+    }
   }
 
   assigneeNames(task: KanbanTask): string {

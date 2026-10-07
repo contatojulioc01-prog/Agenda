@@ -45,8 +45,32 @@
 .filter-stat { margin-left: auto; font-size: 11px; padding: 5px 8px; border-radius: 8px; display: flex; align-items: center; gap: 4px; }
 .filter-stat.overdue { background: rgba(239,68,68,.10); color: #ef4444; }
 .filter-stat mat-icon { font-size: 15px; width: 15px; height: 15px; }
-.board-canvas { flex: 1; min-height: 0; display: flex; align-items: flex-start; gap: 16px; overflow: auto; padding: 8px 7px 22px; }
-.kanban-column { width: 304px; max-height: 100%; flex: 0 0 304px; display: flex; flex-direction: column; padding: 12px; border: 2px solid color-mix(in srgb,var(--border) 78%,var(--brand-500)); border-radius: 16px; background: color-mix(in srgb,var(--bg-surface) 96%,var(--bg-hover)); box-shadow: 4px 6px 10px rgba(15,23,42,.16), 8px 18px 32px rgba(15,23,42,.14);; }
+.board-canvas { flex: 1; min-height: 0; display: flex; align-items: flex-start; gap: 16px; overflow-x: auto; overflow-y: auto; padding: 8px 7px 22px; scroll-behavior: smooth; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.board-canvas::-webkit-scrollbar { width: 8px; height: 8px; }
+.board-canvas::-webkit-scrollbar-track { background: transparent; border-radius: 4px; }
+.board-canvas::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; border: 2px solid transparent; background-clip: content-box; }
+.board-canvas::-webkit-scrollbar-thumb:hover { background: var(--text-muted); background-clip: content-box; }
+.board-canvas::-webkit-scrollbar-corner { background: transparent; }
+.kanban-column { position: relative; width: 304px; max-height: 100%; flex: 0 0 304px; display: flex; flex-direction: column; padding: 12px; border: 2px solid color-mix(in srgb,var(--border) 78%,var(--brand-500)); border-radius: 16px; background: color-mix(in srgb,var(--bg-surface) 96%,var(--bg-hover)); box-shadow: 4px 6px 10px rgba(15,23,42,.16), 8px 18px 32px rgba(15,23,42,.14); box-sizing: border-box;
+
+  .kanban-col-resizer {
+    position: absolute;
+    top: 8px;
+    right: -4px;
+    width: 8px;
+    bottom: 8px;
+    cursor: col-resize;
+    z-index: 25;
+    border-radius: 4px;
+    background: transparent;
+    transition: background 0.15s ease;
+
+    &:hover,
+    &.is-resizing {
+      background: var(--brand-500, #6366f1);
+    }
+  }
+}
 .column-header { min-height: 38px; gap: 4px; padding: 0 2px 10px; margin-bottom: 2px; border-bottom: 1px solid var(--border-light); }
 .column-accent { width: 7px; height: 7px; border-radius: 50%; box-shadow: 0 0 7px currentColor; }
 .column-title { color: var(--text-primary); font-size: 13.5px; font-weight: 780; text-align: left; flex: 1; padding-left: 6px; }
@@ -111,15 +135,446 @@
 .spinner { width:15px; height:15px; border:2px solid var(--border); border-top-color:var(--brand-500); border-radius:50%; animation: spin .8s linear infinite; } @keyframes spin { to{transform:rotate(360deg)} }
 .error-banner { display:flex; align-items:center; gap:7px; padding:8px 11px; background:rgba(239,68,68,.12); color:#ef4444; border-radius:9px; font-size:11px; }.error-banner button{margin-left:auto;color:inherit}.error-banner mat-icon{font-size:17px;width:17px;height:17px}
 input,select,textarea { border:1px solid var(--border); border-radius:8px; background:var(--bg-input); color:var(--text-primary); padding:8px 10px; outline:none; font:inherit; } input:focus,select:focus,textarea:focus { border-color:var(--border-focus); box-shadow:0 0 0 3px var(--brand-100); }
-.task-modal-backdrop { position:fixed; inset:0; z-index:1200; display:grid; place-items:center; padding:18px; background:var(--bg-modal); backdrop-filter:blur(5px); }
-.task-modal { width:min(720px,100%); max-height:92vh; overflow:hidden; display:flex; flex-direction:column; border:1px solid var(--border); border-radius:18px; background:var(--bg-surface); color:var(--text-primary); box-shadow:var(--shadow-xl); }
-.task-modal > header { display:flex; align-items:center; gap:11px; padding:16px 18px; border-bottom:1px solid var(--border-light); background:linear-gradient(135deg,var(--bg-active),var(--bg-surface)); }.task-modal > header > div:nth-child(2){flex:1}.task-modal h2{font-size:17px}.task-modal header p{font-size:10.5px;color:var(--text-muted)}
-.modal-icon { width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:linear-gradient(135deg,var(--brand-500),var(--brand-700));color:#fff;box-shadow:var(--shadow-brand) }
-.modal-body { display:grid; grid-template-columns:1fr 1fr; gap:13px; padding:17px 18px; overflow-y:auto; }.full{grid-column:1/-1}.field{display:flex;flex-direction:column;gap:5px}.field>span,.checklist-heading>span{font-size:10.5px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.04em}.field small{font-weight:500;text-transform:none;color:var(--text-muted)}.field textarea{resize:vertical;min-height:78px}
-.description-header { display:flex; align-items:center; justify-content:space-between; width:100%; gap:10px; }
-.description-header > span { font-size:10.5px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:.04em; }
-.description-header app-ai-text-button { margin-left:auto; display:inline-flex; }
-.team-description-field { display:flex; flex-direction:column; gap:5px; width:100%; }
+.task-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: var(--bg-modal);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: modalFadeIn 0.18s ease-out;
+}
+
+@keyframes modalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modalScaleIn {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.task-modal {
+  width: min(840px, 95vw);
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.28), 0 4px 16px rgba(0, 0, 0, 0.12);
+  animation: modalScaleIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.task-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--border-light);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--brand-500) 8%, var(--bg-surface)), var(--bg-surface));
+
+  .modal-header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .modal-title-group {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .modal-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+
+    .board-badge {
+      font-weight: 650;
+      color: var(--text-muted);
+    }
+
+    .bc-sep {
+      font-size: 14px;
+      width: 14px;
+      height: 14px;
+      color: var(--text-muted);
+    }
+
+    .status-chip-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 1px 8px;
+      border-radius: 10px;
+      font-size: 10.5px;
+      font-weight: 700;
+      border: 1px solid transparent;
+
+      .chip-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+      }
+    }
+  }
+
+  h2 {
+    font-size: 16.5px;
+    font-weight: 750;
+    margin: 0;
+    color: var(--text-primary);
+  }
+
+  .modal-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
+    .close-btn:hover {
+      background: rgba(239, 68, 68, 0.12);
+      color: #ef4444;
+    }
+  }
+}
+
+.modal-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, var(--brand-500), var(--brand-700));
+  color: #fff;
+  box-shadow: var(--shadow-brand);
+  flex-shrink: 0;
+}
+
+.task-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 22px;
+  overflow-y: auto;
+  flex: 1;
+
+  .full { width: 100%; }
+}
+
+/* Título Principal */
+.task-title-section {
+  width: 100%;
+
+  .task-title-main-input {
+    width: 100%;
+    font-size: 1.25rem;
+    font-weight: 700;
+    line-height: 1.4;
+    padding: 10px 14px;
+    border: 1.5px solid var(--border-light);
+    border-radius: 12px;
+    background: var(--bg-input);
+    color: var(--text-primary);
+    transition: all 0.18s ease;
+
+    &:focus {
+      border-color: var(--brand-500);
+      background: var(--bg-surface);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-500) 20%, transparent);
+    }
+
+    &::placeholder {
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+  }
+}
+
+/* Card de Propriedades Moderno */
+.task-properties-card {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg-surface-alt);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  .props-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+
+    .props-title {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11.5px;
+      font-weight: 750;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-secondary);
+
+      mat-icon {
+        font-size: 16px;
+        width: 16px;
+        height: 16px;
+        color: var(--brand-500);
+      }
+    }
+
+    .btn-add-prop-inline {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      height: 26px;
+      padding: 0 9px;
+      border-radius: 7px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      font-size: 11px;
+      font-weight: 650;
+      cursor: pointer;
+      transition: all 0.15s ease;
+
+      mat-icon {
+        font-size: 14px;
+        width: 14px;
+        height: 14px;
+      }
+
+      &:hover {
+        background: var(--bg-hover);
+        color: var(--brand-500);
+        border-color: var(--brand-500);
+      }
+    }
+  }
+
+  /* Form para Adicionar Campo no Modal */
+  .modal-add-property-form {
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: var(--bg-surface);
+    border: 1px solid var(--brand-500);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    animation: modalFadeIn 0.15s ease;
+
+    .add-prop-fields {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+
+      .prop-input-name {
+        flex: 1;
+        min-width: 160px;
+        height: 32px;
+        font-size: 12px;
+      }
+
+      .prop-select-type {
+        width: 150px;
+        height: 32px;
+        font-size: 12px;
+      }
+
+      .prop-input-options {
+        width: 100%;
+        height: 30px;
+        font-size: 11.5px;
+      }
+    }
+
+    .btn-confirm-add-prop {
+      align-self: flex-end;
+      height: 28px;
+      padding: 0 12px;
+      border-radius: 6px;
+      background: var(--brand-500);
+      color: #fff;
+      border: 0;
+      font-size: 11.5px;
+      font-weight: 650;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+
+      mat-icon { font-size: 15px; width: 15px; height: 15px; }
+
+      &:disabled { opacity: 0.5; cursor: not-allowed; }
+    }
+  }
+
+  .props-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 12px 16px;
+
+    .prop-item {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+
+      &.prop-item-full {
+        grid-column: 1 / -1;
+      }
+
+      .prop-label {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 10.5px;
+        font-weight: 700;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+
+        mat-icon {
+          font-size: 14px;
+          width: 14px;
+          height: 14px;
+          color: var(--text-muted);
+        }
+
+        .btn-remove-custom-prop {
+          margin-left: auto;
+          background: transparent;
+          border: 0;
+          padding: 0;
+          color: var(--text-muted);
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          opacity: 0.6;
+
+          mat-icon { font-size: 13px; width: 13px; height: 13px; }
+
+          &:hover { opacity: 1; color: #ef4444; }
+        }
+      }
+
+      .prop-value {
+        position: relative;
+
+        .modal-select-input,
+        .modal-date-input,
+        .modal-text-input {
+          width: 100%;
+          height: 34px;
+          font-size: 12px;
+          border-radius: 8px;
+        }
+
+        .modal-status-select-wrap {
+          display: flex;
+          align-items: center;
+          position: relative;
+
+          .status-dot-indicator {
+            position: absolute;
+            left: 10px;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 2;
+          }
+
+          select {
+            padding-left: 26px;
+          }
+        }
+
+        .modal-priority-wrap {
+          display: flex;
+          align-items: center;
+          position: relative;
+
+          .p-icon {
+            position: absolute;
+            left: 8px;
+            font-size: 15px;
+            width: 15px;
+            height: 15px;
+            pointer-events: none;
+            z-index: 2;
+          }
+
+          select {
+            padding-left: 26px;
+            font-weight: 600;
+          }
+        }
+
+        .modal-checkbox-toggle {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          height: 34px;
+          padding: 0 10px;
+          border-radius: 8px;
+          border: 1px solid var(--border);
+          background: var(--bg-surface);
+          cursor: pointer;
+          font-size: 12px;
+          font-weight: 500;
+
+          input[type="checkbox"] {
+            accent-color: var(--brand-500);
+            cursor: pointer;
+          }
+        }
+      }
+    }
+  }
+}
+
+/* Card de Descrição */
+.task-description-card {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg-surface-alt);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  .desc-heading-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11.5px;
+    font-weight: 750;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-secondary);
+
+    mat-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
+      color: var(--brand-500);
+    }
+  }
+}
 /* ══════════════════════════════════════════════════
    📋 CHECKLIST & SEÇÕES — Design Moderno & Elegante
    ══════════════════════════════════════════════════ */
@@ -1192,45 +1647,37 @@ input,select,textarea { border:1px solid var(--border); border-radius:8px; backg
    VISÃO DE LISTA ESTILO NOTION (NOTION DATABASE TABLE VIEW)
    ══════════════════════════════════════════════════════════════════ */
 
-.notion-view-toggle {
-  display: flex;
+.notion-tabs-nav {
+  display: inline-flex;
   align-items: center;
-  gap: 2px;
-  padding: 3px;
-  background: var(--bg-hover);
+  gap: 3px;
+  padding: 2px;
+  background: var(--bg-hover, rgba(0, 0, 0, 0.05));
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: 11px;
 
-  .view-toggle-btn {
-    height: 28px;
-    padding: 0 10px;
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    border-radius: 6px;
-    border: 0;
-    background: transparent;
-    color: var(--text-muted);
-    font-size: 11.5px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.15s ease;
-
-    mat-icon {
-      font-size: 16px;
-      width: 16px;
-      height: 16px;
-    }
+  .notion-nav-tab {
+    border: 0 !important;
+    background: transparent !important;
+    color: var(--text-muted) !important;
+    box-shadow: none !important;
 
     &:hover {
-      color: var(--text-primary);
+      color: var(--text-primary) !important;
+      background: var(--bg-surface) !important;
     }
 
     &.active {
-      background: var(--bg-surface);
-      color: var(--brand-600, #4f46e5);
-      font-weight: 700;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      background: var(--bg-surface, #ffffff) !important;
+      color: var(--brand-600, #4f46e5) !important;
+      font-weight: 700 !important;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12) !important;
+      border: 1px solid var(--border-light, rgba(255, 255, 255, 0.1)) !important;
+
+      mat-icon {
+        opacity: 1 !important;
+        color: var(--brand-500, #f59e0b) !important;
+      }
     }
   }
 }
@@ -1239,29 +1686,16 @@ input,select,textarea { border:1px solid var(--border); border-radius:8px; backg
   position: relative;
 
   .notion-sort-btn {
-    height: 34px;
-    padding: 0 11px;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    border: 1px solid var(--border);
-    border-radius: 9px;
-    background: var(--bg-input);
-    color: var(--text-secondary);
-    font-size: 11.5px;
-    font-weight: 600;
     cursor: pointer;
 
-    mat-icon {
-      font-size: 16px;
-      width: 16px;
-      height: 16px;
-      color: var(--text-muted);
-    }
+    &.active {
+      color: var(--brand-600, #4f46e5) !important;
+      border-color: var(--brand-500) !important;
+      background: var(--bg-active) !important;
 
-    &:hover {
-      color: var(--text-primary);
-      border-color: var(--border-focus);
+      mat-icon {
+        color: var(--brand-600, #4f46e5) !important;
+      }
     }
   }
 
@@ -1316,16 +1750,310 @@ input,select,textarea { border:1px solid var(--border); border-radius:8px; backg
   }
 }
 
+.notion-columns-wrapper {
+  position: relative;
+
+  .notion-columns-btn {
+    cursor: pointer;
+
+    &.active {
+      color: var(--brand-600, #4f46e5) !important;
+      border-color: var(--brand-500) !important;
+      background: var(--bg-active) !important;
+
+      mat-icon {
+        color: var(--brand-600, #4f46e5) !important;
+      }
+    }
+  }
+
+  .notion-columns-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 100;
+    min-width: 250px;
+    padding: 8px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
+
+    .notion-columns-menu-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 6px 8px;
+      border-bottom: 1px solid var(--border-light, rgba(255, 255, 255, 0.08));
+      margin-bottom: 6px;
+
+      span {
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--text-muted);
+      }
+
+      .col-actions-quick {
+        display: flex;
+        gap: 4px;
+
+        .quick-btn {
+          background: transparent;
+          border: 0;
+          font-size: 11px;
+          color: var(--brand-500, #6366f1);
+          cursor: pointer;
+          padding: 2px 5px;
+          border-radius: 4px;
+          font-weight: 600;
+
+          &:hover {
+            background: var(--bg-hover);
+          }
+        }
+      }
+    }
+
+    .notion-columns-list {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      max-height: 280px;
+      overflow-y: auto;
+
+      .notion-column-item-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 3px 6px;
+        border-radius: 7px;
+        transition: background 0.12s;
+        gap: 6px;
+
+        &:hover {
+          background: var(--bg-hover);
+
+          .btn-delete-custom-col {
+            opacity: 1;
+          }
+        }
+
+        &.is-custom {
+          border-left: 2px solid var(--brand-400, #818cf8);
+        }
+
+        .custom-badge-tag {
+          font-size: 9px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.3px;
+          padding: 1px 5px;
+          border-radius: 4px;
+          background: var(--brand-100, rgba(99, 102, 241, 0.15));
+          color: var(--brand-600, #4f46e5);
+          margin-left: 4px;
+        }
+
+        .btn-delete-custom-col {
+          background: transparent;
+          border: 0;
+          padding: 0;
+          width: 24px;
+          height: 24px;
+          min-width: 24px;
+          color: var(--text-muted);
+          cursor: pointer;
+          border-radius: 5px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.15s ease;
+          opacity: 0.7;
+
+          mat-icon {
+            font-size: 15px;
+            width: 15px;
+            height: 15px;
+          }
+
+          &:hover {
+            color: #ffffff;
+            background: #ef4444;
+            opacity: 1;
+            transform: scale(1.08);
+            box-shadow: 0 2px 6px rgba(239, 68, 68, 0.35);
+          }
+        }
+      }
+
+      .notion-column-toggle-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 2px 0;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 12px;
+        color: var(--text-secondary);
+        user-select: none;
+        flex: 1;
+        min-width: 0;
+
+        &:hover {
+          color: var(--text-primary);
+        }
+
+        &.checked {
+          color: var(--text-primary);
+          font-weight: 500;
+        }
+
+        input[type="checkbox"] {
+          accent-color: var(--brand-500, #6366f1);
+          cursor: pointer;
+        }
+
+        .col-item-icon {
+          font-size: 15px;
+          width: 15px;
+          height: 15px;
+          color: var(--text-muted);
+          flex-shrink: 0;
+        }
+
+        .col-item-name {
+          flex: 1;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+      }
+    }
+
+    /* Seção de Adicionar Coluna no Dropdown */
+    .notion-add-column-section {
+      border-top: 1px solid var(--border-light);
+      padding: 6px 4px 2px;
+      margin-top: 4px;
+
+      .btn-open-add-col {
+        width: 100%;
+        height: 28px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0 8px;
+        border-radius: 6px;
+        background: transparent;
+        border: 0;
+        color: var(--brand-500);
+        font-size: 11.5px;
+        font-weight: 650;
+        cursor: pointer;
+        transition: background 0.12s;
+
+        mat-icon {
+          font-size: 16px;
+          width: 16px;
+          height: 16px;
+        }
+
+        &:hover {
+          background: var(--bg-hover);
+        }
+      }
+
+      .add-col-popover-form {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 6px;
+        background: var(--bg-surface-alt);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+
+        .add-col-form-title {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          font-size: 11px;
+          font-weight: 700;
+          color: var(--text-secondary);
+
+          button {
+            background: transparent;
+            border: 0;
+            padding: 0;
+            color: var(--text-muted);
+            cursor: pointer;
+
+            mat-icon { font-size: 14px; width: 14px; height: 14px; }
+          }
+        }
+
+        .add-col-input {
+          height: 28px;
+          padding: 2px 6px;
+          font-size: 11.5px;
+          border-radius: 5px;
+        }
+
+        .add-col-select {
+          height: 28px;
+          padding: 2px 6px;
+          font-size: 11.5px;
+          border-radius: 5px;
+        }
+
+        .btn-save-new-col {
+          height: 26px;
+          padding: 0 8px;
+          border-radius: 5px;
+          background: var(--brand-500);
+          color: #fff;
+          border: 0;
+          font-size: 11px;
+          font-weight: 650;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 4px;
+          cursor: pointer;
+
+          mat-icon { font-size: 14px; width: 14px; height: 14px; }
+
+          &:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+          }
+        }
+      }
+    }
+  }
+}
+
 /* Container principal para o Canvas quando em visão de lista */
 .board-canvas.is-list-view {
   display: block;
   padding: 8px 12px 24px;
   overflow-x: auto;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+
+  &::-webkit-scrollbar { width: 8px; height: 8px; }
+  &::-webkit-scrollbar-track { background: transparent; border-radius: 4px; }
+  &::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; border: 2px solid transparent; background-clip: content-box; }
+  &::-webkit-scrollbar-thumb:hover { background: var(--text-muted); background-clip: content-box; }
+  &::-webkit-scrollbar-corner { background: transparent; }
 }
 
 .notion-list-view {
   width: 100%;
-  min-width: 900px;
+  min-width: 860px;
   display: flex;
   flex-direction: column;
 
@@ -1335,38 +2063,90 @@ input,select,textarea { border:1px solid var(--border); border-radius:8px; backg
     border-radius: 12px;
     background: var(--bg-surface);
     box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
-    overflow: hidden;
+    overflow-x: auto;
+    overflow-y: visible;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+
+    &::-webkit-scrollbar { height: 6px; }
+    &::-webkit-scrollbar-track { background: transparent; }
+    &::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    &::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
   }
 
   .notion-table {
-    width: 100%;
+    width: max-content;
+    min-width: 100%;
+    table-layout: fixed;
     border-collapse: collapse;
     font-size: 12.5px;
     text-align: left;
 
     thead {
-      background: color-mix(in srgb, var(--bg-surface) 90%, var(--bg-hover));
-      border-bottom: 1px solid var(--border);
+      background: var(--bg-surface, #ffffff);
+      border-bottom: 1px solid var(--border-light, #e5e7eb);
 
       th {
-        padding: 9px 12px;
-        font-size: 11px;
-        font-weight: 650;
-        color: var(--text-muted);
-        text-transform: uppercase;
-        letter-spacing: 0.03em;
+        padding: 8px 12px;
+        font-size: 11.5px;
+        font-weight: 500;
+        color: var(--text-muted, #64748b);
+        text-transform: none;
+        letter-spacing: normal;
         white-space: nowrap;
         user-select: none;
         cursor: pointer;
-        transition: color 0.15s;
+        border-right: 1px solid var(--border-light, #f1f3f5);
+        transition: color 0.15s, background 0.15s;
+        box-sizing: border-box;
+        overflow: hidden;
+
+        &:last-child {
+          border-right: none;
+        }
+
+        &.resizable-th {
+          position: relative !important;
+
+          .th-content {
+            display: flex;
+            align-items: center;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            width: 100%;
+          }
+
+          .col-resizer {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 7px;
+            height: 100%;
+            cursor: col-resize;
+            user-select: none;
+            z-index: 10;
+            background: transparent;
+            transition: background 0.15s ease;
+
+            &:hover,
+            &.is-resizing {
+              background: var(--brand-500, #6366f1);
+            }
+          }
+        }
 
         mat-icon {
           font-size: 14px;
           width: 14px;
           height: 14px;
           vertical-align: middle;
-          margin-right: 4px;
-          color: var(--text-muted);
+          margin-right: 5px;
+          color: var(--text-muted, #94a3b8);
+        }
+
+        .macro-header-icon {
+          color: var(--text-muted, #94a3b8);
         }
 
         .sort-icon {
@@ -1377,6 +2157,7 @@ input,select,textarea { border:1px solid var(--border); border-radius:8px; backg
 
         &:hover {
           color: var(--text-primary);
+          background: var(--bg-hover, #f8fafc);
 
           mat-icon {
             color: var(--text-primary);
@@ -1387,7 +2168,7 @@ input,select,textarea { border:1px solid var(--border); border-radius:8px; backg
 
     tbody {
       tr.notion-row {
-        border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+        border-bottom: 1px solid var(--border-light, #f1f3f5);
         transition: background 0.12s ease;
         cursor: pointer;
 
@@ -1396,14 +2177,21 @@ input,select,textarea { border:1px solid var(--border); border-radius:8px; backg
         }
 
         &:hover {
-          background: color-mix(in srgb, var(--bg-surface) 85%, var(--bg-hover));
+          background: var(--bg-hover, #f8fafc);
         }
 
         td {
-          padding: 8px 12px;
+          padding: 7px 12px;
           vertical-align: middle;
           color: var(--text-primary);
           white-space: nowrap;
+          border-right: 1px solid var(--border-light, #f1f3f5);
+          box-sizing: border-box;
+          overflow: hidden;
+
+          &:last-child {
+            border-right: none;
+          }
         }
       }
     }
@@ -1411,82 +2199,125 @@ input,select,textarea { border:1px solid var(--border); border-radius:8px; backg
 
   /* Estilos específicos das células */
   .col-date {
-    width: 100px;
+    position: relative !important;
+    cursor: pointer;
+    box-sizing: border-box;
+
+    /* Overlay do input cobre 100% da célula */
+    .cell-date-overlay {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      cursor: pointer;
+      z-index: 5;
+      margin: 0;
+      padding: 0;
+      border: 0;
+    }
+
+    .notion-date-wrapper {
+      pointer-events: none;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    &:hover {
+      background: var(--bg-hover, #f8fafc);
+    }
   }
 
-  .notion-date-cell {
-    font-size: 11.5px;
-    font-weight: 600;
-    color: var(--text-secondary);
+  .notion-date-text {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text-secondary, #374151);
+    font-variant-numeric: tabular-nums;
 
     &.overdue {
       color: #ef4444;
-      font-weight: 700;
+      font-weight: 600;
     }
 
     &.soon {
       color: #f59e0b;
-      font-weight: 700;
+      font-weight: 600;
     }
   }
 
   .col-sector {
-    width: 140px;
+    box-sizing: border-box;
   }
 
-  .notion-sector-badge {
+  .notion-sector-pill {
     display: inline-flex;
     align-items: center;
-    padding: 3px 8px;
-    border-radius: 6px;
-    font-size: 11px;
-    font-weight: 650;
-    max-width: 130px;
+    padding: 2.5px 8px;
+    border-radius: 4px;
+    font-size: 11.5px;
+    font-weight: 500;
+    background: #f3f4f6;
+    color: #374151;
+    border: 1px solid #e5e7eb;
+    max-width: 140px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .col-macro {
-    width: 150px;
+    box-sizing: border-box;
   }
 
-  .notion-macro-badge {
+  .notion-macro-content {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 3px 9px;
-    border-radius: 6px;
-    background: var(--bg-hover);
-    border: 1px solid var(--border-light);
-    color: var(--text-secondary);
-    font-size: 11px;
-    font-weight: 600;
+    gap: 5px;
+    max-width: 155px;
+    overflow: hidden;
 
-    .macro-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
+    .macro-folder-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
+      color: #d97706;
       flex-shrink: 0;
+    }
+
+    .macro-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-primary, #1f2937);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
   }
 
   .col-subject {
-    min-width: 200px;
-    max-width: 320px;
+    cursor: pointer;
+    box-sizing: border-box;
+
+    &:hover {
+      background: var(--bg-hover, #f8fafc);
+    }
   }
 
   .subject-cell-content {
     display: flex;
     align-items: center;
     gap: 8px;
+    width: 100%;
 
     .task-title-text {
-      font-weight: 650;
-      color: var(--text-primary);
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--text-primary, #111827);
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      flex: 1;
     }
 
     .notion-branch-btn {
@@ -1501,6 +2332,9 @@ input,select,textarea { border:1px solid var(--border); border-radius:8px; backg
       font-size: 10px;
       font-weight: 700;
       cursor: pointer;
+      position: relative;
+      z-index: 2;
+      pointer-events: auto;
 
       mat-icon {
         font-size: 13px;
@@ -1511,12 +2345,17 @@ input,select,textarea { border:1px solid var(--border); border-radius:8px; backg
   }
 
   .col-demand {
-    max-width: 220px;
+    cursor: pointer;
+    box-sizing: border-box;
+
+    &:hover {
+      background: var(--bg-hover, #f8fafc);
+    }
   }
 
   .notion-demand-text {
-    font-size: 11.5px;
-    color: var(--text-muted);
+    font-size: 12px;
+    color: var(--text-secondary, #374151);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1524,16 +2363,64 @@ input,select,textarea { border:1px solid var(--border); border-radius:8px; backg
   }
 
   .col-execution {
-    width: 110px;
+    box-sizing: border-box;
   }
 
   .notion-execution-text {
-    font-size: 11px;
-    color: var(--text-secondary);
+    font-size: 12px;
+    color: var(--text-secondary, #374151);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .interactive-cell {
+    position: relative !important;
+    cursor: pointer;
+
+    .cell-select-overlay,
+    .cell-date-overlay {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      cursor: pointer;
+      z-index: 5;
+      margin: 0;
+      padding: 0;
+      border: 0;
+
+      option {
+        background: var(--bg-surface, #ffffff);
+        color: var(--text-primary, #111827);
+      }
+    }
+
+    .notion-status-pill,
+    .notion-priority-pill,
+    .notion-assignees-stack,
+    .notion-date-wrapper,
+    .notion-custom-select-wrap {
+      pointer-events: none; /* Allows click through to full-cell overlay */
+    }
+
+    &:hover {
+      background: var(--bg-hover, #f8fafc);
+    }
+  }
+
+  .interactive-check-cell {
+    cursor: pointer;
+    user-select: none;
+
+    &:hover {
+      background: var(--bg-hover, #f8fafc);
+    }
   }
 
   .col-assignee {
-    width: 140px;
+    position: relative;
+    cursor: pointer;
+    box-sizing: border-box;
   }
 
   .notion-assignees-stack {
@@ -1541,29 +2428,65 @@ input,select,textarea { border:1px solid var(--border); border-radius:8px; backg
     align-items: center;
     gap: 4px;
     flex-wrap: wrap;
+    pointer-events: none;
 
-    .notion-user-tag {
+    .notion-assignee-pill {
       display: inline-flex;
       align-items: center;
-      gap: 5px;
-      padding: 2px 8px 2px 4px;
-      border-radius: 12px;
-      background: rgba(16, 185, 129, 0.12);
-      color: #047857;
-      font-size: 11px;
-      font-weight: 650;
-
-      .user-tag-avatar {
-        width: 18px;
-        height: 18px;
-        border-radius: 50%;
-        object-fit: cover;
-      }
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: #fce7f3;
+      color: #9d174d;
+      border: 1px solid #fbcfe8;
+      font-size: 11.5px;
+      font-weight: 600;
+      white-space: nowrap;
     }
   }
 
+  .interactive-pill {
+    position: relative;
+    cursor: pointer;
+    transition: transform 0.1s ease, filter 0.12s ease;
+
+    select {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      cursor: pointer;
+      font-size: 12px;
+
+      option {
+        background: var(--bg-surface, #ffffff);
+        color: var(--text-primary, #111827);
+      }
+    }
+
+    &:hover {
+      filter: brightness(0.95);
+    }
+  }
+
+  .notion-assignee-placeholder {
+    font-size: 11px;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px dashed var(--border);
+  }
+
+  .notion-date-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+  }
+
   .col-status {
-    width: 140px;
+    box-sizing: border-box;
   }
 
   /* Notion Status Pill Badge com Ponto Colorido e Dropdown Inline */
@@ -1572,31 +2495,72 @@ input,select,textarea { border:1px solid var(--border); border-radius:8px; backg
     align-items: center;
     gap: 6px;
     position: relative;
-    padding: 3px 8px;
+    padding: 2.5px 10px;
     border-radius: 12px;
-    background: color-mix(in srgb, var(--status-color, #4f46e5) 14%, transparent);
-    color: var(--status-color, #4f46e5);
     font-size: 11.5px;
-    font-weight: 700;
+    font-weight: 600;
     transition: filter 0.15s ease;
+    cursor: pointer;
 
     .status-bullet {
-      width: 7px;
-      height: 7px;
+      width: 6.5px;
+      height: 6.5px;
       border-radius: 50%;
-      background: var(--status-color, #4f46e5);
-      box-shadow: 0 0 5px var(--status-color, #4f46e5);
       flex-shrink: 0;
     }
 
     .status-label-text {
       font-size: 11.5px;
-      font-weight: 700;
-      color: var(--status-color, #4f46e5);
+      font-weight: 600;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
       max-width: 110px;
+    }
+
+    &.status-done {
+      background: #d1fae5;
+      color: #065f46;
+      border: 1px solid #a7f3d0;
+      .status-bullet {
+        background: #10b981;
+      }
+    }
+
+    &.status-waiting {
+      background: #fef3c7;
+      color: #92400e;
+      border: 1px solid #fde68a;
+      .status-bullet {
+        background: #f59e0b;
+      }
+    }
+
+    &.status-in-progress {
+      background: #e0e7ff;
+      color: #3730a3;
+      border: 1px solid #c7d2fe;
+      .status-bullet {
+        background: #6366f1;
+      }
+    }
+
+    &.status-todo {
+      background: #f1f5f9;
+      color: #475569;
+      border: 1px solid #e2e8f0;
+      .status-bullet {
+        background: #94a3b8;
+      }
+    }
+
+    &.status-custom {
+      background: var(--custom-status-bg);
+      color: var(--custom-status-color);
+      border: 1px solid color-mix(in srgb, var(--custom-status-color) 30%, transparent);
+      .status-bullet {
+        background: var(--custom-status-dot);
+      }
     }
 
     select {
@@ -1609,43 +2573,241 @@ input,select,textarea { border:1px solid var(--border); border-radius:8px; backg
       font-size: 12px;
 
       option {
-        background: var(--bg-surface);
-        color: var(--text-primary);
+        background: var(--bg-surface, #ffffff);
+        color: var(--text-primary, #111827);
       }
     }
 
-    .status-arrow {
-      font-size: 15px;
-      width: 15px;
-      height: 15px;
-      opacity: 0.6;
-      margin-left: -2px;
+    &:hover {
+      filter: brightness(0.96);
     }
+  }
+
+  .col-priority {
+    box-sizing: border-box;
+  }
+
+  .notion-priority-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2.5px 8px;
+    border-radius: 6px;
+    font-size: 11.5px;
+    font-weight: 700;
+    cursor: pointer;
+    position: relative;
+
+    .p-icon {
+      font-size: 14px;
+      width: 14px;
+      height: 14px;
+    }
+
+    &.urgent {
+      background: rgba(239, 68, 68, 0.14);
+      color: #ef4444;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    &.high {
+      background: rgba(249, 115, 22, 0.14);
+      color: #ea580c;
+      border: 1px solid rgba(249, 115, 22, 0.3);
+    }
+
+    &.medium {
+      background: rgba(245, 158, 11, 0.14);
+      color: #d97706;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    &.low {
+      background: rgba(16, 185, 129, 0.14);
+      color: #059669;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+  }
+
+  .col-labels {
+    min-width: 120px;
+    max-width: 200px;
+    cursor: pointer;
 
     &:hover {
-      filter: brightness(0.95);
+      background: var(--bg-hover, #f8fafc);
     }
   }
 
-  .col-tags {
-    width: 130px;
-  }
-
-  .notion-tags-group {
+  .notion-labels-wrapper {
     display: flex;
     align-items: center;
     gap: 4px;
     flex-wrap: wrap;
+    width: 100%;
 
     .notion-label-tag {
-      padding: 2px 6px;
-      border-radius: 4px;
-      background: var(--bg-hover);
-      border: 1px solid var(--border-light);
-      color: var(--text-secondary);
       font-size: 10.5px;
       font-weight: 600;
+      padding: 1.5px 6px;
+      border-radius: 4px;
+      background: var(--brand-100);
+      color: var(--text-brand);
+      white-space: nowrap;
+      max-width: 90px;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
+
+    .notion-label-more {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text-muted);
+    }
+  }
+
+  .col-custom-dyn {
+    box-sizing: border-box;
+  }
+
+  .col-custom-cell {
+    box-sizing: border-box;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--bg-hover, #f8fafc);
+    }
+
+    .notion-custom-text-wrap {
+      width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .notion-custom-select-wrap {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: 6px;
+      background: var(--bg-hover);
+      border: 1px solid var(--border);
+      font-size: 11.5px;
+      font-weight: 500;
+      color: var(--text-primary);
+
+      .custom-select-val {
+        max-width: 130px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+    }
+
+    .notion-custom-check-wrap {
+      display: inline-flex;
+      align-items: center;
+
+      input[type="checkbox"] {
+        accent-color: var(--brand-500);
+        cursor: pointer;
+        width: 16px;
+        height: 16px;
+      }
+    }
+  }
+
+  .editable-field {
+    cursor: text;
+    border-radius: 4px;
+    padding: 1px 4px;
+    margin: -1px -4px;
+    transition: background 0.12s ease;
+
+    &:hover {
+      background: rgba(148, 163, 184, 0.15);
+    }
+  }
+
+  .inline-cell-input {
+    width: 100%;
+    height: 26px;
+    padding: 2px 6px;
+    font-size: 12px;
+    font-family: inherit;
+    color: var(--text-primary);
+    background: var(--bg-surface);
+    border: 1px solid var(--brand-500, #6366f1);
+    border-radius: 5px;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+
+    &.title-input {
+      font-weight: 500;
+    }
+  }
+
+  .col-add-column {
+    width: 36px;
+    min-width: 36px;
+    max-width: 36px;
+    padding: 8px 6px !important;
+    text-align: center;
+    cursor: pointer;
+
+    mat-icon {
+      margin: 0 !important;
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
+      color: var(--text-muted);
+    }
+
+    &:hover {
+      background: var(--bg-hover);
+      mat-icon {
+        color: var(--brand-500);
+      }
+    }
+  }
+
+  .col-add-column-cell {
+    width: 36px;
+    min-width: 36px;
+    max-width: 36px;
+    padding: 4px 6px !important;
+    text-align: center;
+
+    .row-open-modal-btn {
+      opacity: 0;
+      width: 24px;
+      height: 24px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      border-radius: 4px;
+      cursor: pointer;
+      color: var(--text-muted);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.15s, background 0.15s, color 0.15s;
+
+      mat-icon {
+        font-size: 14px;
+        width: 14px;
+        height: 14px;
+      }
+
+      &:hover {
+        background: var(--bg-hover);
+        color: var(--brand-500);
+      }
+    }
+  }
+
+  tr.notion-row:hover .row-open-modal-btn {
+    opacity: 1;
   }
 
   .notion-empty-cell {

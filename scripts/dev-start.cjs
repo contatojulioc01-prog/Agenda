@@ -1,18 +1,22 @@
 const { spawn } = require('node:child_process');
+const path = require('node:path');
+
+const rootDir = path.resolve(__dirname, '..');
+const backendDir = path.join(rootDir, 'backend');
+const frontendDir = path.join(rootDir, 'frontend');
 
 const isWindows = process.platform === 'win32';
-const npmCommand = 'npm';
 const token = 'agenda-dev-local';
 const appHost = process.env.DEV_HOST || '0.0.0.0';
 const appUrl = `http://0.0.0.0:9990/?token=${encodeURIComponent(token)}`;
 const children = [];
 let stopping = false;
 
-function start(name, args, env) {
-  const command = isWindows ? (process.env.ComSpec || 'cmd.exe') : npmCommand;
-  const commandArgs = isWindows ? ['/d', '/s', '/c', `npm ${args.join(' ')}`] : args;
-  const child = spawn(command, commandArgs, {
-    cwd: process.cwd(),
+function start(name, npmArgs, workingDir, env = {}) {
+  const shell = isWindows ? (process.env.ComSpec || 'cmd.exe') : 'npm';
+  const commandArgs = isWindows ? ['/d', '/s', '/c', `npm ${npmArgs.join(' ')}`] : npmArgs;
+  const child = spawn(shell, commandArgs, {
+    cwd: workingDir,
     env: { ...process.env, ...env },
     stdio: 'inherit',
     windowsHide: true,
@@ -50,11 +54,12 @@ process.on('SIGINT', () => stop(0));
 process.on('SIGTERM', () => stop(0));
 
 const devDb = process.env.PGDATABASE || 'agenda_dev';
-console.log('[DEV] Iniciando Agenda sem autenticação SSO externa...');
-console.log('[DEV] O bypass só funciona em 0.0.0.0 e não é habilitado em produção.');
+console.log('[DEV] Iniciando Agenda (Backend e Frontend) em suas respectivas pastas...');
+console.log(`[DEV] Backend CWD:  ${backendDir}`);
+console.log(`[DEV] Frontend CWD: ${frontendDir}`);
 console.log(`[DEV] Banco de dados: ${devDb}`);
 
-start('backend', ['--prefix', 'backend', 'start'], {
+start('backend', ['start'], backendDir, {
   NODE_ENV: 'development',
   DEV_AUTH_BYPASS: 'true',
   DEV_AUTH_TOKEN: token,
@@ -62,7 +67,7 @@ start('backend', ['--prefix', 'backend', 'start'], {
   PORT: '9900',
   PGDATABASE: devDb,
 });
-start('frontend', ['--prefix', 'frontend', 'run', 'dev'], {});
+start('frontend', ['run', 'dev:serve'], frontendDir, {});
 
 Promise.all([
   waitUntilReady('http://0.0.0.0:9900/health'),

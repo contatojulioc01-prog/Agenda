@@ -2090,6 +2090,25 @@ app-calendar-page {
   font-size: 9.5px;
 }
 
+.owner-badge {
+  display: inline-flex;
+  align-items: center;
+  color: #f59e0b;
+  mat-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+  }
+}
+
+.promote-btn {
+  color: #0ea5e9 !important;
+  &:hover {
+    background: rgba(14, 165, 233, 0.12) !important;
+    color: #0284c7 !important;
+  }
+}
+
 .new-team-link {
   margin-top: 13px;
   color: var(--text-brand);

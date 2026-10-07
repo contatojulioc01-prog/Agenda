@@ -28,6 +28,7 @@ function muralDto(mural, role, itemCount = 0) {
     owner_id: mural.owner_id,
     scopeType: mural.scope_type || 'personal',
     teamId: mural.team_id || null,
+    position: Number(mural.position || 0),
     myRole: role,
     itemCount: Number(itemCount || 0),
     createdAt: mural.created_at,
@@ -122,7 +123,7 @@ router.get('/boards', asyncRoute(async (req, res) => {
       (SELECT COUNT(*) FROM mural_items i WHERE i.mural_id = b.id) as item_count
     FROM mural_boards b
     WHERE b.owner_id = $1 AND b.scope_type = 'personal'
-    ORDER BY b.created_at
+    ORDER BY b.position ASC, b.created_at ASC
   `, [uid]);
 
   const teamBoards = await db.all(`
@@ -132,7 +133,7 @@ router.get('/boards', asyncRoute(async (req, res) => {
     JOIN kanban_teams t ON t.id = b.team_id
     JOIN kanban_team_members m ON m.team_id = t.id AND m.user_id = $1
     WHERE b.scope_type = 'team'
-    ORDER BY b.created_at
+    ORDER BY b.position ASC, b.created_at ASC
   `, [uid]);
 
   const summaries = [
@@ -141,6 +142,24 @@ router.get('/boards', asyncRoute(async (req, res) => {
   ];
 
   res.json(summaries);
+}));
+
+// PUT /api/mural/boards/reorder
+router.put('/boards/reorder', asyncRoute(async (req, res) => {
+  const uid = userId(req);
+  if (!uid) return res.status(401).json({ error: 'Não autorizado' });
+
+  const { boardIds } = req.body;
+  if (!Array.isArray(boardIds)) return res.status(400).json({ error: 'boardIds deve ser um array' });
+
+  await db.transaction(async tx => {
+    for (let pos = 0; pos < boardIds.length; pos++) {
+      await tx.run('UPDATE mural_boards SET position = $1 WHERE id = $2 AND (owner_id = $3 OR scope_type = \'team\')', [pos, boardIds[pos], uid]);
+    }
+  });
+
+  req.broadcast?.({ type: 'mural_updated' });
+  res.json({ success: true });
 }));
 
 // GET /api/mural/boards/:id
@@ -186,10 +205,12 @@ router.post('/boards', asyncRoute(async (req, res) => {
 
   const boardId = id('mrl');
   const now = new Date().toISOString();
+  const maxPos = await db.get("SELECT COALESCE(MAX(position), -1) as max_p FROM mural_boards WHERE owner_id = $1 OR scope_type = 'team'", [uid]);
+
   await db.transaction(async tx => {
-    await tx.run(`INSERT INTO mural_boards (id, name, description, color, owner_id, scope_type, team_id, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)`,
-      [boardId, name.trim(), description, color, uid, scopeType, scopeType === 'team' ? teamId : null, now]);
+    await tx.run(`INSERT INTO mural_boards (id, name, description, color, owner_id, scope_type, team_id, position, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9)`,
+      [boardId, name.trim(), description, color, uid, scopeType, scopeType === 'team' ? teamId : null, Number(maxPos.max_p) + 1, now]);
     await tx.run('INSERT INTO mural_groups (id, mural_id, title, color, position, created_at) VALUES ($1, $2, $3, $4, $5, $6)',
       [id('grp'), boardId, 'Geral', color, 0, now]);
   });
@@ -206,7 +227,7 @@ router.put('/boards/:id', asyncRoute(async (req, res) => {
   if (!access) return res.status(404).json({ error: 'Mural não encontrado ou sem permissão' });
   if (access.role !== 'admin') return res.status(403).json({ error: 'Apenas administradores podem editar o mural' });
 
-  const { name, description, color } = req.body;
+  const { name, description, color, position } = req.body;
   const updates = [];
   const params = [];
   let idx = 1;
@@ -223,6 +244,10 @@ router.put('/boards/:id', asyncRoute(async (req, res) => {
   if (color !== undefined) {
     updates.push(`color = $${idx++}`);
     params.push(color);
+  }
+  if (position !== undefined) {
+    updates.push(`position = $${idx++}`);
+    params.push(Number(position));
   }
 
   if (updates.length) {
@@ -265,6 +290,26 @@ router.delete('/boards/:id', asyncRoute(async (req, res) => {
 
   req.broadcast?.({ type: 'mural_deleted', muralId: req.params.id });
   res.json({ success: true });
+}));
+
+// PUT /api/mural/boards/:id/groups/reorder
+router.put('/boards/:id/groups/reorder', asyncRoute(async (req, res) => {
+  const uid = userId(req);
+  const access = await muralAccess(req.params.id, uid, true);
+  if (!access) return res.status(404).json({ error: 'Mural não encontrado ou sem permissão' });
+
+  const { groupIds } = req.body;
+  if (!Array.isArray(groupIds)) return res.status(400).json({ error: 'groupIds deve ser um array' });
+
+  await db.transaction(async tx => {
+    for (let pos = 0; pos < groupIds.length; pos++) {
+      await tx.run('UPDATE mural_groups SET position = $1 WHERE id = $2 AND mural_id = $3', [pos, groupIds[pos], req.params.id]);
+    }
+  });
+
+  const updatedGroups = await db.all('SELECT * FROM mural_groups WHERE mural_id = $1 ORDER BY position, created_at', [req.params.id]);
+  req.broadcast?.({ type: 'mural_updated', muralId: req.params.id });
+  res.json(updatedGroups.map(groupDto));
 }));
 
 // POST /api/mural/boards/:id/groups

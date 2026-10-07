@@ -56,6 +56,18 @@ export class MuralBoardApiService {
     });
   }
 
+  reordenarGrupos(muralId: string, groupIds: string[], userId: string): Observable<MuralGroup[]> {
+    return this.http.put<MuralGroup[]>(`/api/mural/boards/${muralId}/groups/reorder`, { groupIds }, {
+      headers: { 'x-user-id': userId }
+    });
+  }
+
+  reordenarMurais(boardIds: string[], userId: string): Observable<{ success: boolean }> {
+    return this.http.put<{ success: boolean }>('/api/mural/boards/reorder', { boardIds }, {
+      headers: { 'x-user-id': userId }
+    });
+  }
+
   alternarFixacao(itemId: string, isPinned: boolean, userId: string): Observable<MuralItem> {
     return this.http.put<MuralItem>(`/api/mural/items/${itemId}`, { isPinned }, {
       headers: { 'x-user-id': userId }

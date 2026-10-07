@@ -2,6 +2,7 @@ import { Component, OnInit, OnDestroy, inject, signal, computed, effect } from '
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
+import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -30,6 +31,7 @@ import { MarkdownEditorComponent } from '../../../shared/components/markdown-edi
   imports: [
     CommonModule,
     FormsModule,
+    DragDropModule,
     MatIconModule,
     MatTooltipModule,
     MatProgressSpinnerModule,
@@ -67,6 +69,18 @@ export class MuralBoardComponent implements OnInit, OnDestroy {
   readonly filterPinnedOnly = signal(false);
   readonly filterWithAttachments = signal(false);
 
+  readonly colorPresets = [
+    { label: 'Âmbar', value: '#f59e0b' },
+    { label: 'Azul', value: '#0ea5e9' },
+    { label: 'Índigo', value: '#4f46e5' },
+    { label: 'Esmeralda', value: '#10b981' },
+    { label: 'Rosa', value: '#ec4899' },
+    { label: 'Vermelho', value: '#ef4444' },
+    { label: 'Roxo', value: '#8b5cf6' },
+    { label: 'Cinza', value: '#64748b' },
+    { label: 'Turquesa', value: '#06b6d4' },
+  ];
+
   // Modals state
   readonly itemModalOpen = signal(false);
   readonly editingItem = signal<MuralItem | null>(null);
@@ -81,6 +95,15 @@ export class MuralBoardComponent implements OnInit, OnDestroy {
   boardName = '';
   boardDescription = '';
   boardColor = '#f59e0b';
+
+  // Novo Mural modal state
+  readonly createBoardModalOpen = signal(false);
+  newBoardName = '';
+  newBoardDescription = '';
+  newBoardColor = '#f59e0b';
+  newBoardScopeType: 'personal' | 'team' = 'personal';
+  newBoardTeamId: string | null = null;
+  loadingCriarMural = false;
 
   // HTTP loading variables
   loadingSalvarGrupo = false;
@@ -107,6 +130,7 @@ export class MuralBoardComponent implements OnInit, OnDestroy {
 
   // In-app confirmations & alert states
   readonly confirmDeleteGroup = signal(false);
+  readonly confirmDeleteBoard = signal(false);
   readonly confirmDeleteTeam = signal(false);
   readonly errorMessage = signal<string | null>(null);
 
@@ -359,6 +383,15 @@ export class MuralBoardComponent implements OnInit, OnDestroy {
     this.confirmDeleteGroup.set(true);
   }
 
+  solicitarExclusaoGrupoDireto(group: MuralGroup, event: MouseEvent): void {
+    event.stopPropagation();
+    this.editingGroup.set(group);
+    this.groupTitle = group.title;
+    this.groupColor = group.color;
+    this.confirmDeleteGroup.set(true);
+    this.groupModalOpen.set(true);
+  }
+
   cancelarExclusaoGrupo(): void {
     this.confirmDeleteGroup.set(false);
   }
@@ -383,18 +416,112 @@ export class MuralBoardComponent implements OnInit, OnDestroy {
       });
   }
 
+  isFirstGroup(group: MuralGroup): boolean {
+    const groups = this.activeBoard()?.groups || [];
+    return groups.length > 0 && groups[0].id === group.id;
+  }
+
+  isLastGroup(group: MuralGroup): boolean {
+    const groups = this.activeBoard()?.groups || [];
+    return groups.length > 0 && groups[groups.length - 1].id === group.id;
+  }
+
+  onGroupDropped(event: CdkDragDrop<MuralGroup[]>): void {
+    const active = this.activeBoard();
+    if (!active || !active.groups || event.previousIndex === event.currentIndex) return;
+    const updatedGroups = [...active.groups];
+    moveItemInArray(updatedGroups, event.previousIndex, event.currentIndex);
+    updatedGroups.forEach((grp, idx) => { grp.position = idx; });
+    this.activeBoard.update(curr => curr ? { ...curr, groups: updatedGroups } : null);
+
+    const groupIds = updatedGroups.map(g => g.id);
+    this.apiService.reordenarGrupos(active.id, groupIds, this.currentUserId).subscribe({
+      error: (err) => console.error('Erro ao reordenar grupos:', err)
+    });
+  }
+
+  moverGrupo(group: MuralGroup, delta: number, event?: Event): void {
+    event?.stopPropagation();
+    const active = this.activeBoard();
+    if (!active || !active.groups) return;
+    const index = active.groups.findIndex(g => g.id === group.id);
+    if (index === -1) return;
+    const newIndex = index + delta;
+    if (newIndex < 0 || newIndex >= active.groups.length) return;
+
+    const updatedGroups = [...active.groups];
+    moveItemInArray(updatedGroups, index, newIndex);
+    updatedGroups.forEach((grp, idx) => { grp.position = idx; });
+    this.activeBoard.update(curr => curr ? { ...curr, groups: updatedGroups } : null);
+
+    const groupIds = updatedGroups.map(g => g.id);
+    this.apiService.reordenarGrupos(active.id, groupIds, this.currentUserId).subscribe({
+      error: (err) => console.error('Erro ao reordenar grupos:', err)
+    });
+  }
+
+  onBoardDropped(event: CdkDragDrop<MuralBoardSummary[]>): void {
+    if (event.previousIndex === event.currentIndex) return;
+    const allBoards = [...this.boards()];
+    moveItemInArray(allBoards, event.previousIndex, event.currentIndex);
+    allBoards.forEach((b, idx) => { b.position = idx; });
+    this.boards.set(allBoards);
+
+    const boardIds = allBoards.map(b => b.id);
+    this.apiService.reordenarMurais(boardIds, this.currentUserId).subscribe({
+      error: (err) => console.error('Erro ao reordenar murais:', err)
+    });
+  }
+
   // Board modal management
+  abrirNovoMural(scopeType: 'personal' | 'team' = 'personal', teamId: string | null = null): void {
+    this.newBoardName = '';
+    this.newBoardDescription = '';
+    this.newBoardColor = '#f59e0b';
+    this.newBoardScopeType = scopeType;
+    this.newBoardTeamId = teamId;
+    this.createBoardModalOpen.set(true);
+  }
+
+  fecharNovoMuralModal(): void {
+    this.createBoardModalOpen.set(false);
+  }
+
+  salvarNovoMural(): void {
+    if (!this.newBoardName.trim() || this.loadingCriarMural) return;
+
+    this.loadingCriarMural = true;
+    this.apiService.salvarMural({
+      name: this.newBoardName.trim(),
+      description: this.newBoardDescription,
+      color: this.newBoardColor,
+      scopeType: this.newBoardScopeType,
+      teamId: this.newBoardTeamId,
+    }, this.currentUserId)
+      .pipe(finalize(() => { this.loadingCriarMural = false; }))
+      .subscribe({
+        next: (created) => {
+          this.boards.update(list => [...list, created]);
+          this.fecharNovoMuralModal();
+          this.selecionarMural(created.id);
+        },
+        error: (err) => console.error('Erro ao criar mural:', err)
+      });
+  }
+
   abrirEditarMural(): void {
     const active = this.activeBoard();
     if (!active) return;
     this.boardName = active.name;
     this.boardDescription = active.description;
     this.boardColor = active.color;
+    this.confirmDeleteBoard.set(false);
     this.boardModalOpen.set(true);
   }
 
   fecharBoardModal(): void {
     this.boardModalOpen.set(false);
+    this.confirmDeleteBoard.set(false);
   }
 
   salvarMural(): void {
@@ -416,6 +543,57 @@ export class MuralBoardComponent implements OnInit, OnDestroy {
         },
         error: (err) => console.error('Erro ao atualizar mural:', err)
       });
+  }
+
+  solicitarExclusaoMural(): void {
+    this.confirmDeleteBoard.set(true);
+  }
+
+  cancelarExclusaoMural(): void {
+    this.confirmDeleteBoard.set(false);
+  }
+
+  confirmarExclusaoMural(): void {
+    const active = this.activeBoard();
+    if (!active || this.loadingExcluirMural) return;
+
+    this.loadingExcluirMural = true;
+    this.apiService.excluirMural(active.id, this.currentUserId)
+      .pipe(finalize(() => { this.loadingExcluirMural = false; }))
+      .subscribe({
+        next: () => {
+          const remaining = this.boards().filter(b => b.id !== active.id);
+          this.boards.set(remaining);
+          this.confirmDeleteBoard.set(false);
+          this.fecharBoardModal();
+          if (remaining.length) {
+            this.selecionarMural(remaining[0].id);
+          } else {
+            this.muralService.loadBoards();
+          }
+        },
+        error: (err) => console.error('Erro ao excluir mural:', err)
+      });
+  }
+
+  excluirMuralPorId(board: MuralBoardSummary, event?: Event): void {
+    event?.stopPropagation();
+    if (!confirm(`Deseja excluir o mural "${board.name}" e todas as suas notas? Esta ação não pode ser desfeita.`)) return;
+
+    this.apiService.excluirMural(board.id, this.currentUserId).subscribe({
+      next: () => {
+        const remaining = this.boards().filter(b => b.id !== board.id);
+        this.boards.set(remaining);
+        if (this.activeBoard()?.id === board.id) {
+          if (remaining.length) {
+            this.selecionarMural(remaining[0].id);
+          } else {
+            this.muralService.loadBoards();
+          }
+        }
+      },
+      error: (err) => console.error('Erro ao excluir mural:', err)
+    });
   }
 
   // ══ Drag & Drop ══
@@ -530,6 +708,16 @@ export class MuralBoardComponent implements OnInit, OnDestroy {
     const team = this.currentTeam();
     if (!team) return;
     this.kanbanService.removeTeamMember(team.id, memberId);
+  }
+
+  changeMemberRole(memberId: string, role: 'admin' | 'member'): void {
+    const team = this.currentTeam();
+    if (!team) return;
+    this.kanbanService.changeTeamMemberRole(team.id, memberId, role);
+  }
+
+  isTeamOwner(userId: string): boolean {
+    return this.currentTeam()?.owner_id === userId;
   }
 
   solicitarExclusaoTime(): void {

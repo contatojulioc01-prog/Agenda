@@ -12,6 +12,7 @@ export interface MuralBoardSummary {
   teamName?: string;
   myRole?: 'admin' | 'member';
   itemCount: number;
+  position?: number;
   createdAt?: string;
   updatedAt?: string;
 }
