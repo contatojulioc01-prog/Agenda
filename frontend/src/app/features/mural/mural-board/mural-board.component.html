@@ -151,7 +151,7 @@
   </div>
 
   <!-- ══════════════ CANVAS ══════════════ -->
-  <div class="mural-canvas" [class.is-loading]="loading()" (dragover)="$event.preventDefault()">
+  <div class="mural-canvas" [class.is-loading]="loading()" (click)="closeMuralItemContextMenu()" (dragover)="$event.preventDefault()">
 
     <!-- Grupos / Quadros do Mural Reordenáveis por Drag & Drop -->
     <div
@@ -199,7 +199,8 @@
             draggable="true"
             (dragstart)="onDragStart($event, item)"
             (dragend)="onDragEnd()"
-            (click)="abrirEditarItem(item)"
+            (click)="abrirVisualizarItem(item)"
+            (contextmenu)="openMuralItemContextMenu($event, item)"
           >
             <div class="card-pin" [class.active]="item.isPinned" (click)="alternarFixacao($event, item)" matTooltip="{{ item.isPinned ? 'Desafixar' : 'Fixar' }}">
               <mat-icon>push_pin</mat-icon>
@@ -211,8 +212,13 @@
               <app-markdown-text [text]="item.content"></app-markdown-text>
             </div>
             <div class="card-attachments-chips" *ngIf="item.attachments?.length">
-              <span *ngFor="let att of item.attachments" class="att-chip" [class.is-pdf]="att.mimeType === 'application/pdf'" (click)="abrirPreview($event, att)">
-                <mat-icon>{{ att.mimeType === 'application/pdf' ? 'picture_as_pdf' : 'image' }}</mat-icon>
+              <span
+                *ngFor="let att of item.attachments"
+                class="att-chip"
+                [ngClass]="'chip-' + getFileInfo(att.fileName, att.mimeType).category"
+                (click)="abrirPreview($event, att)"
+              >
+                <mat-icon [style.color]="getFileInfo(att.fileName, att.mimeType).color">{{ getFileInfo(att.fileName, att.mimeType).icon }}</mat-icon>
                 <span>{{ att.fileName }}</span>
               </span>
             </div>
@@ -258,7 +264,8 @@
           draggable="true"
           (dragstart)="onDragStart($event, item)"
           (dragend)="onDragEnd()"
-          (click)="abrirEditarItem(item)"
+          (click)="abrirVisualizarItem(item)"
+          (contextmenu)="openMuralItemContextMenu($event, item)"
         >
           <div class="card-pin" [class.active]="item.isPinned" (click)="alternarFixacao($event, item)">
             <mat-icon>push_pin</mat-icon>
@@ -268,8 +275,13 @@
             <app-markdown-text [text]="item.content"></app-markdown-text>
           </div>
           <div class="card-attachments-chips" *ngIf="item.attachments?.length">
-            <span *ngFor="let att of item.attachments" class="att-chip" [class.is-pdf]="att.mimeType === 'application/pdf'" (click)="abrirPreview($event, att)">
-              <mat-icon>{{ att.mimeType === 'application/pdf' ? 'picture_as_pdf' : 'image' }}</mat-icon>
+            <span
+              *ngFor="let att of item.attachments"
+              class="att-chip"
+              [ngClass]="'chip-' + getFileInfo(att.fileName, att.mimeType).category"
+              (click)="abrirPreview($event, att)"
+            >
+              <mat-icon [style.color]="getFileInfo(att.fileName, att.mimeType).color">{{ getFileInfo(att.fileName, att.mimeType).icon }}</mat-icon>
               <span>{{ att.fileName }}</span>
             </span>
           </div>
@@ -300,10 +312,33 @@
   [item]="editingItem()"
   [groups]="activeBoard()?.groups || []"
   [defaultGroupId]="targetGroupId()"
+  [isReadOnly]="itemModalReadOnly()"
   (close)="fecharItemModal()"
   (saved)="onItemSalvo($event)"
   (deleted)="onItemExcluido($event)"
 ></app-mural-item-modal>
+
+<!-- ══════════════ MENU DE CONTEXTO DO ITEM DO MURAL ══════════════ -->
+<div
+  class="mural-context-menu"
+  *ngIf="muralItemContextMenu() as menu"
+  [style.left.px]="menu.x"
+  [style.top.px]="menu.y"
+  (click)="$event.stopPropagation()"
+>
+  <button type="button" (click)="abrirVisualizarItem(menu.item)">
+    <mat-icon>visibility</mat-icon><span>Visualizar</span>
+  </button>
+  <button type="button" (click)="abrirEditarItem(menu.item)">
+    <mat-icon>edit</mat-icon><span>Editar</span>
+  </button>
+  <button type="button" (click)="alternarFixacao($event, menu.item)">
+    <mat-icon>push_pin</mat-icon><span>{{ menu.item.isPinned ? 'Desafixar' : 'Fixar' }}</span>
+  </button>
+  <button type="button" class="danger" (click)="excluirItemFromContext(menu.item)">
+    <mat-icon>delete_outline</mat-icon><span>Excluir</span>
+  </button>
+</div>
 
 <!-- ══════════════ MODAL DE GRUPO / QUADRO ══════════════ -->
 <div class="modal-overlay" *ngIf="groupModalOpen()" (mousedown)="fecharGrupoModal()">
@@ -596,18 +631,13 @@
 </div>
 
 <!-- ══════════════ PREVIEW DE ANEXO ══════════════ -->
-<div class="modal-overlay attachment-overlay" *ngIf="previewAttachmentUrl()" (click)="fecharPreview()">
-  <div class="attachment-preview-card" (click)="$event.stopPropagation()">
-    <div class="preview-header">
-      <div class="preview-title">
-        <mat-icon>{{ previewAttachmentMimeType() === 'application/pdf' ? 'picture_as_pdf' : 'image' }}</mat-icon>
-        <span>{{ previewAttachmentName() }}</span>
-      </div>
-      <button class="close-btn" (click)="fecharPreview()"><mat-icon>close</mat-icon></button>
-    </div>
-    <div class="preview-body">
-      <iframe *ngIf="previewAttachmentMimeType() === 'application/pdf'" [src]="trustedPreviewUrl()" class="pdf-frame"></iframe>
-      <img *ngIf="previewAttachmentMimeType() !== 'application/pdf'" [src]="previewAttachmentUrl()" [alt]="previewAttachmentName()" class="image-frame" />
-    </div>
-  </div>
-</div>
+<app-attachment-preview-modal
+  *ngIf="previewAttachmentUrl()"
+  [fileName]="previewAttachmentName()"
+  [fileUrl]="previewAttachmentUrl()"
+  [mimeType]="previewAttachmentMimeType()"
+  [rawContent]="previewAttachmentRawContent()"
+  [byteSize]="previewAttachmentByteSize()"
+  (close)="fecharPreview()"
+  (download)="baixarAnexo()"
+></app-attachment-preview-modal>

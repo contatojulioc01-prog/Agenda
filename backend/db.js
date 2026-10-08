@@ -44,6 +44,7 @@ async function initDb() {
   if (pool) return pool;
   pool = new Pool({ ...connectionConfig(), max: Number(process.env.PGPOOL_MAX || 10) });
   pool.on('error', error => console.error('[DB] Erro inesperado no pool PostgreSQL:', error));
+  pool.on('connect', client => { client.query("SET client_encoding = 'UTF8'").catch(() => {}); });
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS calendars (

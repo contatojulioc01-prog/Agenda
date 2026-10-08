@@ -48,12 +48,12 @@ export class App {
   private scheduleDismiss(): void {
     if (this.dismissScheduled) return;
     this.dismissScheduled = true;
-    const minimumDisplayTime = 1_800;
+    const minimumDisplayTime = 1_300;
     const remainingTime = Math.max(0, minimumDisplayTime - (Date.now() - this.startedAt));
 
     const leaveTimer = window.setTimeout(() => {
       this.loadingLeaving.set(true);
-      const removeTimer = window.setTimeout(() => this.loadingVisible.set(false), 460);
+      const removeTimer = window.setTimeout(() => this.loadingVisible.set(false), 230);
       this.destroyRef.onDestroy(() => window.clearTimeout(removeTimer));
     }, remainingTime);
     this.destroyRef.onDestroy(() => window.clearTimeout(leaveTimer));

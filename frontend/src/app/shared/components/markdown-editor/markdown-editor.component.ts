@@ -164,6 +164,12 @@ export class MarkdownEditorComponent implements AfterViewInit {
     const children = () => Array.from(element.childNodes).map(child => this.nodeToMarkdown(child)).join('');
 
     if (tag === 'br') return '\n';
+    if (tag === 'a') {
+      const href = element.getAttribute('href') || '';
+      const text = children();
+      if (!href) return text;
+      return text === href ? href : `[${text}](${href})`;
+    }
     if (tag === 'strong' || tag === 'b') return `**${children()}**`;
     if (tag === 'em' || tag === 'i') return `*${children()}*`;
     if (tag === 'code') return `\`${children()}\``;

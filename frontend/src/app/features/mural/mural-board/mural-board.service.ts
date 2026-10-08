@@ -80,6 +80,12 @@ export class MuralBoardApiService {
     });
   }
 
+  excluirItem(itemId: string, userId: string): Observable<{ success: boolean }> {
+    return this.http.delete<{ success: boolean }>(`/api/mural/items/${itemId}`, {
+      headers: { 'x-user-id': userId }
+    });
+  }
+
   adicionarMembroTime(teamId: string, userId: string, role: 'member' | 'admin', requesterId: string): Observable<{ success: boolean }> {
     return this.http.post<{ success: boolean }>(`/api/mural/teams/${teamId}/members`, { userId, role }, {
       headers: { 'x-user-id': requesterId }

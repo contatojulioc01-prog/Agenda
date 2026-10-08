@@ -16,6 +16,9 @@ import { AuthService } from '../../../core/services/auth.service';
 import { MuralItemModalService } from './mural-item-modal.service';
 import { AiTextButtonComponent } from '../../../shared/components/ai-text-button/ai-text-button.component';
 import { MarkdownEditorComponent } from '../../../shared/components/markdown-editor/markdown-editor.component';
+import { MarkdownTextComponent } from '../../../shared/components/markdown-text/markdown-text.component';
+import { AttachmentPreviewModalComponent } from '../../../shared/components/attachment-preview-modal/attachment-preview-modal.component';
+import { detectFileType } from '../../../core/utils/code-highlight.util';
 
 export interface MuralColorOption {
   value: string;
@@ -36,6 +39,8 @@ export interface MuralColorOption {
     MatDividerModule,
     AiTextButtonComponent,
     MarkdownEditorComponent,
+    MarkdownTextComponent,
+    AttachmentPreviewModalComponent,
   ],
   templateUrl: './mural-item-modal.component.html',
   styleUrl: './mural-item-modal.component.scss',
@@ -46,6 +51,7 @@ export class MuralItemModalComponent implements OnInit {
   @Input() item: MuralItem | null = null;
   @Input() groups: MuralGroup[] = [];
   @Input() defaultGroupId: string | null = null;
+  @Input() isReadOnly = false;
   @Output() close = new EventEmitter<void>();
   @Output() saved = new EventEmitter<MuralItem>();
   @Output() deleted = new EventEmitter<string>();
@@ -56,6 +62,11 @@ export class MuralItemModalComponent implements OnInit {
   private sanitizer = inject(DomSanitizer);
 
   isEdit = false;
+
+  enableEditMode(): void {
+    this.isReadOnly = false;
+    this.isEdit = true;
+  }
   title = '';
   content = '';
   selectedColor = '#fef08a';
@@ -63,6 +74,12 @@ export class MuralItemModalComponent implements OnInit {
   isPinned = false;
   attachments: Attachment[] = [];
   pendingFiles: File[] = [];
+
+  getGroupName(): string | null {
+    if (!this.selectedGroupId) return null;
+    const group = this.groups.find(g => g.id === this.selectedGroupId);
+    return group ? group.title : null;
+  }
 
   readonly colorOptions: MuralColorOption[] = [
     { value: '#fef08a', name: 'Amarelo Clássico', border: '#facc15' },
@@ -89,7 +106,9 @@ export class MuralItemModalComponent implements OnInit {
   previewAttachmentUrl = signal<string | null>(null);
   previewAttachmentName = signal('');
   previewAttachmentMimeType = signal('');
-  trustedPreviewUrl = signal<SafeResourceUrl | null>(null);
+  previewAttachmentRawContent = signal<string | null>(null);
+  previewAttachmentByteSize = signal(0);
+  previewCurrentAttachment = signal<Attachment | null>(null);
 
   get currentUserId(): string {
     return this.auth.currentUser()?.id || 'anonymous';
@@ -288,19 +307,69 @@ export class MuralItemModalComponent implements OnInit {
     });
   }
 
+  getFileInfo(fileName: string, mimeType?: string) {
+    return detectFileType(fileName, mimeType);
+  }
+
   abrirPreview(att: Attachment): void {
-    this.attachmentsService.content(att.id, this.currentUserId).subscribe({
-      next: (blob) => {
-        const url = URL.createObjectURL(blob);
+    const fileInfo = detectFileType(att.fileName, att.mimeType);
+    this.previewCurrentAttachment.set(att);
+    this.previewAttachmentName.set(att.fileName);
+    this.previewAttachmentMimeType.set(att.mimeType);
+    this.previewAttachmentByteSize.set(att.byteSize);
+
+    if (fileInfo.category === 'code' || fileInfo.category === 'other' || att.mimeType.startsWith('text/')) {
+      this.attachmentsService.text(att.id, this.currentUserId).subscribe({
+        next: (text) => {
+          this.previewAttachmentRawContent.set(text);
+          this.attachmentsService.content(att.id, this.currentUserId).subscribe({
+            next: (blob) => {
+              const url = URL.createObjectURL(blob);
+              this.previewAttachmentUrl.set(url);
+            }
+          });
+        },
+        error: () => {
+          this.attachmentsService.content(att.id, this.currentUserId).subscribe({
+            next: (blob) => {
+              const url = URL.createObjectURL(blob);
+              this.previewAttachmentUrl.set(url);
+            }
+          });
+        }
+      });
+    } else {
+      this.previewAttachmentRawContent.set(null);
+      this.attachmentsService.content(att.id, this.currentUserId).subscribe({
+        next: (blob) => {
+          const url = URL.createObjectURL(blob);
+          this.previewAttachmentUrl.set(url);
+        }
+      });
+    }
+  }
+
+  abrirPendingPreview(file: File): void {
+    const fileInfo = detectFileType(file.name, file.type);
+    this.previewCurrentAttachment.set(null);
+    this.previewAttachmentName.set(file.name);
+    this.previewAttachmentMimeType.set(file.type || '');
+    this.previewAttachmentByteSize.set(file.size);
+
+    if (fileInfo.category === 'code' || file.type.startsWith('text/')) {
+      file.text().then(text => {
+        this.previewAttachmentRawContent.set(text);
+        const url = URL.createObjectURL(file);
         this.previewAttachmentUrl.set(url);
-        this.previewAttachmentName.set(att.fileName);
-        this.previewAttachmentMimeType.set(att.mimeType);
-        this.trustedPreviewUrl.set(this.sanitizer.bypassSecurityTrustResourceUrl(url));
-      },
-      error: (err) => {
-        console.error('Erro ao carregar preview do anexo:', err);
-      }
-    });
+      }).catch(() => {
+        const url = URL.createObjectURL(file);
+        this.previewAttachmentUrl.set(url);
+      });
+    } else {
+      this.previewAttachmentRawContent.set(null);
+      const url = URL.createObjectURL(file);
+      this.previewAttachmentUrl.set(url);
+    }
   }
 
   fecharPreview(): void {
@@ -309,11 +378,16 @@ export class MuralItemModalComponent implements OnInit {
     this.previewAttachmentUrl.set(null);
     this.previewAttachmentName.set('');
     this.previewAttachmentMimeType.set('');
-    this.trustedPreviewUrl.set(null);
+    this.previewAttachmentRawContent.set(null);
+    this.previewAttachmentByteSize.set(0);
+    this.previewCurrentAttachment.set(null);
   }
 
-  baixarAnexo(att: Attachment): void {
-    this.attachmentsService.download(att, this.currentUserId);
+  baixarAnexo(att?: Attachment | null): void {
+    const target = att || this.previewCurrentAttachment();
+    if (target) {
+      this.attachmentsService.download(target, this.currentUserId);
+    }
   }
 
   formatarTamanho(bytes: number): string {

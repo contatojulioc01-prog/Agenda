@@ -7,10 +7,10 @@ const DEFAULT_SYSTEM_PROMPT = 'Você é o assistente inteligente da Agenda Corpo
 const MAX_MESSAGE_LENGTH = 12000;
 const MAX_MESSAGES = 30;
 const TEXT_ACTION_PROMPTS = {
-  improve: 'Melhore a escrita do texto a seguir, tornando-o mais claro, profissional e conciso, mantendo o sentido original. Retorne somente a versão final:',
-  review: 'Revise o texto a seguir, corrigindo erros de gramática, ortografia e coesão textual. Retorne somente o texto corrigido:',
-  explain: 'Explique o conteúdo do texto a seguir em linguagem simples e direta. Retorne somente a explicação final, sem introduções ou comentários:',
-  reformat: 'Reformate o texto a seguir em uma única estrutura mais organizada, usando Markdown com tópicos ou parágrafos curtos quando apropriado. Mantenha todas as informações e retorne somente o texto final:',
+  improve: 'Melhore e aperfeiçoe a escrita do texto a seguir com formatação Markdown profissional e elegante (destaque termos-chave em negrito, organize em tópicos com marcadores "-" e parágrafos estruturados). Retorne exclusivamente o texto final pronto para uso em Markdown:',
+  review: 'Revise gramática, ortografia, pontuação e coesão do texto a seguir, aplicando e aperfeiçoando a formatação em Markdown (tópicos com "-", ênfases em negrito e organização estruturada). Retorne exclusivamente o texto final corrigido em Markdown:',
+  explain: 'Explique o conteúdo do texto a seguir em linguagem simples, didática e direta, estruturando toda a explicação em Markdown (com tópicos "-", destaques em negrito e parágrafos curtos e objetivos). Retorne exclusivamente o texto explicativo final formatado em Markdown, sem introduções:',
+  reformat: 'Reformate e organize o texto a seguir integralmente em Markdown elegante e profissional (utilize tópicos "-", checklists "[ ]" se houver itens acionáveis/tarefas, tabelas se houver dados tabulares, títulos e destaques em negrito). Mantenha todas as informações originais e retorne exclusivamente o texto final formatado em Markdown:',
 };
 
 function getProviderCandidates() {
@@ -608,7 +608,14 @@ router.post('/text-action', async (req, res) => {
   if (!text || text.length > MAX_MESSAGE_LENGTH) return res.status(400).json({ error: 'O texto deve ter entre 1 e 12000 caracteres.' });
   try {
     const sessionId = resolveSessionId(req);
-    const response = await requestProvider(provider, [{ role: 'user', content: `${TEXT_ACTION_PROMPTS[action]}\n\n${text}` }], 'Você é um assistente de escrita em português do Brasil. Sua resposta substituirá diretamente um campo de descrição. Retorne exclusivamente o texto final pronto para uso. Nunca faça perguntas, nunca ofereça alternativas ou opções e nunca inclua introduções, análises, justificativas, comentários ou seções como "Principais melhorias". Preserve fatos, nomes e a intenção do texto original.', false, undefined, sessionId);
+    const response = await requestProvider(
+      provider,
+      [{ role: 'user', content: `${TEXT_ACTION_PROMPTS[action]}\n\n${text}` }],
+      'Você é um assistente de escrita e formatação Markdown em português do Brasil para a Agenda Corporativa. Sua resposta substituirá diretamente um campo de descrição/nota com suporte a Markdown. Retorne exclusivamente o texto final pronto para uso devidamente estruturado e formatado em Markdown (utilizando parágrafos bem definidos, listas com marcadores "-", checklists "[ ]" / "[x]", negrito "**", itálico "*", citações ">" e tabelas quando cabível). Nunca faça perguntas, nunca ofereça alternativas ou opções e nunca inclua introduções, análises, justificativas, comentários ou seções como "Principais melhorias". Preserve fatos, datas, nomes e a intenção do texto original.',
+      false,
+      undefined,
+      sessionId
+    );
     const payload = await response.text();
     if (!response.ok) {
       console.error(`[AI] ${providerErrorMessage(provider, response.status, payload)}`);

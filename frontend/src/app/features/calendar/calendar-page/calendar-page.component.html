@@ -356,16 +356,16 @@
 
       <app-month-view *ngIf="currentView === 'month'" [year]="year" [month]="month" [events]="displayedEvents()"
         [holidays]="holidays" (dayClick)="openCreateModal($event)" (dayContextMenu)="openDayContextMenu($event)"
-        (eventClick)="openEditModal($event)" (eventContextMenu)="openEventContextMenu($event)"
+        (eventClick)="openViewModal($event)" (eventContextMenu)="openEventContextMenu($event)"
         (eventDrop)="onEventDrop($event)"></app-month-view>
 
       <app-week-view *ngIf="currentView === 'week'" [selectedDate]="selectedDate" [events]="displayedEvents()"
         [holidays]="holidays" (dayClick)="openCreateModal($event)" (dayContextMenu)="openDayContextMenu($event)"
-        (eventClick)="openEditModal($event)" (eventContextMenu)="openEventContextMenu($event)"
+        (eventClick)="openViewModal($event)" (eventContextMenu)="openEventContextMenu($event)"
         (eventDrop)="onEventDrop($event)"></app-week-view>
 
       <app-day-view *ngIf="currentView === 'day'" [selectedDate]="selectedDate" [events]="displayedEvents()"
-        [holidays]="holidays" (dayContextMenu)="openDayContextMenu($event)" (eventClick)="openEditModal($event)"
+        [holidays]="holidays" (dayContextMenu)="openDayContextMenu($event)" (eventClick)="openViewModal($event)"
         (eventContextMenu)="openEventContextMenu($event)" (eventDrop)="onEventDrop($event)"></app-day-view>
 
     </div>
@@ -399,16 +399,13 @@
 
 <div class="agenda-context-menu event-menu" *ngIf="eventContextMenu() as menu" [style.left.px]="menu.x"
   [style.top.px]="menu.y" (click)="$event.stopPropagation()">
-  <ng-container *ngIf="canManageEvent(menu.event); else protectedEventMenu">
-    <button type="button" (click)="editEventFromContext(menu.event)"><mat-icon>edit</mat-icon>Editar evento</button>
+  <button type="button" (click)="viewEventFromContext(menu.event)"><mat-icon>visibility</mat-icon>Visualizar</button>
+  <ng-container *ngIf="canManageEvent(menu.event)">
+    <button type="button" (click)="editEventFromContext(menu.event)"><mat-icon>edit</mat-icon>Editar</button>
     <button type="button" class="danger"
-      (click)="requestEventDeletion(menu.event)"><mat-icon>delete_outline</mat-icon>Excluir evento</button>
+      (click)="requestEventDeletion(menu.event)"><mat-icon>delete_outline</mat-icon>Excluir</button>
   </ng-container>
-  <ng-template #protectedEventMenu>
-    <div class="context-menu-notice"><mat-icon>lock</mat-icon><span>{{ menu.event.isTaskDeadline ? 'Edite este prazo
-        pelo card em Tarefas' : menu.event.isSystem ? 'Evento gerenciado pelo sistema' : 'Você possui acesso somente
-        para visualização' }}</span></div>
-  </ng-template>
+  <div class="context-menu-notice" *ngIf="!canManageEvent(menu.event)"><mat-icon>lock</mat-icon><span>{{ menu.event.isTaskDeadline ? 'Edite este prazo pelo card em Tarefas' : menu.event.isSystem ? 'Evento gerenciado pelo sistema' : 'Acesso somente para visualização' }}</span></div>
 </div>
 
 <div class="agenda-context-menu day-menu" *ngIf="dayContextMenu() as menu" [style.left.px]="menu.x"

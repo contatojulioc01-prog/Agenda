@@ -27,6 +27,12 @@ export class AttachmentsService {
     });
   }
 
+  text(attachmentId: string, userId: string): Observable<string> {
+    return this.http.get(`/api/attachments/${attachmentId}/content`, {
+      headers: { 'x-user-id': userId }, responseType: 'text',
+    });
+  }
+
   download(attachment: Attachment, userId: string): void {
     this.content(attachment.id, userId).subscribe(blob => {
       const url = URL.createObjectURL(blob);

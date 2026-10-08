@@ -24,6 +24,8 @@ import { MuralItemModalComponent } from '../mural-item-modal/mural-item-modal.co
 import { MarkdownTextComponent } from '../../../shared/components/markdown-text/markdown-text.component';
 import { AiTextButtonComponent } from '../../../shared/components/ai-text-button/ai-text-button.component';
 import { MarkdownEditorComponent } from '../../../shared/components/markdown-editor/markdown-editor.component';
+import { AttachmentPreviewModalComponent } from '../../../shared/components/attachment-preview-modal/attachment-preview-modal.component';
+import { detectFileType } from '../../../core/utils/code-highlight.util';
 
 @Component({
   selector: 'app-mural-board',
@@ -40,6 +42,7 @@ import { MarkdownEditorComponent } from '../../../shared/components/markdown-edi
     MarkdownTextComponent,
     AiTextButtonComponent,
     MarkdownEditorComponent,
+    AttachmentPreviewModalComponent,
   ],
   templateUrl: './mural-board.component.html',
   styleUrl: './mural-board.component.scss',
@@ -83,8 +86,10 @@ export class MuralBoardComponent implements OnInit, OnDestroy {
 
   // Modals state
   readonly itemModalOpen = signal(false);
+  readonly itemModalReadOnly = signal(false);
   readonly editingItem = signal<MuralItem | null>(null);
   readonly targetGroupId = signal<string | null>(null);
+  readonly muralItemContextMenu = signal<{ item: MuralItem; x: number; y: number } | null>(null);
 
   readonly groupModalOpen = signal(false);
   readonly editingGroup = signal<MuralGroup | null>(null);
@@ -166,7 +171,9 @@ export class MuralBoardComponent implements OnInit, OnDestroy {
   previewAttachmentUrl = signal<string | null>(null);
   previewAttachmentName = signal('');
   previewAttachmentMimeType = signal('');
-  trustedPreviewUrl = signal<SafeResourceUrl | null>(null);
+  previewAttachmentRawContent = signal<string | null>(null);
+  previewAttachmentByteSize = signal<number | undefined>(undefined);
+  previewCurrentAttachment = signal<Attachment | null>(null);
 
   private unsubscribeRealtime?: () => void;
 
@@ -258,19 +265,54 @@ export class MuralBoardComponent implements OnInit, OnDestroy {
   }
 
   abrirNovoItem(groupId: string | null = null): void {
+    this.closeMuralItemContextMenu();
+    this.itemModalReadOnly.set(false);
     this.editingItem.set(null);
     this.targetGroupId.set(groupId);
     this.itemModalOpen.set(true);
   }
 
-  abrirEditarItem(item: MuralItem): void {
+  abrirVisualizarItem(item: MuralItem): void {
+    this.closeMuralItemContextMenu();
+    this.itemModalReadOnly.set(true);
     this.editingItem.set(item);
     this.targetGroupId.set(item.groupId);
     this.itemModalOpen.set(true);
   }
 
+  abrirEditarItem(item: MuralItem): void {
+    this.closeMuralItemContextMenu();
+    this.itemModalReadOnly.set(false);
+    this.editingItem.set(item);
+    this.targetGroupId.set(item.groupId);
+    this.itemModalOpen.set(true);
+  }
+
+  openMuralItemContextMenu(event: MouseEvent, item: MuralItem): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.muralItemContextMenu.set({
+      item,
+      x: Math.max(8, Math.min(event.clientX, window.innerWidth - 200)),
+      y: Math.max(8, Math.min(event.clientY, window.innerHeight - 190)),
+    });
+  }
+
+  closeMuralItemContextMenu(): void {
+    this.muralItemContextMenu.set(null);
+  }
+
+  excluirItemFromContext(item: MuralItem): void {
+    this.closeMuralItemContextMenu();
+    this.apiService.excluirItem(item.id, this.currentUserId).subscribe({
+      next: () => this.onItemExcluido(item.id),
+      error: (err) => console.error('Erro ao excluir nota:', err)
+    });
+  }
+
   fecharItemModal(): void {
     this.itemModalOpen.set(false);
+    this.itemModalReadOnly.set(false);
     this.editingItem.set(null);
     this.targetGroupId.set(null);
   }
@@ -750,19 +792,49 @@ export class MuralBoardComponent implements OnInit, OnDestroy {
     return this.auth.allUsers().find(user => user.id === userId)?.avatar || this.defaultAvatar;
   }
 
+  getFileInfo(name: string, mime?: string) {
+    return detectFileType(name, mime);
+  }
+
   // Attachment preview in board
   abrirPreview(event: MouseEvent, att: Attachment): void {
     event.stopPropagation();
-    this.attachmentsService.content(att.id, this.currentUserId).subscribe({
-      next: (blob) => {
-        const url = URL.createObjectURL(blob);
-        this.previewAttachmentUrl.set(url);
-        this.previewAttachmentName.set(att.fileName);
-        this.previewAttachmentMimeType.set(att.mimeType);
-        this.trustedPreviewUrl.set(this.sanitizer.bypassSecurityTrustResourceUrl(url));
-      },
-      error: (err) => console.error('Erro ao carregar preview do anexo:', err)
-    });
+    const fileInfo = detectFileType(att.fileName, att.mimeType);
+    this.previewCurrentAttachment.set(att);
+    this.previewAttachmentName.set(att.fileName);
+    this.previewAttachmentMimeType.set(att.mimeType);
+    this.previewAttachmentByteSize.set(att.byteSize);
+
+    if (fileInfo.category === 'code' || fileInfo.category === 'other' || att.mimeType.startsWith('text/')) {
+      this.attachmentsService.text(att.id, this.currentUserId).subscribe({
+        next: (text) => {
+          this.previewAttachmentRawContent.set(text);
+          this.attachmentsService.content(att.id, this.currentUserId).subscribe({
+            next: (blob) => {
+              const url = URL.createObjectURL(blob);
+              this.previewAttachmentUrl.set(url);
+            }
+          });
+        },
+        error: () => {
+          this.attachmentsService.content(att.id, this.currentUserId).subscribe({
+            next: (blob) => {
+              const url = URL.createObjectURL(blob);
+              this.previewAttachmentUrl.set(url);
+            }
+          });
+        }
+      });
+    } else {
+      this.previewAttachmentRawContent.set(null);
+      this.attachmentsService.content(att.id, this.currentUserId).subscribe({
+        next: (blob) => {
+          const url = URL.createObjectURL(blob);
+          this.previewAttachmentUrl.set(url);
+        },
+        error: (err) => console.error('Erro ao carregar preview do anexo:', err)
+      });
+    }
   }
 
   fecharPreview(): void {
@@ -771,7 +843,24 @@ export class MuralBoardComponent implements OnInit, OnDestroy {
     this.previewAttachmentUrl.set(null);
     this.previewAttachmentName.set('');
     this.previewAttachmentMimeType.set('');
-    this.trustedPreviewUrl.set(null);
+    this.previewAttachmentRawContent.set(null);
+    this.previewAttachmentByteSize.set(undefined);
+    this.previewCurrentAttachment.set(null);
+  }
+
+  baixarAnexo(att?: Attachment | null): void {
+    const target = att || this.previewCurrentAttachment();
+    if (!target) return;
+    this.attachmentsService.content(target.id, this.currentUserId).subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = target.fileName;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    });
   }
 
   formatarData(isoString: string): string {

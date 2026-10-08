@@ -293,7 +293,7 @@
           (cdkDropListDropped)="dropTask($event, column)">
           <article class="task-card" *ngFor="let task of tasksFor(column.id); trackBy: trackById" cdkDrag
             [cdkDragData]="task" [cdkDragDisabled]="showArchived()" [attr.data-priority]="task.priority" tabindex="0"
-            (keydown.enter)="openEdit(task)" (click)="openEdit(task)" (contextmenu)="openTaskContextMenu($event, task)">
+            (keydown.enter)="openView(task)" (click)="openView(task)" (contextmenu)="openTaskContextMenu($event, task)">
             <div class="drag-placeholder" *cdkDragPlaceholder></div>
             <div class="card-labels" *ngIf="getTaskFreeLabels(task).length"><span *ngFor="let label of getTaskFreeLabels(task) | slice:0:4">{{
                 label }}</span></div>
@@ -547,7 +547,7 @@
           </thead>
           <tbody>
             <tr *ngFor="let task of sortedVisibleTasks(); trackBy: trackById" class="notion-row"
-              (click)="openEdit(task)" (contextmenu)="openTaskContextMenu($event, task)">
+              (click)="openView(task)" (contextmenu)="openTaskContextMenu($event, task)">
 
               <!-- Assunto -->
               <td *ngIf="isColumnVisible('subject')" class="col-subject"
@@ -647,7 +647,7 @@
                 [style.width.px]="getColumnWidth('date')"
                 [style.min-width.px]="getColumnWidth('date')"
                 [style.max-width.px]="getColumnWidth('date')"
-                (click)="$event.stopPropagation()">
+                (click)="openDatePickerFromCell($event)">
                 <div class="notion-date-wrapper" title="Clique para alterar o prazo">
                   <span *ngIf="task.dueDate" class="notion-date-text" [class.overdue]="isOverdue(task)"
                     [class.soon]="isDueSoon(task)">
@@ -718,6 +718,7 @@
                 [class.interactive-check-cell]="col.type === 'checkbox'"
                 (click)="$event.stopPropagation();
                   col.type === 'checkbox' ? toggleCustomCheckbox(task, col, $event) :
+                  col.type === 'date' ? openDatePickerFromCell($event) :
                   (col.type === 'text' || col.type === 'number') && (inlineEditingCell()?.taskId !== task.id || inlineEditingCell()?.field !== col.id) ? startInlineEdit(task, col.id, $event) : null">
 
                 <!-- Texto ou Número com Inline Edit -->
@@ -886,6 +887,7 @@
 
 <div class="task-context-menu" *ngIf="taskContextMenu() as menu" [style.left.px]="menu.x" [style.top.px]="menu.y"
   (click)="$event.stopPropagation()">
+  <button type="button" (click)="viewTaskFromContext(menu.task)"><mat-icon>visibility</mat-icon>Visualizar tarefa</button>
   <button type="button" (click)="editTaskFromContext(menu.task)"><mat-icon>edit</mat-icon>Editar tarefa</button>
   <button type="button" (click)="openTaskBranchFromContext(menu.task)"><mat-icon>account_tree</mat-icon>{{
     branchHasContent(menu.task) ? 'Abrir subtarefas' : 'Criar subtarefas' }}</button>
@@ -1193,7 +1195,7 @@
               {{ getColumnTitle(draft.columnId) }}
             </span>
           </div>
-          <h2 id="task-modal-title">{{ editingId() ? 'Detalhes da Tarefa' : 'Nova Tarefa' }}</h2>
+          <h2 id="task-modal-title">{{ isTaskReadOnly() ? 'Detalhes da Tarefa' : (editingId() ? 'Editar Tarefa' : 'Nova Tarefa') }}</h2>
         </div>
       </div>
 
@@ -1210,345 +1212,469 @@
     <!-- Modal Body -->
     <div class="modal-body task-modal-body">
       
-      <!-- Título Principal -->
-      <div class="task-title-section">
-        <input [(ngModel)]="draft.title" maxlength="180" class="task-title-main-input"
-          placeholder="O que precisa ser feito? (Título da tarefa)" autofocus />
+      <!-- Modo Visualização Limpo & Elegante -->
+      <div class="read-only-view-container" *ngIf="isTaskReadOnly()">
+        <div class="view-content-card" [style.border-left-color]="getStatusTheme(draft.columnId).dot">
+          <div class="view-header-row">
+            <h1 class="view-title">{{ draft.title || 'Sem título' }}</h1>
+            <div class="view-meta-badges">
+              <!-- Status -->
+              <span class="view-badge badge-status" [style.color]="getStatusTheme(draft.columnId).color">
+                <span class="view-badge-dot" [style.background]="getStatusTheme(draft.columnId).dot"></span>
+                <span>{{ getColumnTitle(draft.columnId) }}</span>
+              </span>
+
+              <!-- Prioridade -->
+              <span class="view-badge badge-priority priority" [ngClass]="draft.priority" *ngIf="draft.priority">
+                <mat-icon>{{ getPriorityIcon(draft.priority) }}</mat-icon>
+                <span>{{ getPriorityLabel(draft.priority) }}</span>
+              </span>
+
+              <!-- Prazo -->
+              <span class="view-badge badge-due-date" *ngIf="draft.dueDate">
+                <mat-icon>event</mat-icon>
+                <span>{{ formatDueDate(draft.dueDate) }}</span>
+              </span>
+
+              <!-- Responsáveis -->
+              <span class="view-badge badge-assignees" *ngIf="draft.assigneeIds.length">
+                <mat-icon>person</mat-icon>
+                <span>{{ draftAssigneeNames() }}</span>
+              </span>
+
+              <!-- Etiquetas -->
+              <ng-container *ngIf="draftLabels().length">
+                <span *ngFor="let label of draftLabels()" class="view-badge badge-label">
+                  #{{ label.startsWith('#') ? label.substring(1) : label }}
+                </span>
+              </ng-container>
+            </div>
+          </div>
+
+          <div class="view-description-wrap">
+            <app-markdown-text *ngIf="draft.description" [text]="draft.description"></app-markdown-text>
+            <p *ngIf="!draft.description" class="view-empty-desc">Nenhuma descrição informada.</p>
+          </div>
+        </div>
+
+        <!-- Checklist no modo visualização (se houver) -->
+        <div class="view-checklist-card" *ngIf="draft.checklist.length > 0">
+          <div class="view-card-subtitle">
+            <mat-icon>checklist</mat-icon>
+            <span>Checklist ({{ draft.checklist.filter(item => item.done).length }}/{{ draft.checklist.length }})</span>
+          </div>
+          <div class="view-checklist-list">
+            <!-- Itens avulsos -->
+            <div class="view-check-item" *ngFor="let item of ungroupedChecklistItems">
+              <mat-icon class="check-icon" [class.done]="item.done">{{ item.done ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>
+              <span class="check-text" [class.done]="item.done">{{ item.text }}</span>
+            </div>
+            <!-- Seções / Grupos -->
+            <div class="view-check-group" *ngFor="let group of checklistGroups">
+              <div class="view-group-title">
+                <mat-icon>folder</mat-icon>
+                <span>{{ group }}</span>
+              </div>
+              <div class="view-check-item grouped" *ngFor="let item of checklistItemsForGroup(group)">
+                <mat-icon class="check-icon" [class.done]="item.done">{{ item.done ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>
+                <span class="check-text" [class.done]="item.done">{{ item.text }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Anexos no modo visualização (se houver) -->
+        <div class="view-attachments-card" *ngIf="taskAttachments.length > 0">
+          <div class="view-card-subtitle">
+            <mat-icon>attach_file</mat-icon>
+            <span>Anexos ({{ taskAttachments.length }})</span>
+          </div>
+          <div class="attachment-list">
+            <div
+              class="attachment-item"
+              *ngFor="let attachment of taskAttachments"
+              (click)="openTaskAttachment(attachment)"
+              role="button"
+              tabindex="0"
+              (keydown.enter)="openTaskAttachment(attachment)"
+            >
+              <mat-icon [style.color]="getFileInfo(attachment.fileName, attachment.mimeType).color">
+                {{ getFileInfo(attachment.fileName, attachment.mimeType).icon }}
+              </mat-icon>
+              <div>
+                <strong>{{ attachment.fileName }}</strong>
+                <span>{{ attachment.byteSize / 1048576 | number:'1.0-2' }} MB · {{ getFileInfo(attachment.fileName, attachment.mimeType).name }}</span>
+              </div>
+              <mat-icon class="view-action-icon">visibility</mat-icon>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <!-- Grade de Propriedades (Estilo Notion/Linear) -->
-      <div class="task-properties-card">
-        <div class="props-header">
-          <span class="props-title"><mat-icon>tune</mat-icon> Propriedades da Tarefa</span>
-          <button type="button" class="btn-add-prop-inline" (click)="showAddPropertyInModal.set(!showAddPropertyInModal())">
-            <mat-icon>{{ showAddPropertyInModal() ? 'close' : 'add' }}</mat-icon>
-            <span>{{ showAddPropertyInModal() ? 'Cancelar' : 'Adicionar Campo' }}</span>
-          </button>
+      <!-- Modo Edição / Criação com Formulário Completo -->
+      <ng-container *ngIf="!isTaskReadOnly()">
+        <!-- Título Principal -->
+        <div class="task-title-section">
+          <input [(ngModel)]="draft.title" maxlength="180" class="task-title-main-input"
+            placeholder="O que precisa ser feito? (Título da tarefa)" autofocus />
         </div>
 
-        <!-- Form Inline para Adicionar Nova Propriedade no Modal -->
-        <div class="modal-add-property-form" *ngIf="showAddPropertyInModal()">
-          <div class="add-prop-fields">
-            <input type="text" [(ngModel)]="newPropertyLabelInModal" placeholder="Nome do campo (ex: Cliente, Valor...)" class="prop-input-name" />
-            <select [(ngModel)]="newPropertyTypeInModal" class="prop-select-type">
-              <option value="text">Texto</option>
-              <option value="date">Data</option>
-              <option value="number">Número</option>
-              <option value="select">Lista de Seleção</option>
-              <option value="checkbox">Caixa de Seleção (Sim/Não)</option>
-            </select>
-            <input *ngIf="newPropertyTypeInModal === 'select'" type="text" [(ngModel)]="newPropertyOptionsInModal" placeholder="Opções separadas por vírgula..." class="prop-input-options" />
-          </div>
-          <div class="add-prop-actions">
-            <button type="button" class="btn-confirm-add-prop" (click)="addPropertyInModal()" [disabled]="!newPropertyLabelInModal.trim()">
-              <mat-icon>check</mat-icon> Criar Propriedade
+        <!-- Grade de Propriedades (Estilo Notion/Linear) -->
+        <div class="task-properties-card">
+          <div class="props-header">
+            <span class="props-title"><mat-icon>tune</mat-icon> Propriedades da Tarefa</span>
+            <button type="button" class="btn-add-prop-inline" (click)="showAddPropertyInModal.set(!showAddPropertyInModal())">
+              <mat-icon>{{ showAddPropertyInModal() ? 'close' : 'add' }}</mat-icon>
+              <span>{{ showAddPropertyInModal() ? 'Cancelar' : 'Adicionar Campo' }}</span>
             </button>
           </div>
-        </div>
 
-        <div class="props-grid">
-          <!-- Status / Lista -->
-          <div class="prop-item">
-            <div class="prop-label">
-              <mat-icon>donut_large</mat-icon>
-              <span>Status</span>
+          <!-- Form Inline para Adicionar Nova Propriedade no Modal -->
+          <div class="modal-add-property-form" *ngIf="showAddPropertyInModal()">
+            <div class="add-prop-fields">
+              <input type="text" [(ngModel)]="newPropertyLabelInModal" placeholder="Nome do campo (ex: Cliente, Valor...)" class="prop-input-name" />
+              <select [(ngModel)]="newPropertyTypeInModal" class="prop-select-type">
+                <option value="text">Texto</option>
+                <option value="date">Data</option>
+                <option value="number">Número</option>
+                <option value="select">Lista de Seleção</option>
+                <option value="checkbox">Caixa de Seleção (Sim/Não)</option>
+              </select>
+              <input *ngIf="newPropertyTypeInModal === 'select'" type="text" [(ngModel)]="newPropertyOptionsInModal" placeholder="Opções separadas por vírgula..." class="prop-input-options" />
             </div>
-            <div class="prop-value">
-              <div class="modal-status-select-wrap">
-                <span class="status-dot-indicator" [style.background]="getStatusTheme(draft.columnId).dot"></span>
-                <select [(ngModel)]="draft.columnId" class="modal-select-input">
-                  <option *ngFor="let column of board()?.columns" [value]="column.id">{{ column.title }}</option>
-                </select>
-              </div>
+            <div class="add-prop-actions">
+              <button type="button" class="btn-confirm-add-prop" (click)="addPropertyInModal()" [disabled]="!newPropertyLabelInModal.trim()">
+                <mat-icon>check</mat-icon> Criar Propriedade
+              </button>
             </div>
           </div>
 
-          <!-- Prioridade -->
-          <div class="prop-item">
-            <div class="prop-label">
-              <mat-icon>flag</mat-icon>
-              <span>Prioridade</span>
-            </div>
-            <div class="prop-value">
-              <div class="modal-priority-wrap priority" [ngClass]="draft.priority">
-                <mat-icon class="p-icon">{{ getPriorityIcon(draft.priority) }}</mat-icon>
-                <select [(ngModel)]="draft.priority" class="modal-select-input">
-                  <option value="low">Baixa</option>
-                  <option value="medium">Média</option>
-                  <option value="high">Alta</option>
-                  <option value="urgent">Urgente</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <!-- Prazo -->
-          <div class="prop-item">
-            <div class="prop-label">
-              <mat-icon>event</mat-icon>
-              <span>Prazo</span>
-            </div>
-            <div class="prop-value">
-              <input type="date" [(ngModel)]="draft.dueDate" class="modal-date-input" />
-            </div>
-          </div>
-
-          <!-- Responsáveis -->
-          <div class="prop-item prop-item-full">
-            <div class="prop-label">
-              <mat-icon>person</mat-icon>
-              <span>Responsáveis</span>
-            </div>
-            <div class="prop-value assignees-prop-value">
-              <div class="assignee-options">
-                <button type="button"
-                  [class.selected]="isDraftAssignee(auth.currentUser()?.id || '')"
-                  (click)="toggleDraftAssignee(auth.currentUser()?.id || '')">
-                  <img [src]="auth.currentUser()?.avatar || defaultAvatar" (error)="$any($event.target).src = defaultAvatar">
-                  <span>{{ auth.currentUser()?.name || 'Eu' }}</span>
-                  <mat-icon>{{ isDraftAssignee(auth.currentUser()?.id || '') ? 'check_circle' : 'add_circle_outline' }}</mat-icon>
-                </button>
-                <button type="button" *ngFor="let user of assignableUsers()"
-                  [class.selected]="isDraftAssignee(user.id)" (click)="toggleDraftAssignee(user.id)">
-                  <img [src]="user.avatar || defaultAvatar" (error)="$any($event.target).src = defaultAvatar">
-                  <span>{{ user.name }}</span>
-                  <mat-icon>{{ isDraftAssignee(user.id) ? 'check_circle' : 'add_circle_outline' }}</mat-icon>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Etiquetas -->
-          <div class="prop-item prop-item-full">
-            <div class="prop-label">
-              <mat-icon>sell</mat-icon>
-              <span>Etiquetas</span>
-            </div>
-            <div class="prop-value">
-              <input [(ngModel)]="labelText" placeholder="Ex.: Produto, Cliente, Bloqueado (separadas por vírgula)" class="modal-text-input" />
-            </div>
-          </div>
-
-          <!-- Campos Personalizados Dinâmicos -->
-          <ng-container *ngFor="let col of customColumns()">
-            <div class="prop-item" [class.prop-item-full]="col.type === 'text' && (col.label.length > 15)">
+          <div class="props-grid">
+            <!-- Status / Lista -->
+            <div class="prop-item">
               <div class="prop-label">
-                <mat-icon>{{ col.icon }}</mat-icon>
-                <span>{{ col.label }}</span>
-                <button type="button" class="btn-remove-custom-prop" (click)="removeCustomColumn(col.id, $event)" matTooltip="Excluir este campo">
-                  <mat-icon>close</mat-icon>
-                </button>
+                <mat-icon>donut_large</mat-icon>
+                <span>Status</span>
               </div>
               <div class="prop-value">
-                <input *ngIf="col.type === 'text'" type="text" [(ngModel)]="draftCustomFields[col.id]" [placeholder]="col.label + '...'" class="modal-text-input" />
-                <input *ngIf="col.type === 'number'" type="number" [(ngModel)]="draftCustomFields[col.id]" placeholder="0" class="modal-text-input" />
-                <input *ngIf="col.type === 'date'" type="date" [(ngModel)]="draftCustomFields[col.id]" class="modal-date-input" />
-                <label *ngIf="col.type === 'checkbox'" class="modal-checkbox-toggle">
-                  <input type="checkbox" [(ngModel)]="draftCustomFields[col.id]" />
-                  <span>{{ draftCustomFields[col.id] ? 'Sim / Concluído' : 'Não / Pendente' }}</span>
-                </label>
-                <select *ngIf="col.type === 'select'" [(ngModel)]="draftCustomFields[col.id]" class="modal-select-input">
-                  <option value="">— Selecione —</option>
-                  <option *ngFor="let opt of col.options" [value]="opt">{{ opt }}</option>
-                </select>
-              </div>
-            </div>
-          </ng-container>
-        </div>
-      </div>
-
-      <!-- Demanda / Descrição -->
-      <div class="task-description-card full">
-        <div class="description-header">
-          <div class="desc-heading-title">
-            <mat-icon>notes</mat-icon>
-            <span>Descrição & Demanda</span>
-          </div>
-          <app-ai-text-button [text]="draft.description" (textChange)="draft.description = $event" />
-        </div>
-        <app-markdown-editor [text]="draft.description" (textChange)="draft.description = $event" [maxLength]="5000"
-          placeholder="Adicione contexto, links ou critérios de aceite..." ariaLabel="Descrição da tarefa" />
-      </div>
-      <div class='task-attachments full'>
-        <div class='attachment-heading'><span><mat-icon>attach_file</mat-icon>Anexos</span><strong>{{
-            taskAttachments.length + pendingFiles.length }}/10</strong></div>
-        <p>Arquivos de até 10 MB. Clique em uma imagem para visualizá-la.</p>
-        <label class='attachment-picker' *ngIf='taskAttachments.length + pendingFiles.length < 10'>
-          <mat-icon>upload_file</mat-icon><span>Adicionar arquivos ou imagens</span><input type='file' multiple
-            (change)='selectTaskFiles($event)'>
-        </label>
-        <div class='attachment-list' *ngIf='taskAttachments.length || pendingFiles.length'>
-          <div class='attachment-item' *ngFor='let attachment of taskAttachments'
-            (click)='openTaskAttachment(attachment)' role='button' tabindex='0'
-            (keydown.enter)='openTaskAttachment(attachment)'>
-            <mat-icon>{{ attachment.mimeType === 'application/pdf' ? 'picture_as_pdf' : attachment.previewable ? 'image'
-              : 'description' }}</mat-icon>
-            <div><strong>{{ attachment.fileName }}</strong><span>{{ attachment.byteSize / 1048576 | number:'1.0-2' }}
-                MB</span></div>
-            <button type='button' (click)='$event.stopPropagation(); deleteTaskAttachment(attachment)'
-              title='Excluir anexo'><mat-icon>delete_outline</mat-icon></button>
-          </div>
-          <div class='attachment-item pending' *ngFor='let file of pendingFiles; let index = index'
-            (click)='openPendingFile(file)'>
-            <mat-icon>{{ file.type === 'application/pdf' ? 'picture_as_pdf' : file.type.startsWith('image/') ? 'image' :
-              'description' }}</mat-icon>
-            <div><strong>{{ file.name }}</strong><span>Aguardando salvar · {{ file.size / 1048576 | number:'1.0-2' }}
-                MB</span></div>
-            <button type='button' (click)='$event.stopPropagation(); removePendingFile(index)'
-              title='Remover'><mat-icon>close</mat-icon></button>
-          </div>
-        </div>
-        <p class='attachment-error' *ngIf='attachmentError'>{{ attachmentError }}</p>
-      </div>
-      <div class="checklist-field full">
-        <!-- Cabeçalho Principal do Checklist -->
-        <div class="checklist-main-header">
-          <div class="checklist-heading-left">
-            <span class="checklist-title-badge"><mat-icon>checklist</mat-icon>Checklist & Seções</span>
-            <span class="checklist-counter-pill" *ngIf="draft.checklist.length">
-              {{ draft.checklist.filter(item => item.done).length }}/{{ draft.checklist.length }} concluídos
-            </span>
-          </div>
-          <button type="button" class="add-section-toggle-btn"
-            (click)="showAddSectionForm = !showAddSectionForm"
-            [class.active]="showAddSectionForm"
-            matTooltip="Adicionar nova seção organizada">
-            <mat-icon>{{ showAddSectionForm ? 'close' : 'create_new_folder' }}</mat-icon>
-            <span>{{ showAddSectionForm ? 'Fechar' : 'Nova Seção' }}</span>
-          </button>
-        </div>
-
-        <!-- Painel Moderno: Criar Nova Seção com Sugestões Rápidas -->
-        <div class="modern-new-section-card" *ngIf="showAddSectionForm || !checklistGroups.length">
-          <div class="new-section-card-top">
-            <div class="new-section-input-wrap">
-              <mat-icon class="new-section-icon">folder_open</mat-icon>
-              <input [(ngModel)]="checklistGroupTitle"
-                (keydown.enter)="$event.preventDefault(); addChecklistGroup()"
-                placeholder="Nome da nova seção (ex: Preparação, Execução, Revisão...)"
-                maxlength="80">
-            </div>
-            <button type="button" class="btn-create-section" (click)="addChecklistGroup()" [disabled]="!checklistGroupTitle.trim()">
-              <mat-icon>add</mat-icon>
-              <span>Criar Seção</span>
-            </button>
-          </div>
-          <div class="section-quick-presets">
-            <span class="preset-label">Sugestões rápidas:</span>
-            <button type="button" class="preset-chip" *ngFor="let preset of quickSectionPresets"
-              (click)="addChecklistGroup(preset)"
-              [disabled]="checklistGroups.includes(preset)">
-              + {{ preset }}
-            </button>
-          </div>
-        </div>
-
-        <!-- Bloco de Itens Gerais / Avulsos -->
-        <div class="checklist-section-block general-block" *ngIf="ungroupedChecklistItems.length || !checklistGroups.length">
-          <div class="section-block-header general-header" *ngIf="checklistGroups.length">
-            <div class="section-header-title">
-              <mat-icon class="section-type-icon">format_list_bulleted</mat-icon>
-              <span class="section-name">Itens Gerais</span>
-            </div>
-            <span class="section-counter-badge">{{ ungroupedChecklistItems.filter(i => i.done).length }}/{{ ungroupedChecklistItems.length }}</span>
-          </div>
-
-          <div class="section-items-list" *ngIf="ungroupedChecklistItems.length">
-            <label class="check-item modern-check-item" *ngFor="let item of ungroupedChecklistItems">
-              <input type="checkbox" [(ngModel)]="item.done">
-              <span [class.done]="item.done">{{ item.text }}</span>
-              <button (click)="removeChecklistItem(draft.checklist.indexOf(item))" type="button" matTooltip="Excluir item">
-                <mat-icon>close</mat-icon>
-              </button>
-            </label>
-          </div>
-
-          <!-- Input inline para itens gerais -->
-          <div class="inline-add-item-row">
-            <mat-icon class="inline-add-icon">add</mat-icon>
-            <input [(ngModel)]="checklistText"
-              (keydown.enter)="$event.preventDefault(); addChecklistItemToGroup()"
-              placeholder="Adicionar item avulso...">
-            <button type="button" class="inline-btn-add" (click)="addChecklistItemToGroup()" [disabled]="!checklistText.trim()">
-              <mat-icon>arrow_forward</mat-icon>
-            </button>
-          </div>
-        </div>
-
-        <!-- Blocos de Seções Criadas -->
-        <div class="checklist-section-block" *ngFor="let group of checklistGroups" [class.is-active-target]="activeChecklistGroup === group">
-          <div class="section-block-header">
-            <div class="section-header-title" (click)="setActiveGroup(activeChecklistGroup === group ? undefined : group)">
-              <mat-icon class="section-type-icon">folder</mat-icon>
-              <span class="section-name">{{ group }}</span>
-            </div>
-            <div class="section-progress-wrapper">
-              <span class="section-counter-badge">
-                {{ groupProgress(group).done }}/{{ groupProgress(group).total }}
-              </span>
-              <div class="section-mini-progress">
-                <div class="section-progress-fill"
-                  [style.width.%]="groupProgress(group).total ? (groupProgress(group).done / groupProgress(group).total * 100) : 0">
+                <div class="modal-status-select-wrap">
+                  <span class="status-dot-indicator" [style.background]="getStatusTheme(draft.columnId).dot"></span>
+                  <select [(ngModel)]="draft.columnId" class="modal-select-input">
+                    <option *ngFor="let column of board()?.columns" [value]="column.id">{{ column.title }}</option>
+                  </select>
                 </div>
               </div>
             </div>
-            <button class="remove-section-btn" type="button" (click)="removeChecklistGroup(group)"
-              matTooltip="Excluir seção e seus itens">
-              <mat-icon>delete_outline</mat-icon>
-            </button>
-          </div>
 
-          <div class="section-items-list">
-            <div class="section-empty-hint" *ngIf="!checklistItemsForGroup(group).length">
-              <mat-icon>info_outline</mat-icon>
-              <span>Nenhum item adicionado nesta seção ainda.</span>
+            <!-- Prioridade -->
+            <div class="prop-item">
+              <div class="prop-label">
+                <mat-icon>flag</mat-icon>
+                <span>Prioridade</span>
+              </div>
+              <div class="prop-value">
+                <div class="modal-priority-wrap priority" [ngClass]="draft.priority">
+                  <mat-icon class="p-icon">{{ getPriorityIcon(draft.priority) }}</mat-icon>
+                  <select [(ngModel)]="draft.priority" class="modal-select-input">
+                    <option value="low">Baixa</option>
+                    <option value="medium">Média</option>
+                    <option value="high">Alta</option>
+                    <option value="urgent">Urgente</option>
+                  </select>
+                </div>
+              </div>
             </div>
-            <label class="check-item modern-check-item grouped-item" *ngFor="let item of checklistItemsForGroup(group)">
-              <input type="checkbox" [(ngModel)]="item.done">
-              <span [class.done]="item.done">{{ item.text }}</span>
-              <button (click)="removeChecklistItem(draft.checklist.indexOf(item))" type="button" matTooltip="Excluir item">
-                <mat-icon>close</mat-icon>
-              </button>
-            </label>
-          </div>
 
-          <!-- Input inline exclusivo desta seção -->
-          <div class="inline-add-item-row">
-            <mat-icon class="inline-add-icon">add</mat-icon>
-            <input [(ngModel)]="sectionItemDrafts[group]"
-              (keydown.enter)="$event.preventDefault(); addChecklistItemToGroup(group)"
-              [placeholder]="'Adicionar item em ' + group + '...'">
-            <button type="button" class="inline-btn-add" (click)="addChecklistItemToGroup(group)" [disabled]="!sectionItemDrafts[group]?.trim()">
-              <mat-icon>arrow_forward</mat-icon>
-            </button>
+            <!-- Prazo -->
+            <div class="prop-item">
+              <div class="prop-label">
+                <mat-icon>event</mat-icon>
+                <span>Prazo</span>
+              </div>
+              <div class="prop-value">
+                <input type="date" [(ngModel)]="draft.dueDate" class="modal-date-input" />
+              </div>
+            </div>
+
+            <!-- Responsáveis -->
+            <div class="prop-item prop-item-full">
+              <div class="prop-label">
+                <mat-icon>person</mat-icon>
+                <span>Responsáveis</span>
+              </div>
+              <div class="prop-value assignees-prop-value">
+                <div class="assignee-options">
+                  <button type="button"
+                    [class.selected]="isDraftAssignee(auth.currentUser()?.id || '')"
+                    (click)="toggleDraftAssignee(auth.currentUser()?.id || '')">
+                    <img [src]="auth.currentUser()?.avatar || defaultAvatar" (error)="$any($event.target).src = defaultAvatar">
+                    <span>{{ auth.currentUser()?.name || 'Eu' }}</span>
+                    <mat-icon>{{ isDraftAssignee(auth.currentUser()?.id || '') ? 'check_circle' : 'add_circle_outline' }}</mat-icon>
+                  </button>
+                  <button type="button" *ngFor="let user of assignableUsers()"
+                    [class.selected]="isDraftAssignee(user.id)" (click)="toggleDraftAssignee(user.id)">
+                    <img [src]="user.avatar || defaultAvatar" (error)="$any($event.target).src = defaultAvatar">
+                    <span>{{ user.name }}</span>
+                    <mat-icon>{{ isDraftAssignee(user.id) ? 'check_circle' : 'add_circle_outline' }}</mat-icon>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Etiquetas -->
+            <div class="prop-item prop-item-full">
+              <div class="prop-label">
+                <mat-icon>sell</mat-icon>
+                <span>Etiquetas</span>
+              </div>
+              <div class="prop-value">
+                <input [(ngModel)]="labelText" placeholder="Ex.: Produto, Cliente, Bloqueado (separadas por vírgula)" class="modal-text-input" />
+              </div>
+            </div>
+
+            <!-- Campos Personalizados Dinâmicos -->
+            <ng-container *ngFor="let col of customColumns()">
+              <div class="prop-item" [class.prop-item-full]="col.type === 'text' && (col.label.length > 15)">
+                <div class="prop-label">
+                  <mat-icon>{{ col.icon }}</mat-icon>
+                  <span>{{ col.label }}</span>
+                  <button type="button" class="btn-remove-custom-prop" (click)="removeCustomColumn(col.id, $event)" matTooltip="Excluir este campo">
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </div>
+                <div class="prop-value">
+                  <input *ngIf="col.type === 'text'" type="text" [(ngModel)]="draftCustomFields[col.id]" [placeholder]="col.label + '...'" class="modal-text-input" />
+                  <input *ngIf="col.type === 'number'" type="number" [(ngModel)]="draftCustomFields[col.id]" placeholder="0" class="modal-text-input" />
+                  <input *ngIf="col.type === 'date'" type="date" [(ngModel)]="draftCustomFields[col.id]" class="modal-date-input" />
+                  <label *ngIf="col.type === 'checkbox'" class="modal-checkbox-toggle">
+                    <input type="checkbox" [(ngModel)]="draftCustomFields[col.id]" />
+                    <span>{{ draftCustomFields[col.id] ? 'Sim / Concluído' : 'Não / Pendente' }}</span>
+                  </label>
+                  <select *ngIf="col.type === 'select'" [(ngModel)]="draftCustomFields[col.id]" class="modal-select-input">
+                    <option value="">— Selecione —</option>
+                    <option *ngFor="let opt of col.options" [value]="opt">{{ opt }}</option>
+                  </select>
+                </div>
+              </div>
+            </ng-container>
           </div>
         </div>
-      </div>
+
+        <!-- Demanda / Descrição -->
+        <div class="task-description-card full">
+          <div class="description-header">
+            <div class="desc-heading-title">
+              <mat-icon>notes</mat-icon>
+              <span>Descrição & Demanda</span>
+            </div>
+            <app-ai-text-button [text]="draft.description" (textChange)="draft.description = $event" />
+          </div>
+          <app-markdown-editor [text]="draft.description" (textChange)="draft.description = $event" [maxLength]="5000"
+            placeholder="Adicione contexto, links ou critérios de aceite..." ariaLabel="Descrição da tarefa" />
+        </div>
+
+        <div class='task-attachments full'>
+          <div class='attachment-heading'><span><mat-icon>attach_file</mat-icon>Anexos</span><strong>{{
+              taskAttachments.length + pendingFiles.length }}/10</strong></div>
+          <p>Aceita todos os tipos de arquivos até 10 MB. Arquivos de programação contam com destaque de sintaxe.</p>
+          <label class='attachment-picker' *ngIf='taskAttachments.length + pendingFiles.length < 10'>
+            <mat-icon>upload_file</mat-icon><span>Adicionar arquivos ou imagens</span><input type='file' multiple
+              (change)='selectTaskFiles($event)'>
+          </label>
+          <div class='attachment-list' *ngIf='taskAttachments.length || pendingFiles.length'>
+            <div class='attachment-item' *ngFor='let attachment of taskAttachments'
+              (click)='openTaskAttachment(attachment)' role='button' tabindex='0'
+              (keydown.enter)='openTaskAttachment(attachment)'>
+              <mat-icon [style.color]="getFileInfo(attachment.fileName, attachment.mimeType).color">
+                {{ getFileInfo(attachment.fileName, attachment.mimeType).icon }}
+              </mat-icon>
+              <div><strong>{{ attachment.fileName }}</strong><span>{{ attachment.byteSize / 1048576 | number:'1.0-2' }}
+                  MB · {{ getFileInfo(attachment.fileName, attachment.mimeType).name }}</span></div>
+              <button type='button' (click)='$event.stopPropagation(); deleteTaskAttachment(attachment)'
+                title='Excluir anexo'><mat-icon>delete_outline</mat-icon></button>
+            </div>
+            <div class='attachment-item pending' *ngFor='let file of pendingFiles; let index = index'
+              (click)='openPendingFile(file)'>
+              <mat-icon [style.color]="getFileInfo(file.name, file.type).color">
+                {{ getFileInfo(file.name, file.type).icon }}
+              </mat-icon>
+              <div><strong>{{ file.name }}</strong><span>Aguardando salvar · {{ file.size / 1048576 | number:'1.0-2' }}
+                  MB · {{ getFileInfo(file.name, file.type).name }}</span></div>
+              <button type='button' (click)='$event.stopPropagation(); removePendingFile(index)'
+                title='Remover'><mat-icon>close</mat-icon></button>
+            </div>
+          </div>
+          <p class='attachment-error' *ngIf='attachmentError'>{{ attachmentError }}</p>
+        </div>
+
+        <div class="checklist-field full">
+          <!-- Cabeçalho Principal do Checklist -->
+          <div class="checklist-main-header">
+            <div class="checklist-heading-left">
+              <span class="checklist-title-badge"><mat-icon>checklist</mat-icon>Checklist & Seções</span>
+              <span class="checklist-counter-pill" *ngIf="draft.checklist.length">
+                {{ draft.checklist.filter(item => item.done).length }}/{{ draft.checklist.length }} concluídos
+              </span>
+            </div>
+            <button type="button" class="add-section-toggle-btn"
+              (click)="showAddSectionForm = !showAddSectionForm"
+              [class.active]="showAddSectionForm"
+              matTooltip="Adicionar nova seção organizada">
+              <mat-icon>{{ showAddSectionForm ? 'close' : 'create_new_folder' }}</mat-icon>
+              <span>{{ showAddSectionForm ? 'Fechar' : 'Nova Seção' }}</span>
+            </button>
+          </div>
+
+          <!-- Painel Moderno: Criar Nova Seção com Sugestões Rápidas -->
+          <div class="modern-new-section-card" *ngIf="showAddSectionForm || !checklistGroups.length">
+            <div class="new-section-card-top">
+              <div class="new-section-input-wrap">
+                <mat-icon class="new-section-icon">folder_open</mat-icon>
+                <input [(ngModel)]="checklistGroupTitle"
+                  (keydown.enter)="$event.preventDefault(); addChecklistGroup()"
+                  placeholder="Nome da nova seção (ex: Preparação, Execução, Revisão...)"
+                  maxlength="80">
+              </div>
+              <button type="button" class="btn-create-section" (click)="addChecklistGroup()" [disabled]="!checklistGroupTitle.trim()">
+                <mat-icon>add</mat-icon>
+                <span>Criar Seção</span>
+              </button>
+            </div>
+            <div class="section-quick-presets">
+              <span class="preset-label">Sugestões rápidas:</span>
+              <button type="button" class="preset-chip" *ngFor="let preset of quickSectionPresets"
+                (click)="addChecklistGroup(preset)"
+                [disabled]="checklistGroups.includes(preset)">
+                + {{ preset }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Bloco de Itens Gerais / Avulsos -->
+          <div class="checklist-section-block general-block" *ngIf="ungroupedChecklistItems.length || !checklistGroups.length">
+            <div class="section-block-header general-header" *ngIf="checklistGroups.length">
+              <div class="section-header-title">
+                <mat-icon class="section-type-icon">format_list_bulleted</mat-icon>
+                <span class="section-name">Itens Gerais</span>
+              </div>
+              <span class="section-counter-badge">{{ ungroupedChecklistItems.filter(i => i.done).length }}/{{ ungroupedChecklistItems.length }}</span>
+            </div>
+
+            <div class="section-items-list" *ngIf="ungroupedChecklistItems.length">
+              <label class="check-item modern-check-item" *ngFor="let item of ungroupedChecklistItems">
+                <input type="checkbox" [(ngModel)]="item.done">
+                <span [class.done]="item.done">{{ item.text }}</span>
+                <button (click)="removeChecklistItem(draft.checklist.indexOf(item))" type="button" matTooltip="Excluir item">
+                  <mat-icon>close</mat-icon>
+                </button>
+              </label>
+            </div>
+
+            <!-- Input inline para itens gerais -->
+            <div class="inline-add-item-row">
+              <mat-icon class="inline-add-icon">add</mat-icon>
+              <input [(ngModel)]="checklistText"
+                (keydown.enter)="$event.preventDefault(); addChecklistItemToGroup()"
+                placeholder="Adicionar item avulso...">
+              <button type="button" class="inline-btn-add" (click)="addChecklistItemToGroup()" [disabled]="!checklistText.trim()">
+                <mat-icon>arrow_forward</mat-icon>
+              </button>
+            </div>
+          </div>
+
+          <!-- Blocos de Seções Criadas -->
+          <div class="checklist-section-block" *ngFor="let group of checklistGroups" [class.is-active-target]="activeChecklistGroup === group">
+            <div class="section-block-header">
+              <div class="section-header-title" (click)="setActiveGroup(activeChecklistGroup === group ? undefined : group)">
+                <mat-icon class="section-type-icon">folder</mat-icon>
+                <span class="section-name">{{ group }}</span>
+              </div>
+              <div class="section-progress-wrapper">
+                <span class="section-counter-badge">
+                  {{ groupProgress(group).done }}/{{ groupProgress(group).total }}
+                </span>
+                <div class="section-mini-progress">
+                  <div class="section-progress-fill"
+                    [style.width.%]="groupProgress(group).total ? (groupProgress(group).done / groupProgress(group).total * 100) : 0">
+                  </div>
+                </div>
+              </div>
+              <button class="remove-section-btn" type="button" (click)="removeChecklistGroup(group)"
+                matTooltip="Excluir seção e seus itens">
+                <mat-icon>delete_outline</mat-icon>
+              </button>
+            </div>
+
+            <div class="section-items-list">
+              <div class="section-empty-hint" *ngIf="!checklistItemsForGroup(group).length">
+                <mat-icon>info_outline</mat-icon>
+                <span>Nenhum item adicionado nesta seção ainda.</span>
+              </div>
+              <label class="check-item modern-check-item grouped-item" *ngFor="let item of checklistItemsForGroup(group)">
+                <input type="checkbox" [(ngModel)]="item.done">
+                <span [class.done]="item.done">{{ item.text }}</span>
+                <button (click)="removeChecklistItem(draft.checklist.indexOf(item))" type="button" matTooltip="Excluir item">
+                  <mat-icon>close</mat-icon>
+                </button>
+              </label>
+            </div>
+
+            <!-- Input inline exclusivo desta seção -->
+            <div class="inline-add-item-row">
+              <mat-icon class="inline-add-icon">add</mat-icon>
+              <input [(ngModel)]="sectionItemDrafts[group]"
+                (keydown.enter)="$event.preventDefault(); addChecklistItemToGroup(group)"
+                [placeholder]="'Adicionar item em ' + group + '...'">
+              <button type="button" class="inline-btn-add" (click)="addChecklistItemToGroup(group)" [disabled]="!sectionItemDrafts[group]?.trim()">
+                <mat-icon>arrow_forward</mat-icon>
+              </button>
+            </div>
+          </div>
+        </div>
+      </ng-container>
     </div>
-    <div class='image-preview-backdrop' *ngIf='attachmentPreviewUrl()' (mousedown)='closeAttachmentPreview()'>
-      <section class='image-preview' (mousedown)='$event.stopPropagation()'>
-        <header><strong>{{ attachmentPreviewName() }}</strong><button type='button'
-            (click)='closeAttachmentPreview()'><mat-icon>close</mat-icon></button></header>
-        <img *ngIf='attachmentPreviewMimeType() !== "application/pdf"' [src]='attachmentPreviewUrl()'
-          [alt]='attachmentPreviewName()'>
-        <iframe *ngIf='attachmentPreviewMimeType() === "application/pdf"' [src]='trustedAttachmentPreviewUrl()'
-          [title]='attachmentPreviewName()'></iframe>
-      </section>
-    </div>
+    <app-attachment-preview-modal
+      *ngIf="attachmentPreviewUrl()"
+      [fileName]="attachmentPreviewName()"
+      [fileUrl]="attachmentPreviewUrl()"
+      [mimeType]="attachmentPreviewMimeType()"
+      [rawContent]="attachmentPreviewRawContent()"
+      [byteSize]="attachmentPreviewByteSize()"
+      (close)="closeAttachmentPreview()"
+      (download)="downloadTaskAttachment()"
+    ></app-attachment-preview-modal>
     <footer>
-      <div><button *ngIf="editingId() && !showArchived()" class="archive-btn" [disabled]="savingTask()"
-          (click)="archiveEditing()"><mat-icon>archive</mat-icon>Arquivar</button><button
-          *ngIf="editingId() && !showArchived()" class="subtasks-btn" [disabled]="savingTask()"
-          (click)="openEditingChildBoard()"><mat-icon>account_tree</mat-icon>Subtarefas</button><button
-          *ngIf="editingId() && showArchived()" class="archive-btn" [disabled]="savingTask()"
-          (click)="archiveEditing()"><mat-icon>unarchive</mat-icon>Restaurar</button><button
-          *ngIf="editingId() && canDeleteTasks()" class="delete-btn" [disabled]="savingTask()"
-          (click)="deleteEditing()"><mat-icon>delete_outline</mat-icon>Lixeira</button></div>
-      <div><button type="button" class="secondary-btn print-task-btn"
-          (click)="printSingleTask()"><mat-icon>print</mat-icon>Imprimir</button><button class="cancel-btn"
-          [disabled]="savingTask()" (click)="closeTaskModal()">Cancelar</button><button class="primary-btn"
-          [disabled]="savingTask() || !draft.title.trim()" (click)="saveTask()"><mat-icon>{{ savingTask() ?
-            'hourglass_top' : 'save' }}</mat-icon>{{ savingTask() ? 'Salvando...' : 'Salvar tarefa' }}</button></div>
+      <div>
+        <button *ngIf="editingId() && !showArchived()" class="subtasks-btn" [disabled]="savingTask()"
+          (click)="openEditingChildBoard()"><mat-icon>account_tree</mat-icon>Subtarefas</button>
+        <ng-container *ngIf="!isTaskReadOnly()">
+          <button *ngIf="editingId() && !showArchived()" class="archive-btn" [disabled]="savingTask()"
+            (click)="archiveEditing()"><mat-icon>archive</mat-icon>Arquivar</button>
+          <button *ngIf="editingId() && showArchived()" class="archive-btn" [disabled]="savingTask()"
+            (click)="archiveEditing()"><mat-icon>unarchive</mat-icon>Restaurar</button>
+          <button *ngIf="editingId() && canDeleteTasks()" class="delete-btn" [disabled]="savingTask()"
+            (click)="deleteEditing()"><mat-icon>delete_outline</mat-icon>Lixeira</button>
+        </ng-container>
+      </div>
+      <div>
+        <button type="button" class="secondary-btn print-task-btn"
+          (click)="printSingleTask()"><mat-icon>print</mat-icon>Imprimir</button>
+        <ng-container *ngIf="isTaskReadOnly()">
+          <button type="button" class="secondary-btn" (click)="enableTaskEditMode()">
+            <mat-icon>edit</mat-icon>
+            <span>Editar Tarefa</span>
+          </button>
+          <button type="button" class="primary-btn" (click)="closeTaskModal()">
+            <mat-icon>close</mat-icon>
+            <span>Fechar</span>
+          </button>
+        </ng-container>
+        <ng-container *ngIf="!isTaskReadOnly()">
+          <button class="cancel-btn" [disabled]="savingTask()" (click)="closeTaskModal()">Cancelar</button>
+          <button class="primary-btn" [disabled]="savingTask() || !draft.title.trim()" (click)="saveTask()"><mat-icon>{{ savingTask() ?
+            'hourglass_top' : 'save' }}</mat-icon>{{ savingTask() ? 'Salvando...' : 'Salvar tarefa' }}</button>
+        </ng-container>
+      </div>
     </footer>
   </section>
 </div>

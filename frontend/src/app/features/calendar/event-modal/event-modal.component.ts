@@ -18,6 +18,8 @@ import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { AiTextButtonComponent } from '../../../shared/components/ai-text-button/ai-text-button.component';
 import { MarkdownTextComponent } from '../../../shared/components/markdown-text/markdown-text.component';
 import { MarkdownEditorComponent } from '../../../shared/components/markdown-editor/markdown-editor.component';
+import { AttachmentPreviewModalComponent } from '../../../shared/components/attachment-preview-modal/attachment-preview-modal.component';
+import { detectFileType } from '../../../core/utils/code-highlight.util';
 
 export interface EventModalData {
   event?: CalendarEvent;
@@ -39,6 +41,7 @@ export interface EventModalData {
     AiTextButtonComponent,
     MarkdownTextComponent,
     MarkdownEditorComponent,
+    AttachmentPreviewModalComponent,
   ],
   templateUrl: './event-modal.component.html',
   styleUrl: './event-modal.component.scss'
@@ -49,6 +52,47 @@ export class EventModalComponent implements OnInit, OnDestroy {
   private sanitizer = inject(DomSanitizer);
   isEdit = false;
   get isReadOnly(): boolean { return !!this.data.readOnly; }
+
+  get canEditCurrentCalendar(): boolean {
+    const calId = this.formData.calendarId || this.data?.event?.calendarId;
+    return calId ? this.calendarsService.canEdit(calId) : false;
+  }
+
+  enableEditMode(): void {
+    if (this.canEditCurrentCalendar) {
+      this.data.readOnly = false;
+      this.isEdit = true;
+    }
+  }
+
+  getCalendarName(): string {
+    const calId = this.formData.calendarId || this.data?.event?.calendarId;
+    if (!calId) return '';
+    const cal = this.calendarsService.calendars().find(c => c.id === calId);
+    return cal ? cal.name : '';
+  }
+
+  getCalendarColor(): string {
+    const calId = this.formData.calendarId || this.data?.event?.calendarId;
+    if (!calId) return this.colorMap[this.formData.color] || '#6366f1';
+    const cal = this.calendarsService.calendars().find(c => c.id === calId);
+    return cal?.color || this.colorMap[this.formData.color] || '#6366f1';
+  }
+
+  formatEventSchedule(): string {
+    if (!this.formData.date) return '';
+    const [year, month, day] = this.formData.date.split('-');
+    const formattedDate = `${day}/${month}/${year}`;
+    if (this.formData.allDay) {
+      return `${formattedDate} · Dia inteiro`;
+    }
+    const time = `${this.formData.startTime || '00:00'} às ${this.formData.endTime || '00:00'}`;
+    if (this.formData.endDate && this.formData.endDate !== this.formData.date) {
+      const [endYear, endMonth, endDay] = this.formData.endDate.split('-');
+      return `${formattedDate} ${this.formData.startTime || ''} até ${endDay}/${endMonth}/${endYear} ${this.formData.endTime || ''}`;
+    }
+    return `${formattedDate} · ${time}`;
+  }
 
   // ── Skill: Button HTTP Loading ──
   loadingSalvar = false;
@@ -77,6 +121,9 @@ export class EventModalComponent implements OnInit, OnDestroy {
   readonly previewUrl = signal<string | null>(null);
   readonly previewName = signal('');
   readonly previewMimeType = signal('');
+  readonly previewRawContent = signal<string | null>(null);
+  readonly previewByteSize = signal<number | undefined>(undefined);
+  readonly previewCurrentAttachment = signal<Attachment | null>(null);
   readonly trustedPreviewUrl = signal<SafeResourceUrl | null>(null);
 
   holidayWarning: string | null = null;
@@ -164,18 +211,62 @@ export class EventModalComponent implements OnInit, OnDestroy {
 
   removePending(index: number): void { this.pendingFiles.splice(index, 1); }
 
+  getFileInfo(name: string, mime?: string) {
+    return detectFileType(name, mime);
+  }
+
   openAttachment(attachment: Attachment): void {
     const userId = this.eventsService.currentUserId();
-    if (!attachment.previewable) return this.attachmentsService.download(attachment, userId);
-    this.attachmentsService.content(attachment.id, userId).subscribe({
-      next: blob => this.showPreview(URL.createObjectURL(blob), attachment.fileName, attachment.mimeType),
-      error: () => this.attachmentError = 'Não foi possível abrir a imagem.',
-    });
+    const fileInfo = detectFileType(attachment.fileName, attachment.mimeType);
+    this.closePreview();
+    this.previewCurrentAttachment.set(attachment);
+    this.previewName.set(attachment.fileName);
+    this.previewMimeType.set(attachment.mimeType);
+    this.previewByteSize.set(attachment.byteSize);
+
+    if (fileInfo.category === 'code' || fileInfo.category === 'other' || attachment.mimeType.startsWith('text/')) {
+      this.attachmentsService.text(attachment.id, userId).subscribe({
+        next: (text) => {
+          this.previewRawContent.set(text);
+          this.attachmentsService.content(attachment.id, userId).subscribe({
+            next: blob => this.previewUrl.set(URL.createObjectURL(blob)),
+            error: () => this.attachmentError = 'Não foi possível carregar o arquivo.',
+          });
+        },
+        error: () => {
+          this.attachmentsService.content(attachment.id, userId).subscribe({
+            next: blob => this.previewUrl.set(URL.createObjectURL(blob)),
+            error: () => this.attachmentError = 'Não foi possível carregar o arquivo.',
+          });
+        }
+      });
+    } else {
+      this.previewRawContent.set(null);
+      this.attachmentsService.content(attachment.id, userId).subscribe({
+        next: blob => this.previewUrl.set(URL.createObjectURL(blob)),
+        error: () => this.attachmentError = 'Não foi possível carregar o arquivo.',
+      });
+    }
   }
 
   openPending(file: File): void {
-    if (file.type.startsWith('image/') || file.type === 'application/pdf') {
-      this.showPreview(URL.createObjectURL(file), file.name, file.type);
+    const fileInfo = detectFileType(file.name, file.type);
+    this.closePreview();
+    this.previewCurrentAttachment.set(null);
+    this.previewName.set(file.name);
+    this.previewMimeType.set(file.type || '');
+    this.previewByteSize.set(file.size);
+
+    if (fileInfo.category === 'code' || file.type.startsWith('text/')) {
+      file.text().then(text => {
+        this.previewRawContent.set(text);
+        this.previewUrl.set(URL.createObjectURL(file));
+      }).catch(() => {
+        this.previewUrl.set(URL.createObjectURL(file));
+      });
+    } else {
+      this.previewRawContent.set(null);
+      this.previewUrl.set(URL.createObjectURL(file));
     }
   }
 
@@ -185,15 +276,16 @@ export class EventModalComponent implements OnInit, OnDestroy {
     this.previewUrl.set(null);
     this.previewName.set('');
     this.previewMimeType.set('');
+    this.previewRawContent.set(null);
+    this.previewByteSize.set(undefined);
+    this.previewCurrentAttachment.set(null);
     this.trustedPreviewUrl.set(null);
   }
 
-  private showPreview(url: string, name: string, mimeType: string): void {
-    this.closePreview();
-    this.previewUrl.set(url);
-    this.previewName.set(name);
-    this.previewMimeType.set(mimeType);
-    this.trustedPreviewUrl.set(this.sanitizer.bypassSecurityTrustResourceUrl(url));
+  downloadAttachment(att?: Attachment | null): void {
+    const target = att || this.previewCurrentAttachment();
+    if (!target) return;
+    this.attachmentsService.download(target, this.eventsService.currentUserId());
   }
 
   deleteAttachment(attachment: Attachment): void {

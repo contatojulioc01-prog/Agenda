@@ -178,6 +178,12 @@ app.use((req, _res, next) => {
 app.use(express.json());
 app.use((req, _res, next) => { req.broadcast = broadcast; next(); });
 
+// Garante UTF-8 em todas as respostas JSON da API
+app.use('/api', (_req, res, next) => {
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  next();
+});
+
 // Proxy transparente para a API corporativa (SSO Portal Doce Brinquedo)
 const PORTAL_API = process.env.PORTAL_API || 'http://192.168.13.244:7000';
 const SSO_API_KEY = process.env.SSO_API_KEY || process.env.PORTAL_API_KEY || '';

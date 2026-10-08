@@ -12,11 +12,17 @@ const ATTACHMENTS_DIR = process.env.ATTACHMENTS_DIR || (
     : path.join(__dirname, '..', 'attachments')
 );
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
-const PREVIEWABLE_IMAGE = /^image\/(?:png|jpe?g|gif|webp|bmp|avif)$/i;
-const isPreviewable = mimeType => PREVIEWABLE_IMAGE.test(mimeType) || mimeType === 'application/pdf';
+const PREVIEWABLE_IMAGE = /^image\/(?:png|jpe?g|gif|webp|bmp|avif|svg\+xml)$/i;
+const CODE_EXTENSIONS = /\.(?:ts|tsx|js|mjs|cjs|jsx|py|pyw|cs|java|cpp|cxx|cc|c|h|hpp|go|rs|php|rb|sql|sh|bash|zsh|ps1|bat|cmd|kt|kts|swift|dart|lua|r|html|htm|css|scss|sass|less|json|jsonc|xml|svg|yaml|yml|md|markdown|txt|log|csv|tsv|env|ini|conf|toml)$/i;
+const isPreviewable = (mimeType, fileName = '') =>
+  PREVIEWABLE_IMAGE.test(mimeType) ||
+  mimeType === 'application/pdf' ||
+  (typeof mimeType === 'string' && (mimeType.startsWith('text/') || mimeType.startsWith('audio/') || mimeType.startsWith('video/'))) ||
+  ['application/json', 'application/javascript', 'application/xml', 'application/x-sh', 'application/x-httpd-php'].includes(mimeType) ||
+  CODE_EXTENSIONS.test(fileName);
 const userId = req => String(req.headers['x-user-id'] || '');
 const attachmentDto = row => ({ id: row.id, fileName: row.file_name, mimeType: row.mime_type,
-  byteSize: Number(row.byte_size), previewable: isPreviewable(row.mime_type), createdAt: row.created_at });
+  byteSize: Number(row.byte_size), previewable: isPreviewable(row.mime_type, row.file_name), createdAt: row.created_at });
 
 function ensureAttachmentsDir() {
   if (!fs.existsSync(ATTACHMENTS_DIR)) {
@@ -107,7 +113,7 @@ router.get('/:attachmentId/content', asyncRoute(async (req, res) => {
   const item = await db.get('SELECT * FROM attachments WHERE id = $1', [req.params.attachmentId]);
   if (!item) return res.status(404).json({ error: 'Anexo não encontrado' });
   if (!(await ownerAccess(item.owner_type, item.owner_id, userId(req)))) return res.status(403).json({ error: 'Sem acesso ao anexo' });
-  const inline = isPreviewable(item.mime_type);
+  const inline = isPreviewable(item.mime_type, item.file_name);
   res.setHeader('Content-Type', item.mime_type || 'application/octet-stream');
   res.setHeader('Content-Length', String(item.byte_size));
   res.setHeader('Content-Disposition', `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(item.file_name)}`);

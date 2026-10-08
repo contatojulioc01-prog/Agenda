@@ -343,6 +343,11 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
     if (this.calendarsService.isOwner(calendar.id) && !calendar.isDefault) this.removeCalendar(calendar);
   }
 
+  viewEventFromContext(event: CalendarEvent): void {
+    this.closeCalendarContextMenus();
+    this.openViewModal(event);
+  }
+
   editEventFromContext(event: CalendarEvent): void {
     this.closeCalendarContextMenus();
     if (this.canManageEvent(event)) this.openEditModal(event);
@@ -485,6 +490,27 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
     const dialogRef = this.dialog.open(EventModalComponent, {
       width: '600px', maxWidth: '98vw',
       data: { defaultDate, targetCalendarIds } satisfies EventModalData,
+      panelClass: 'agenda-dialog',
+      disableClose: true,
+    });
+    dialogRef.afterClosed().subscribe(() => this.clearUrlAction());
+  }
+
+  openViewModal(event: CalendarEvent): void {
+    if (event.isTaskDeadline) {
+      this.openTaskFromCalendar(event);
+      return;
+    }
+    if (this.openedEventId === event.id && this.dialog.openDialogs.length) return;
+    this.openedEventId = event.id;
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { evento: event.id, acao: null, data: null },
+      queryParamsHandling: 'merge',
+    });
+    const dialogRef = this.dialog.open(EventModalComponent, {
+      width: '600px', maxWidth: '98vw',
+      data: { event, readOnly: true } satisfies EventModalData,
       panelClass: 'agenda-dialog',
       disableClose: true,
     });

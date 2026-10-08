@@ -274,6 +274,214 @@ input,select,textarea { border:1px solid var(--border); border-radius:8px; backg
   .full { width: 100%; }
 }
 
+/* ── Modo Visualização Limpo & Elegante (Task Modal) ── */
+.read-only-view-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: fadeIn 0.2s ease;
+  width: 100%;
+}
+
+.view-content-card {
+  background: var(--bg-surface, #ffffff);
+  border: 1px solid var(--border-light, #e2e8f0);
+  border-left: 6px solid var(--brand-500, #6366f1);
+  border-radius: 14px;
+  padding: 22px 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.view-header-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.view-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 750;
+  color: var(--text-primary, #0f172a);
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+}
+
+.view-meta-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.view-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--bg-surface-alt, #f8fafc);
+  border: 1px solid var(--border-light, #e2e8f0);
+  color: var(--text-secondary, #475569);
+
+  mat-icon {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+  }
+
+  &.badge-status {
+    background: color-mix(in srgb, currentColor 8%, transparent);
+    border-color: color-mix(in srgb, currentColor 25%, transparent);
+    font-weight: 700;
+  }
+
+  &.badge-priority {
+    font-weight: 700;
+  }
+
+  &.badge-due-date {
+    background: #eff6ff;
+    border-color: #bfdbfe;
+    color: #1d4ed8;
+
+    mat-icon {
+      color: #3b82f6;
+    }
+  }
+
+  &.badge-assignees {
+    background: #fdf4ff;
+    border-color: #f5d0fe;
+    color: #a21caf;
+
+    mat-icon {
+      color: #c026d3;
+    }
+  }
+
+  &.badge-label {
+    background: #f1f5f9;
+    border-color: #e2e8f0;
+    color: #475569;
+  }
+}
+
+.view-badge-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.view-description-wrap {
+  padding-top: 14px;
+  border-top: 1px solid var(--border-light, #f1f5f9);
+  color: var(--text-primary, #1e293b);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.view-empty-desc {
+  color: var(--text-muted, #94a3b8);
+  font-style: italic;
+  font-size: 13px;
+  margin: 0;
+}
+
+.view-checklist-card,
+.view-attachments-card {
+  background: var(--bg-surface, #ffffff);
+  border: 1px solid var(--border-light, #e2e8f0);
+  border-radius: 14px;
+  padding: 16px 20px;
+
+  .view-card-subtitle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-secondary, #475569);
+    margin-bottom: 12px;
+
+    mat-icon {
+      font-size: 17px;
+      width: 17px;
+      height: 17px;
+      color: var(--brand-500, #6366f1);
+    }
+  }
+}
+
+.view-checklist-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.view-check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  font-size: 13.5px;
+  color: var(--text-primary);
+
+  .check-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    color: var(--text-muted);
+    margin-top: 1px;
+    flex-shrink: 0;
+
+    &.done {
+      color: var(--brand-500, #6366f1);
+    }
+  }
+
+  .check-text.done {
+    text-decoration: line-through;
+    color: var(--text-muted);
+  }
+
+  &.grouped {
+    margin-left: 14px;
+  }
+}
+
+.view-check-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+
+  .view-group-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    padding: 2px 6px;
+
+    mat-icon {
+      font-size: 15px;
+      width: 15px;
+      height: 15px;
+    }
+  }
+}
+
 /* Título Principal */
 .task-title-section {
   width: 100%;
@@ -2215,6 +2423,18 @@ input,select,textarea { border:1px solid var(--border); border-radius:8px; backg
       margin: 0;
       padding: 0;
       border: 0;
+
+      &::-webkit-calendar-picker-indicator {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+        cursor: pointer;
+      }
     }
 
     .notion-date-wrapper {
@@ -2226,6 +2446,51 @@ input,select,textarea { border:1px solid var(--border); border-radius:8px; backg
 
     &:hover {
       background: var(--bg-hover, #f8fafc);
+    }
+  }
+
+  /* Células de colunas customizadas com tipo data — mesmo overlay do col-date */
+  .col-custom-cell {
+    &.interactive-cell {
+      position: relative !important;
+      cursor: pointer;
+      box-sizing: border-box;
+
+      .cell-date-overlay {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+        cursor: pointer;
+        z-index: 5;
+        margin: 0;
+        padding: 0;
+        border: 0;
+
+        &::-webkit-calendar-picker-indicator {
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          width: 100%;
+          height: 100%;
+          opacity: 0;
+          cursor: pointer;
+        }
+      }
+
+      .notion-date-wrapper {
+        pointer-events: none;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      &:hover {
+        background: var(--bg-hover, #f8fafc);
+      }
     }
   }
 
@@ -2392,6 +2657,18 @@ input,select,textarea { border:1px solid var(--border); border-radius:8px; backg
       option {
         background: var(--bg-surface, #ffffff);
         color: var(--text-primary, #111827);
+      }
+
+      &::-webkit-calendar-picker-indicator {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+        cursor: pointer;
       }
     }
 

@@ -7,13 +7,50 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#039;');
 }
 
+function sanitizeUrl(rawUrl: string): string {
+  const unescaped = rawUrl.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#039;/g, "'").trim();
+  if (/^(https?:\/\/|mailto:|tel:|\/|#)/i.test(unescaped)) {
+    return escapeHtml(unescaped);
+  }
+  return '';
+}
+
 function formatInline(value: string): string {
-  return value
-    .replace(/`([^`\n]+)`/g, '<code>$1</code>')
+  const codeTokens: string[] = [];
+  let processed = value.replace(/`([^`\n]+)`/g, (_m, codeContent) => {
+    const idx = codeTokens.length;
+    codeTokens.push(`<code>${codeContent}</code>`);
+    return `\x00CODE_${idx}\x00`;
+  });
+
+  processed = processed.replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s<)"']+|mailto:[^\s<)"']+|tel:[^\s<)"']+|[^\s<)"']+)\)/g, (_match, text, url) => {
+    const safeHref = sanitizeUrl(url);
+    if (!safeHref) return text;
+    return `<a href="${safeHref}" target="_blank" rel="noopener noreferrer" class="markdown-link">${text}</a>`;
+  });
+
+  processed = processed.replace(/(^|[\s(])(https?:\/\/[^\s<)"']+)/gi, (_match, prefix, rawUrl) => {
+    let url = rawUrl;
+    let trailing = '';
+    const punctMatch = url.match(/[.,;:!?)]+$/);
+    if (punctMatch) {
+      trailing = punctMatch[0];
+      url = url.slice(0, -trailing.length);
+    }
+    const safeHref = sanitizeUrl(url);
+    if (!safeHref) return `${prefix}${rawUrl}`;
+    return `${prefix}<a href="${safeHref}" target="_blank" rel="noopener noreferrer" class="markdown-link">${url}</a>${trailing}`;
+  });
+
+  processed = processed
     .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
     .replace(/__([^_\n]+)__/g, '<strong>$1</strong>')
     .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>')
     .replace(/(^|[^_])_([^_\n]+)_/g, '$1<em>$2</em>');
+
+  processed = processed.replace(/\x00CODE_(\d+)\x00/g, (_m, idx) => codeTokens[Number(idx)] || '');
+
+  return processed;
 }
 
 function tableCells(value: string): string[] | null {

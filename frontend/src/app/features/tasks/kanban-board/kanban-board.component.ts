@@ -16,6 +16,8 @@ import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { AiTextButtonComponent } from '../../../shared/components/ai-text-button/ai-text-button.component';
 import { MarkdownTextComponent } from '../../../shared/components/markdown-text/markdown-text.component';
 import { MarkdownEditorComponent } from '../../../shared/components/markdown-editor/markdown-editor.component';
+import { AttachmentPreviewModalComponent } from '../../../shared/components/attachment-preview-modal/attachment-preview-modal.component';
+import { detectFileType } from '../../../core/utils/code-highlight.util';
 
 export type ColumnFieldType = 'text' | 'date' | 'number' | 'select' | 'checkbox' | 'person' | 'system';
 
@@ -42,7 +44,17 @@ export const DEFAULT_TABLE_COLUMNS: TableColumnDef[] = [
 @Component({
   selector: 'app-kanban-board',
   standalone: true,
-  imports: [CommonModule, FormsModule, DragDropModule, MatIconModule, MatTooltipModule, AiTextButtonComponent, MarkdownTextComponent, MarkdownEditorComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    DragDropModule,
+    MatIconModule,
+    MatTooltipModule,
+    AiTextButtonComponent,
+    MarkdownTextComponent,
+    MarkdownEditorComponent,
+    AttachmentPreviewModalComponent,
+  ],
   templateUrl: './kanban-board.component.html',
   styleUrl: './kanban-board.component.scss',
 })
@@ -97,6 +109,7 @@ export class KanbanBoardComponent implements OnDestroy {
   inlineEditValue = '';
   readonly isFullscreen = signal(false);
   readonly modalOpen = signal(false);
+  readonly isTaskReadOnly = signal(false);
   readonly editingId = signal<string | null>(null);
 
   // Column Resizing & Persistence in LocalStorage
@@ -183,6 +196,9 @@ export class KanbanBoardComponent implements OnDestroy {
   readonly attachmentPreviewUrl = signal<string | null>(null);
   readonly attachmentPreviewName = signal('');
   readonly attachmentPreviewMimeType = signal('');
+  readonly attachmentPreviewRawContent = signal<string | null>(null);
+  readonly attachmentPreviewByteSize = signal<number | undefined>(undefined);
+  readonly attachmentPreviewCurrent = signal<Attachment | null>(null);
   readonly trustedAttachmentPreviewUrl = signal<SafeResourceUrl | null>(null);
   readonly teamDeleteLoading = signal(false);
   readonly taskDeleteLoading = signal(false);
@@ -530,12 +546,24 @@ export class KanbanBoardComponent implements OnDestroy {
 
   closeTaskModal(): void {
     this.modalOpen.set(false);
+    this.isTaskReadOnly.set(false);
     this.updateUrl({ tarefa: null, acao: null, lista: null });
   }
 
-  openEdit(task: KanbanTask): void {
+  openView(task: KanbanTask): void {
+    this.isTaskReadOnly.set(true);
     this.openEditDraft(task);
     this.updateUrl({ tarefa: task.id, acao: null, lista: null });
+  }
+
+  openEdit(task: KanbanTask): void {
+    this.isTaskReadOnly.set(false);
+    this.openEditDraft(task);
+    this.updateUrl({ tarefa: task.id, acao: null, lista: null });
+  }
+
+  enableTaskEditMode(): void {
+    this.isTaskReadOnly.set(false);
   }
 
   private openEditDraft(task: KanbanTask): void {
@@ -813,18 +841,62 @@ export class KanbanBoardComponent implements OnDestroy {
 
   removePendingFile(index: number): void { this.pendingFiles.splice(index, 1); }
 
+  getFileInfo(name: string, mime?: string) {
+    return detectFileType(name, mime);
+  }
+
   openTaskAttachment(attachment: Attachment): void {
     const uid = this.auth.currentUser()?.id || '';
-    if (!attachment.previewable) return this.attachmentsService.download(attachment, uid);
-    this.attachmentsService.content(attachment.id, uid).subscribe({
-      next: blob => this.showAttachmentPreview(URL.createObjectURL(blob), attachment.fileName, attachment.mimeType),
-      error: () => this.attachmentError = 'Não foi possível abrir a imagem.',
-    });
+    const fileInfo = detectFileType(attachment.fileName, attachment.mimeType);
+    this.closeAttachmentPreview();
+    this.attachmentPreviewCurrent.set(attachment);
+    this.attachmentPreviewName.set(attachment.fileName);
+    this.attachmentPreviewMimeType.set(attachment.mimeType);
+    this.attachmentPreviewByteSize.set(attachment.byteSize);
+
+    if (fileInfo.category === 'code' || fileInfo.category === 'other' || attachment.mimeType.startsWith('text/')) {
+      this.attachmentsService.text(attachment.id, uid).subscribe({
+        next: (text) => {
+          this.attachmentPreviewRawContent.set(text);
+          this.attachmentsService.content(attachment.id, uid).subscribe({
+            next: blob => this.attachmentPreviewUrl.set(URL.createObjectURL(blob)),
+            error: () => this.attachmentError = 'Não foi possível carregar o anexo.',
+          });
+        },
+        error: () => {
+          this.attachmentsService.content(attachment.id, uid).subscribe({
+            next: blob => this.attachmentPreviewUrl.set(URL.createObjectURL(blob)),
+            error: () => this.attachmentError = 'Não foi possível carregar o anexo.',
+          });
+        }
+      });
+    } else {
+      this.attachmentPreviewRawContent.set(null);
+      this.attachmentsService.content(attachment.id, uid).subscribe({
+        next: blob => this.attachmentPreviewUrl.set(URL.createObjectURL(blob)),
+        error: () => this.attachmentError = 'Não foi possível abrir o anexo.',
+      });
+    }
   }
 
   openPendingFile(file: File): void {
-    if (file.type.startsWith('image/') || file.type === 'application/pdf') {
-      this.showAttachmentPreview(URL.createObjectURL(file), file.name, file.type);
+    const fileInfo = detectFileType(file.name, file.type);
+    this.closeAttachmentPreview();
+    this.attachmentPreviewCurrent.set(null);
+    this.attachmentPreviewName.set(file.name);
+    this.attachmentPreviewMimeType.set(file.type || '');
+    this.attachmentPreviewByteSize.set(file.size);
+
+    if (fileInfo.category === 'code' || file.type.startsWith('text/')) {
+      file.text().then(text => {
+        this.attachmentPreviewRawContent.set(text);
+        this.attachmentPreviewUrl.set(URL.createObjectURL(file));
+      }).catch(() => {
+        this.attachmentPreviewUrl.set(URL.createObjectURL(file));
+      });
+    } else {
+      this.attachmentPreviewRawContent.set(null);
+      this.attachmentPreviewUrl.set(URL.createObjectURL(file));
     }
   }
 
@@ -834,7 +906,17 @@ export class KanbanBoardComponent implements OnDestroy {
     this.attachmentPreviewUrl.set(null);
     this.attachmentPreviewName.set('');
     this.attachmentPreviewMimeType.set('');
+    this.attachmentPreviewRawContent.set(null);
+    this.attachmentPreviewByteSize.set(undefined);
+    this.attachmentPreviewCurrent.set(null);
     this.trustedAttachmentPreviewUrl.set(null);
+  }
+
+  downloadTaskAttachment(att?: Attachment | null): void {
+    const target = att || this.attachmentPreviewCurrent();
+    if (!target) return;
+    const uid = this.auth.currentUser()?.id || '';
+    this.attachmentsService.download(target, uid);
   }
 
   deleteTaskAttachment(attachment: Attachment): void {
@@ -843,14 +925,6 @@ export class KanbanBoardComponent implements OnDestroy {
       next: () => this.service.setTaskAttachments(this.editingId() || '', this.taskAttachments.filter(item => item.id !== attachment.id)),
       error: error => this.attachmentError = error.error?.error || 'Não foi possível excluir o anexo.',
     });
-  }
-
-  private showAttachmentPreview(url: string, name: string, mimeType: string): void {
-    this.closeAttachmentPreview();
-    this.attachmentPreviewUrl.set(url);
-    this.attachmentPreviewName.set(name);
-    this.attachmentPreviewMimeType.set(mimeType);
-    this.trustedAttachmentPreviewUrl.set(this.sanitizer.bypassSecurityTrustResourceUrl(url));
   }
 
   private uploadPending(task: KanbanTask, onComplete: (success: boolean) => void): void {
@@ -988,6 +1062,11 @@ export class KanbanBoardComponent implements OnDestroy {
   closeContextMenus(): void {
     this.closeTeamContextMenu();
     this.closeTaskContextMenu();
+  }
+
+  viewTaskFromContext(task: KanbanTask): void {
+    this.closeTaskContextMenu();
+    this.openView(task);
   }
 
   editTaskFromContext(task: KanbanTask): void {
@@ -1521,6 +1600,38 @@ export class KanbanBoardComponent implements OnDestroy {
     this.showAddPropertyInModal.set(false);
   }
 
+  openDatePicker(inputEl: HTMLInputElement | null, event?: Event): void {
+    if (event) event.stopPropagation();
+    if (!inputEl) return;
+    try {
+      if (typeof inputEl.showPicker === 'function') {
+        inputEl.showPicker();
+      } else {
+        inputEl.focus();
+      }
+    } catch {
+      inputEl.focus();
+    }
+  }
+
+  openDatePickerFromCell(event: Event): void {
+    event.stopPropagation();
+    const cell = event.currentTarget as HTMLElement;
+    const input = cell.querySelector<HTMLInputElement>('input[type="date"]');
+    if (!input) return;
+    try {
+      if (typeof input.showPicker === 'function') {
+        input.showPicker();
+      } else {
+        input.click();
+        input.focus();
+      }
+    } catch {
+      input.click();
+      input.focus();
+    }
+  }
+
   isCustomColumn(col: TableColumnDef): boolean {
     return !!col.isCustom || col.id.startsWith('col_') || !DEFAULT_TABLE_COLUMNS.some(d => d.id === col.id);
   }
@@ -1989,6 +2100,14 @@ export class KanbanBoardComponent implements OnDestroy {
   draftAssigneeNames(): string {
     if (!this.draft.assigneeIds.length) return 'Não atribuído';
     return this.draft.assigneeIds.map(id => this.assigneeName(id)).filter(Boolean).join(', ');
+  }
+
+  formatDueDate(dateStr?: string | null): string {
+    if (!dateStr) return '';
+    const clean = dateStr.split('T')[0];
+    const parts = clean.split('-');
+    if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    return clean;
   }
 
   getTaskFreeLabels(task: KanbanTask): string[] {

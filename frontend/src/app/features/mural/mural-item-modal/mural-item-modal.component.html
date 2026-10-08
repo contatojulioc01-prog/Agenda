@@ -10,8 +10,8 @@
           </mat-icon>
         </div>
         <div class="header-title-box">
-          <h2>{{ isEdit ? 'Editar Cartão do Mural' : 'Novo Cartão no Mural' }}</h2>
-          <p>{{ isEdit ? 'Atualize as informações, anexos ou estilo do aviso.' : 'Adicione uma nota, documento ou comunicado ao mural.' }}</p>
+          <h2>{{ isReadOnly ? 'Detalhes do Cartão' : (isEdit ? 'Editar Cartão do Mural' : 'Novo Cartão no Mural') }}</h2>
+          <p>{{ isReadOnly ? 'Visualização dos dados, avisos e anexos deste cartão.' : (isEdit ? 'Atualize as informações, anexos ou estilo do aviso.' : 'Adicione uma nota, documento ou comunicado ao mural.') }}</p>
         </div>
       </div>
       <button type="button" class="close-btn" (click)="fechar()" title="Fechar">
@@ -30,7 +30,60 @@
         </button>
       </div>
 
-      <form class="form-container" (submit)="salvar(); $event.preventDefault()">
+      <!-- Modo Visualização Limpo & Elegante -->
+      <div class="read-only-view-container" *ngIf="isReadOnly">
+        <div class="view-content-card" [style.border-left-color]="selectedColor">
+          <div class="view-header-row">
+            <h1 class="view-title">{{ title || 'Sem título' }}</h1>
+            <div class="view-meta-badges" *ngIf="isPinned || getGroupName()">
+              <span class="view-badge badge-pin" *ngIf="isPinned">
+                <mat-icon>push_pin</mat-icon>
+                <span>Fixado</span>
+              </span>
+              <span class="view-badge badge-group" *ngIf="getGroupName()">
+                <mat-icon>folder_open</mat-icon>
+                <span>{{ getGroupName() }}</span>
+              </span>
+            </div>
+          </div>
+
+          <div class="view-description-wrap">
+            <app-markdown-text *ngIf="content" [text]="content"></app-markdown-text>
+            <p *ngIf="!content" class="view-empty-desc">Nenhum conteúdo informado.</p>
+          </div>
+        </div>
+
+        <!-- Anexos no modo visualização (somente se houver) -->
+        <div class="view-attachments-card" *ngIf="attachments.length > 0">
+          <div class="view-card-subtitle">
+            <mat-icon>attach_file</mat-icon>
+            <span>Anexos & Arquivos ({{ attachments.length }})</span>
+          </div>
+          <div class="attachments-list">
+            <div
+              class="attachment-item"
+              *ngFor="let att of attachments"
+              (click)="abrirPreview(att)"
+              (contextmenu)="onAttachmentContextMenu($event, att)"
+              matTooltip="Clique para visualizar ou botão direito para opções"
+              [matTooltipShowDelay]="600"
+            >
+              <div class="attachment-info">
+                <mat-icon class="att-type-icon" [style.color]="getFileInfo(att.fileName, att.mimeType).color">
+                  {{ getFileInfo(att.fileName, att.mimeType).icon }}
+                </mat-icon>
+                <div class="att-text">
+                  <span class="att-name" [title]="att.fileName">{{ att.fileName }}</span>
+                  <span class="att-size">{{ formatarTamanho(att.byteSize) }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modo Edição / Criação com Formulário Completo -->
+      <form class="form-container" *ngIf="!isReadOnly" (submit)="salvar(); $event.preventDefault()">
 
         <!-- GRUPO 1: Conteúdo da Nota -->
         <div class="form-card">
@@ -110,11 +163,11 @@
           </div>
         </div>
 
-        <!-- GRUPO 3: Anexos (PDFs e Imagens em Mini-Cards) -->
+        <!-- GRUPO 3: Anexos & Arquivos (Qualquer tipo de arquivo) -->
         <div class="form-card">
           <div class="card-header">
             <mat-icon class="section-icon color-emerald">attach_file</mat-icon>
-            <h3>Documentos & Anexos (PDFs e Imagens)</h3>
+            <h3>Documentos, Códigos & Anexos</h3>
           </div>
 
           <div class="attachments-section">
@@ -123,7 +176,6 @@
                 type="file"
                 #fileInput
                 (change)="onFilesSelected($event)"
-                accept="image/*,application/pdf"
                 multiple
                 style="display: none;"
               />
@@ -140,25 +192,26 @@
                   class="button-spinner"
                 ></mat-progress-spinner>
                 <mat-icon *ngIf="!loadingUpload">cloud_upload</mat-icon>
-                <span>{{ loadingUpload ? 'Enviando anexos...' : 'Anexar PDFs ou Imagens' }}</span>
+                <span>{{ loadingUpload ? 'Enviando anexos...' : 'Anexar Arquivos (Qualquer formato)' }}</span>
               </button>
-              <span class="upload-hint">Salvo automaticamente no repositório de rede de anexos</span>
+              <span class="upload-hint">Aceita códigos de programação, PDFs, imagens, documentos e planilhas</span>
             </div>
 
             <!-- Arquivos Pendentes (Mini-Cards sem botões visíveis, opções no botão direito) -->
             <div class="pending-section-wrap" *ngIf="pendingFiles.length > 0">
-              <div class="pending-title">Prontos para envio ao salvar (clique direito para opções):</div>
+              <div class="pending-title">Prontos para envio ao salvar (clique para pré-visualizar ou botão direito para opções):</div>
               <div class="pending-attachments-list">
                 <div
                   class="attachment-item pending"
                   *ngFor="let file of pendingFiles; let i = index"
+                  (click)="abrirPendingPreview(file)"
                   (contextmenu)="onPendingContextMenu($event, i)"
-                  matTooltip="Clique com o botão direito para opções"
+                  matTooltip="Clique para visualizar ou botão direito para opções"
                   [matTooltipShowDelay]="600"
                 >
                   <div class="attachment-info">
-                    <mat-icon class="att-type-icon" [class.is-pdf]="file.type === 'application/pdf'">
-                      {{ file.type === 'application/pdf' ? 'picture_as_pdf' : 'image' }}
+                    <mat-icon class="att-type-icon" [style.color]="getFileInfo(file.name, file.type).color">
+                      {{ getFileInfo(file.name, file.type).icon }}
                     </mat-icon>
                     <div class="att-text">
                       <span class="att-name" [title]="file.name">{{ file.name }}</span>
@@ -174,13 +227,14 @@
               <div
                 class="attachment-item"
                 *ngFor="let att of attachments"
+                (click)="abrirPreview(att)"
                 (contextmenu)="onAttachmentContextMenu($event, att)"
-                matTooltip="Clique com o botão direito para opções"
+                matTooltip="Clique para visualizar ou botão direito para opções"
                 [matTooltipShowDelay]="600"
               >
                 <div class="attachment-info">
-                  <mat-icon class="att-type-icon" [class.is-pdf]="att.mimeType === 'application/pdf'">
-                    {{ att.mimeType === 'application/pdf' ? 'picture_as_pdf' : 'image' }}
+                  <mat-icon class="att-type-icon" [style.color]="getFileInfo(att.fileName, att.mimeType).color">
+                    {{ getFileInfo(att.fileName, att.mimeType).icon }}
                   </mat-icon>
                   <div class="att-text">
                     <span class="att-name" [title]="att.fileName">{{ att.fileName }}</span>
@@ -192,109 +246,105 @@
           </div>
         </div>
 
-        <!-- Trigger invisível para Menu de Contexto (Angular Material) -->
-        <div
-          class="context-menu-trigger-anchor"
-          [style.left.px]="contextMenuPosition.x"
-          [style.top.px]="contextMenuPosition.y"
-          [matMenuTriggerFor]="attachmentContextMenu"
-        ></div>
-
-        <!-- Menu de Contexto Angular Material -->
-        <mat-menu #attachmentContextMenu="matMenu" class="mural-attachment-context-menu">
-          <ng-template matMenuContent>
-            <!-- Opções para Anexo Salvo -->
-            <ng-container *ngIf="contextAttachment as att">
-              <button mat-menu-item (click)="abrirPreview(att)">
-                <mat-icon class="color-blue">visibility</mat-icon>
-                <span>Visualizar anexo</span>
-              </button>
-              <button mat-menu-item (click)="baixarAnexo(att)">
-                <mat-icon class="color-indigo">download</mat-icon>
-                <span>Baixar arquivo</span>
-              </button>
-              <mat-divider></mat-divider>
-              <button mat-menu-item (click)="removerAnexo(att)" class="menu-item-danger">
-                <mat-icon class="color-red">delete_outline</mat-icon>
-                <span>Excluir anexo</span>
-              </button>
-            </ng-container>
-
-            <!-- Opções para Arquivo Pendente -->
-            <ng-container *ngIf="contextPendingIndex !== null">
-              <button mat-menu-item (click)="removerPendingFile(contextPendingIndex)" class="menu-item-danger">
-                <mat-icon class="color-red">delete_outline</mat-icon>
-                <span>Remover da lista</span>
-              </button>
-            </ng-container>
-          </ng-template>
-        </mat-menu>
-
       </form>
+
+      <!-- Trigger invisível para Menu de Contexto (Angular Material) -->
+      <div
+        class="context-menu-trigger-anchor"
+        [style.left.px]="contextMenuPosition.x"
+        [style.top.px]="contextMenuPosition.y"
+        [matMenuTriggerFor]="attachmentContextMenu"
+      ></div>
+
+      <!-- Menu de Contexto Angular Material -->
+      <mat-menu #attachmentContextMenu="matMenu" class="mural-attachment-context-menu">
+        <ng-template matMenuContent>
+          <!-- Opções para Anexo Salvo -->
+          <ng-container *ngIf="contextAttachment as att">
+            <button mat-menu-item (click)="abrirPreview(att)">
+              <mat-icon class="color-blue">visibility</mat-icon>
+              <span>Visualizar anexo</span>
+            </button>
+            <button mat-menu-item (click)="baixarAnexo(att)">
+              <mat-icon class="color-indigo">download</mat-icon>
+              <span>Baixar arquivo</span>
+            </button>
+            <mat-divider *ngIf="!isReadOnly"></mat-divider>
+            <button *ngIf="!isReadOnly" mat-menu-item (click)="removerAnexo(att)" class="menu-item-danger">
+              <mat-icon class="color-red">delete_outline</mat-icon>
+              <span>Excluir anexo</span>
+            </button>
+          </ng-container>
+
+          <!-- Opções para Arquivo Pendente -->
+          <ng-container *ngIf="contextPendingIndex !== null">
+            <button mat-menu-item (click)="removerPendingFile(contextPendingIndex)" class="menu-item-danger">
+              <mat-icon class="color-red">delete_outline</mat-icon>
+              <span>Remover da lista</span>
+            </button>
+          </ng-container>
+        </ng-template>
+      </mat-menu>
     </div>
 
     <!-- Fixed Footer -->
     <div class="modal-footer">
-      <ng-container *ngIf="isEdit">
-        <button *ngIf="!confirmDelete()" type="button" class="btn-delete" (click)="excluir()" [disabled]="loadingExcluir">
-          <mat-icon>delete</mat-icon>
-          <span>Excluir</span>
+      <ng-container *ngIf="isReadOnly">
+        <button type="button" class="btn-cancel" (click)="enableEditMode()">
+          <mat-icon>edit</mat-icon>
+          <span>Editar Cartão</span>
         </button>
-
-        <!-- Confirmação in-app integrada -->
-        <div class="delete-confirm-box" *ngIf="confirmDelete()">
-          <span class="confirm-text">Confirmar exclusão?</span>
-          <button type="button" class="btn-delete confirm" (click)="excluir()" [disabled]="loadingExcluir">
-            <mat-progress-spinner *ngIf="loadingExcluir" mode="indeterminate" diameter="16" class="button-spinner"></mat-progress-spinner>
-            <mat-icon *ngIf="!loadingExcluir">check</mat-icon>
-            <span>Sim, excluir</span>
-          </button>
-          <button type="button" class="btn-cancel compact" (click)="cancelarExclusao()">Não</button>
-        </div>
+        <button type="button" class="btn-save" (click)="fechar()">
+          <mat-icon>close</mat-icon>
+          <span>Fechar</span>
+        </button>
       </ng-container>
 
-      <button type="button" class="btn-cancel" (click)="fechar()">Cancelar</button>
+      <ng-container *ngIf="!isReadOnly">
+        <ng-container *ngIf="isEdit">
+          <button *ngIf="!confirmDelete()" type="button" class="btn-delete" (click)="excluir()" [disabled]="loadingExcluir">
+            <mat-icon>delete</mat-icon>
+            <span>Excluir</span>
+          </button>
 
-      <button type="button" class="btn-save" (click)="salvar()" [disabled]="loadingSalvar || !title.trim()">
-        <mat-progress-spinner
-          *ngIf="loadingSalvar"
-          mode="indeterminate"
-          diameter="20"
-          class="button-spinner"
-        ></mat-progress-spinner>
-        <mat-icon *ngIf="!loadingSalvar">save</mat-icon>
-        <span>{{ loadingSalvar ? 'Salvando...' : (isEdit ? 'Salvar Alterações' : 'Adicionar ao Mural') }}</span>
-      </button>
+          <!-- Confirmação in-app integrada -->
+          <div class="delete-confirm-box" *ngIf="confirmDelete()">
+            <span class="confirm-text">Confirmar exclusão?</span>
+            <button type="button" class="btn-delete confirm" (click)="excluir()" [disabled]="loadingExcluir">
+              <mat-progress-spinner *ngIf="loadingExcluir" mode="indeterminate" diameter="16" class="button-spinner"></mat-progress-spinner>
+              <mat-icon *ngIf="!loadingExcluir">check</mat-icon>
+              <span>Sim, excluir</span>
+            </button>
+            <button type="button" class="btn-cancel compact" (click)="cancelarExclusao()">Não</button>
+          </div>
+        </ng-container>
+
+        <button type="button" class="btn-cancel" (click)="fechar()">Cancelar</button>
+
+        <button type="button" class="btn-save" (click)="salvar()" [disabled]="loadingSalvar || !title.trim()">
+          <mat-progress-spinner
+            *ngIf="loadingSalvar"
+            mode="indeterminate"
+            diameter="20"
+            class="button-spinner"
+          ></mat-progress-spinner>
+          <mat-icon *ngIf="!loadingSalvar">save</mat-icon>
+          <span>{{ loadingSalvar ? 'Salvando...' : (isEdit ? 'Salvar Alterações' : 'Adicionar ao Mural') }}</span>
+        </button>
+      </ng-container>
     </div>
 
   </div>
 </div>
 
 <!-- Modal de Pré-visualização de Anexo -->
-<div class="attachment-preview-backdrop" *ngIf="previewAttachmentUrl()" (click)="fecharPreview()">
-  <div class="attachment-preview-card" (click)="$event.stopPropagation()">
-    <div class="preview-header">
-      <div class="preview-title">
-        <mat-icon>{{ previewAttachmentMimeType() === 'application/pdf' ? 'picture_as_pdf' : 'image' }}</mat-icon>
-        <span>{{ previewAttachmentName() }}</span>
-      </div>
-      <button type="button" class="close-btn" (click)="fecharPreview()">
-        <mat-icon>close</mat-icon>
-      </button>
-    </div>
-
-    <div class="preview-body">
-      <iframe
-        *ngIf="previewAttachmentMimeType() === 'application/pdf'"
-        [src]="trustedPreviewUrl()"
-        class="pdf-frame"
-      ></iframe>
-      <img
-        *ngIf="previewAttachmentMimeType() !== 'application/pdf'"
-        [src]="previewAttachmentUrl()"
-        [alt]="previewAttachmentName()"
-        class="image-frame"
-      />
-    </div>
-  </div>
-</div>
+<app-attachment-preview-modal
+  *ngIf="previewAttachmentUrl()"
+  [fileName]="previewAttachmentName()"
+  [fileUrl]="previewAttachmentUrl()"
+  [mimeType]="previewAttachmentMimeType()"
+  [rawContent]="previewAttachmentRawContent()"
+  [byteSize]="previewAttachmentByteSize()"
+  (close)="fecharPreview()"
+  (download)="baixarAnexo()"
+></app-attachment-preview-modal>

@@ -1,0 +1,111 @@
+<div class="attachment-preview-backdrop" (click)="close.emit()">
+  <div class="attachment-preview-card" (click)="$event.stopPropagation()">
+
+    <!-- Header com Informações e Ações -->
+    <div class="preview-header">
+      <div class="preview-header-left">
+        <div class="preview-type-badge" [style.background]="fileInfo().color">
+          <mat-icon>{{ fileInfo().icon }}</mat-icon>
+        </div>
+        <div class="preview-title-box">
+          <h3 class="preview-file-name" [title]="fileName">{{ fileName }}</h3>
+          <div class="preview-meta-row">
+            <span class="preview-lang-pill" [style.border-color]="fileInfo().color" [style.color]="fileInfo().color">
+              {{ fileInfo().name }}
+            </span>
+            <span class="preview-size" *ngIf="byteSize">{{ formatarTamanho(byteSize) }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="preview-header-actions">
+        <!-- Botão de Copiar Código (para arquivos de código/texto) -->
+        <button
+          *ngIf="fileInfo().category === 'code' && (rawContent || currentText())"
+          type="button"
+          class="preview-action-btn copy-btn"
+          (click)="copyCode()"
+          [matTooltip]="isCopied() ? 'Copiado!' : 'Copiar código'"
+        >
+          <mat-icon>{{ isCopied() ? 'check' : 'content_copy' }}</mat-icon>
+          <span>{{ isCopied() ? 'Copiado!' : 'Copiar' }}</span>
+        </button>
+
+        <!-- Botão de Download -->
+        <button
+          *ngIf="fileUrl"
+          type="button"
+          class="preview-action-btn download-btn"
+          (click)="download.emit()"
+          matTooltip="Baixar arquivo"
+        >
+          <mat-icon>download</mat-icon>
+          <span>Baixar</span>
+        </button>
+
+        <!-- Botão de Fechar -->
+        <button type="button" class="preview-close-btn" (click)="close.emit()" title="Fechar">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+    </div>
+
+    <!-- Corpo do Visualizador -->
+    <div class="preview-body" [class.code-mode]="fileInfo().category === 'code'">
+
+      <!-- 1. Código Fonte / Texto Formatado com Syntax Highlighting -->
+      <div class="code-viewer-container" *ngIf="fileInfo().category === 'code'">
+        <div class="code-viewer-header">
+          <span class="code-lang-label">{{ fileInfo().name }}</span>
+          <span class="code-stats" *ngIf="rawContent || currentText()">
+            {{ (rawContent || currentText()).split('\n').length }} linhas
+          </span>
+        </div>
+        <div class="code-editor-viewport">
+          <div class="code-loading-box" *ngIf="contentLoading()">
+            <mat-progress-spinner mode="indeterminate" diameter="28"></mat-progress-spinner>
+            <span>Carregando arquivo de código...</span>
+          </div>
+          <pre class="code-pre" *ngIf="!contentLoading()" [innerHTML]="highlightedCode()"></pre>
+        </div>
+      </div>
+
+      <!-- 2. Imagens -->
+      <div class="image-viewer-container" *ngIf="fileInfo().category === 'image'">
+        <img [src]="fileUrl" [alt]="fileName" class="preview-image" />
+      </div>
+
+      <!-- 3. Documentos PDF -->
+      <div class="pdf-viewer-container" *ngIf="fileInfo().category === 'pdf'">
+        <iframe [src]="trustedUrl()" class="preview-pdf-frame" [title]="fileName"></iframe>
+      </div>
+
+      <!-- 4. Áudio -->
+      <div class="media-viewer-container" *ngIf="fileInfo().category === 'audio'">
+        <mat-icon class="media-big-icon color-purple">audiotrack</mat-icon>
+        <h4>{{ fileName }}</h4>
+        <audio controls [src]="fileUrl" class="preview-audio-player"></audio>
+      </div>
+
+      <!-- 5. Vídeo -->
+      <div class="media-viewer-container video" *ngIf="fileInfo().category === 'video'">
+        <video controls [src]="fileUrl" class="preview-video-player"></video>
+      </div>
+
+      <!-- 6. Outros Tipos de Arquivo (Download Direto) -->
+      <div class="generic-file-container" *ngIf="['other', 'archive', 'sheet', 'document'].includes(fileInfo().category)">
+        <div class="generic-file-card">
+          <mat-icon class="generic-big-icon" [style.color]="fileInfo().color">{{ fileInfo().icon }}</mat-icon>
+          <h3>{{ fileName }}</h3>
+          <p>Arquivo {{ fileInfo().name }} · {{ formatarTamanho(byteSize) }}</p>
+          <button type="button" class="btn-download-generic" (click)="download.emit()">
+            <mat-icon>download</mat-icon>
+            <span>Baixar Arquivo</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</div>

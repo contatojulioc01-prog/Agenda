@@ -26,7 +26,63 @@
 
   <!-- ── Body rolável ── -->
   <div class="modal-body">
-    <form class="form-container" [class.read-only-form]="isReadOnly" #eventForm="ngForm">
+    <!-- Modo Visualização Limpo & Elegante -->
+    <div class="read-only-view-container" *ngIf="isReadOnly">
+      <div class="view-content-card" [style.border-left-color]="getCalendarColor()">
+        <div class="view-header-row">
+          <h1 class="view-title">{{ formData.title || 'Sem título' }}</h1>
+          <div class="view-meta-badges">
+            <span class="view-badge badge-calendar" *ngIf="getCalendarName()" [style.color]="getCalendarColor()">
+              <span class="view-badge-dot" [style.background]="getCalendarColor()"></span>
+              <span>{{ getCalendarName() }}</span>
+            </span>
+            <span class="view-badge badge-schedule">
+              <mat-icon>schedule</mat-icon>
+              <span>{{ formatEventSchedule() }}</span>
+            </span>
+            <span class="view-badge badge-category" *ngIf="formData.category">
+              <mat-icon>label</mat-icon>
+              <span>{{ formData.category }}</span>
+            </span>
+          </div>
+        </div>
+
+        <div class="view-description-wrap">
+          <app-markdown-text *ngIf="formData.description" [text]="formData.description"></app-markdown-text>
+          <p *ngIf="!formData.description" class="view-empty-desc">Nenhuma descrição informada.</p>
+        </div>
+      </div>
+
+      <!-- Anexos no modo visualização (somente se houver) -->
+      <div class="view-attachments-card" *ngIf="attachments.length > 0">
+        <div class="view-card-subtitle">
+          <mat-icon>attach_file</mat-icon>
+          <span>Anexos ({{ attachments.length }})</span>
+        </div>
+        <div class="attachment-list">
+          <div
+            class="attachment-item"
+            *ngFor="let attachment of attachments"
+            (click)="openAttachment(attachment)"
+            role="button"
+            tabindex="0"
+            (keydown.enter)="openAttachment(attachment)"
+          >
+            <mat-icon [style.color]="getFileInfo(attachment.fileName, attachment.mimeType).color">
+              {{ getFileInfo(attachment.fileName, attachment.mimeType).icon }}
+            </mat-icon>
+            <div>
+              <strong>{{ attachment.fileName }}</strong>
+              <span>{{ attachment.byteSize / 1048576 | number:'1.0-2' }} MB · {{ getFileInfo(attachment.fileName, attachment.mimeType).name }}</span>
+            </div>
+            <mat-icon class="view-action-icon">visibility</mat-icon>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modo Edição / Criação com Formulário Completo -->
+    <form class="form-container" *ngIf="!isReadOnly" #eventForm="ngForm">
 
       <p class="no-calendar-warning" *ngIf="!isEdit && !hasTargetCalendars">Selecione ao menos uma agenda na lateral antes de criar o evento.</p>
 
@@ -83,9 +139,9 @@
           <div class="form-field col-span-2 description-field">
             <div class="description-header">
               <label for="ev-desc">Descrição</label>
-              <app-ai-text-button *ngIf="!isReadOnly" [text]="formData.description" (textChange)="formData.description = $event" />
+              <app-ai-text-button [text]="formData.description" (textChange)="formData.description = $event" />
             </div>
-            <app-markdown-editor *ngIf="!isReadOnly"
+            <app-markdown-editor
               [text]="formData.description"
               (textChange)="formData.description = $event"
               [maxLength]="5000"
@@ -93,7 +149,6 @@
               ariaLabel="Descrição do evento"
               editorId="ev-desc"
             />
-            <app-markdown-text *ngIf="isReadOnly && formData.description" [text]="formData.description" />
           </div>
         </div>
       </div>
@@ -103,21 +158,30 @@
           <mat-icon class='section-icon color-purple'>attach_file</mat-icon>
           <h3>Anexos</h3><span class='attachment-count'>{{ attachments.length + pendingFiles.length }}/10</span>
         </div>
-        <p class='attachment-help'>Arquivos de até 10 MB. Clique em uma imagem para visualizá-la.</p>
-        <label class='attachment-picker' *ngIf='!isReadOnly && attachments.length + pendingFiles.length < 10'>
+        <p class='attachment-help'>Aceita todos os tipos de arquivos até 10 MB. Arquivos de programação contam com destaque de sintaxe.</p>
+        <label class='attachment-picker' *ngIf='attachments.length + pendingFiles.length < 10'>
           <mat-icon>upload_file</mat-icon><span>Adicionar arquivos ou imagens</span>
           <input type='file' multiple (change)='selectFiles($event)' />
         </label>
         <div class='attachment-list' *ngIf='attachments.length || pendingFiles.length'>
           <div class='attachment-item' *ngFor='let attachment of attachments' (click)='openAttachment(attachment)' role='button' tabindex='0' (keydown.enter)='openAttachment(attachment)'>
-            <mat-icon>{{ attachment.mimeType === 'application/pdf' ? 'picture_as_pdf' : attachment.previewable ? 'image' : 'description' }}</mat-icon>
-            <div><strong>{{ attachment.fileName }}</strong><span>{{ attachment.byteSize / 1048576 | number:'1.0-2' }} MB</span></div>
-            <button type='button' *ngIf='!isReadOnly' (click)='$event.stopPropagation(); deleteAttachment(attachment)' title='Excluir anexo'><mat-icon>delete_outline</mat-icon></button>
-            <mat-icon *ngIf='isReadOnly'>{{ attachment.previewable ? 'visibility' : 'download' }}</mat-icon>
+            <mat-icon [style.color]="getFileInfo(attachment.fileName, attachment.mimeType).color">
+              {{ getFileInfo(attachment.fileName, attachment.mimeType).icon }}
+            </mat-icon>
+            <div>
+              <strong>{{ attachment.fileName }}</strong>
+              <span>{{ attachment.byteSize / 1048576 | number:'1.0-2' }} MB · {{ getFileInfo(attachment.fileName, attachment.mimeType).name }}</span>
+            </div>
+            <button type='button' (click)='$event.stopPropagation(); deleteAttachment(attachment)' title='Excluir anexo'><mat-icon>delete_outline</mat-icon></button>
           </div>
           <div class='attachment-item pending' *ngFor='let file of pendingFiles; let index = index' (click)='openPending(file)'>
-            <mat-icon>{{ file.type === 'application/pdf' ? 'picture_as_pdf' : file.type.startsWith('image/') ? 'image' : 'description' }}</mat-icon>
-            <div><strong>{{ file.name }}</strong><span>Aguardando salvar · {{ file.size / 1048576 | number:'1.0-2' }} MB</span></div>
+            <mat-icon [style.color]="getFileInfo(file.name, file.type).color">
+              {{ getFileInfo(file.name, file.type).icon }}
+            </mat-icon>
+            <div>
+              <strong>{{ file.name }}</strong>
+              <span>Aguardando salvar · {{ file.size / 1048576 | number:'1.0-2' }} MB · {{ getFileInfo(file.name, file.type).name }}</span>
+            </div>
             <button type='button' (click)='$event.stopPropagation(); removePending(index)' title='Remover'><mat-icon>close</mat-icon></button>
           </div>
         </div>
@@ -195,7 +259,7 @@
           </div>
 
           <!-- Recorrência Mensal -->
-          <div class="form-field col-span-2 recurrence-card" *ngIf="!isReadOnly">
+          <div class="form-field col-span-2 recurrence-card">
             <div class="recurrence-toggle-box">
               <label class="checkbox-label" for="ev-recurring">
                 <input
@@ -243,36 +307,6 @@
                 <span>O evento será criado para <strong>todo dia {{ formData.date.slice(8, 10) }}</strong> durante <strong>{{ effectiveRecurringMonths }} {{ effectiveRecurringMonths === 1 ? 'mês' : 'meses' }}</strong>.</span>
               </div>
             </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- SKILL: Form Groups — Grupo 3: Participantes & Colaboradores -->
-      <div class="form-card" *ngIf="false">
-        <div class="card-header">
-          <mat-icon class="section-icon color-purple">group</mat-icon>
-          <h3>Participantes (Equipe Corporativa)</h3>
-        </div>
-
-        <div class="attendees-selection-grid">
-          <div
-            *ngFor="let user of allUsers()"
-            class="attendee-chip"
-            [class.selected]="isAttendeeSelected(user.id)"
-            (click)="toggleAttendee(user.id)"
-          >
-            <div class="chip-avatar">
-              <img
-                [src]="user.avatar || defaultAvatar"
-                [alt]="user.name"
-                (error)="$any($event.target).src = defaultAvatar"
-              />
-            </div>
-            <div class="chip-details">
-              <span class="chip-name">{{ user.name }}</span>
-              <span class="chip-dept">{{ user.departament?.name || 'Geral' }}</span>
-            </div>
-            <mat-icon class="chip-check" *ngIf="isAttendeeSelected(user.id)">check_circle</mat-icon>
           </div>
         </div>
       </div>
@@ -335,7 +369,22 @@
       <mat-icon *ngIf="!loadingSalvar" style="font-size:18px;width:18px;height:18px;">save</mat-icon>
       <span>{{ loadingSalvar ? 'Salvando...' : 'Salvar' }}</span>
     </button>
-    <button *ngIf="isReadOnly" type="button" class="btn-save" (click)="dialogRef.close()"><mat-icon>close</mat-icon>Fechar</button>
+    <ng-container *ngIf="isReadOnly">
+      <button
+        *ngIf="canEditCurrentCalendar"
+        type="button"
+        class="btn-cancel"
+        (click)="enableEditMode()"
+        matTooltip="Alternar para edição do evento"
+      >
+        <mat-icon>edit</mat-icon>
+        <span>Editar Evento</span>
+      </button>
+      <button type="button" class="btn-save" (click)="dialogRef.close()">
+        <mat-icon>close</mat-icon>
+        <span>Fechar</span>
+      </button>
+    </ng-container>
   </div>
 
   <div class="event-delete-backdrop" *ngIf="showDeleteConfirmation" (mousedown)="showDeleteConfirmation = false">
@@ -347,11 +396,14 @@
     </section>
   </div>
 
-  <div class='image-preview-backdrop' *ngIf='previewUrl()' (mousedown)='closePreview()'>
-    <section class='image-preview' (mousedown)='$event.stopPropagation()'>
-      <header><strong>{{ previewName() }}</strong><button type='button' (click)='closePreview()'><mat-icon>close</mat-icon></button></header>
-      <img *ngIf='previewMimeType() !== "application/pdf"' [src]='previewUrl()' [alt]='previewName()' />
-      <iframe *ngIf='previewMimeType() === "application/pdf"' [src]='trustedPreviewUrl()' [title]='previewName()'></iframe>
-    </section>
-  </div>
+  <app-attachment-preview-modal
+    *ngIf="previewUrl()"
+    [fileName]="previewName()"
+    [fileUrl]="previewUrl()"
+    [mimeType]="previewMimeType()"
+    [rawContent]="previewRawContent()"
+    [byteSize]="previewByteSize()"
+    (close)="closePreview()"
+    (download)="downloadAttachment()"
+  ></app-attachment-preview-modal>
 </div>
