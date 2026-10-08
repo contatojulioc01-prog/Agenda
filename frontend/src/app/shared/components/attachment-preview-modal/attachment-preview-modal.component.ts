@@ -5,11 +5,12 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { detectFileType, formatCodeWithHighlight, FileTypeInfo } from '../../../core/utils/code-highlight.util';
+import { MarkdownTextComponent } from '../markdown-text/markdown-text.component';
 
 @Component({
   selector: 'app-attachment-preview-modal',
   standalone: true,
-  imports: [CommonModule, MatIconModule, MatTooltipModule, MatProgressSpinnerModule],
+  imports: [CommonModule, MatIconModule, MatTooltipModule, MatProgressSpinnerModule, MarkdownTextComponent],
   templateUrl: './attachment-preview-modal.component.html',
   styleUrl: './attachment-preview-modal.component.scss',
 })
@@ -39,6 +40,7 @@ export class AttachmentPreviewModalComponent implements OnInit, OnChanges {
   readonly isCopied = signal(false);
   readonly contentLoading = signal(false);
   readonly currentText = signal<string>('');
+  readonly markdownViewMode = signal<'rendered' | 'raw'>('rendered');
 
   ngOnInit(): void {
     this.refreshState();

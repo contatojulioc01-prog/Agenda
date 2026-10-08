@@ -1,21 +1,300 @@
-<div
-  #editor
-  class="markdown-editor"
-  [id]="editorId"
-  contenteditable="true"
-  role="textbox"
-  aria-multiline="true"
-  spellcheck="true"
-  [attr.aria-label]="ariaLabel"
-  [attr.data-placeholder]="placeholder"
-  (focus)="onFocus()"
-  (blur)="onBlur()"
-  (input)="onInput($event)"
-  (paste)="onPaste($event)"
-  (compositionstart)="onCompositionStart()"
-  (compositionend)="onCompositionEnd($event)"
-></div>
-<div class="markdown-editor-footer">
-  <span>Formatação com Markdown</span>
-  <span>{{ text.length }}/{{ maxLength }}</span>
+<div class="markdown-editor-shell">
+  <!-- Barra de Ferramentas de Formatação Rápida Markdown -->
+  <div class="markdown-editor-toolbar" *ngIf="showToolbar" (mousedown)="$event.preventDefault()">
+    <button
+      type="button"
+      class="toolbar-btn"
+      (click)="applyToolbarFormat('bold')"
+      matTooltip="Negrito (**texto**)"
+    >
+      <mat-icon>format_bold</mat-icon>
+    </button>
+    <button
+      type="button"
+      class="toolbar-btn"
+      (click)="applyToolbarFormat('italic')"
+      matTooltip="Itálico (*texto*)"
+    >
+      <mat-icon>format_italic</mat-icon>
+    </button>
+    <button
+      type="button"
+      class="toolbar-btn"
+      (click)="applyToolbarFormat('strike')"
+      matTooltip="Riscado (~~texto~~)"
+    >
+      <mat-icon>strikethrough_s</mat-icon>
+    </button>
+    <button
+      type="button"
+      class="toolbar-btn"
+      (click)="applyToolbarFormat('heading')"
+      matTooltip="Título (### Título)"
+    >
+      <mat-icon>title</mat-icon>
+    </button>
+    <span class="toolbar-divider"></span>
+    <button
+      type="button"
+      class="toolbar-btn"
+      (click)="openLinkModalFromToolbar()"
+      matTooltip="Inserir / Editar Hyperlink (Ctrl+K ou clique no link)"
+    >
+      <mat-icon>link</mat-icon>
+    </button>
+    <button
+      type="button"
+      class="toolbar-btn"
+      (click)="applyToolbarFormat('list')"
+      matTooltip="Lista com marcadores (- item)"
+    >
+      <mat-icon>format_list_bulleted</mat-icon>
+    </button>
+    <button
+      type="button"
+      class="toolbar-btn"
+      (click)="applyToolbarFormat('checklist')"
+      matTooltip="Lista de tarefas (- [ ] item)"
+    >
+      <mat-icon>checklist</mat-icon>
+    </button>
+    <button
+      type="button"
+      class="toolbar-btn"
+      (click)="applyToolbarFormat('quote')"
+      matTooltip="Citação (> texto)"
+    >
+      <mat-icon>format_quote</mat-icon>
+    </button>
+    <button
+      type="button"
+      class="toolbar-btn"
+      (click)="applyToolbarFormat('code')"
+      matTooltip="Código (`código`)"
+    >
+      <mat-icon>code</mat-icon>
+    </button>
+  </div>
+
+  <!-- Área Editável do Editor com Formatação em Tempo Real -->
+  <div
+    #editor
+    class="markdown-editor"
+    [id]="editorId"
+    contenteditable="true"
+    role="textbox"
+    aria-multiline="true"
+    spellcheck="true"
+    [attr.aria-label]="ariaLabel"
+    [attr.data-placeholder]="placeholder"
+    (focus)="onFocus()"
+    (blur)="onBlur()"
+    (beforeinput)="onBeforeInput($event)"
+    (input)="onInput()"
+    (keydown)="onKeyDown($event)"
+    (click)="onEditorClick($event)"
+    (contextmenu)="onContextMenu($event)"
+    (paste)="onPaste($event)"
+    (compositionstart)="onCompositionStart()"
+    (compositionend)="onCompositionEnd()"
+  ></div>
+
+  <!-- Gatilho Invisível para Posicionar o Menu de Contexto na Coordenada do Cursor -->
+  <div
+    #contextMenuTrigger="matMenuTrigger"
+    [matMenuTriggerFor]="contextMenu"
+    style="visibility: hidden; position: fixed; width: 0; height: 0; pointer-events: none;"
+    [style.left]="contextMenuPosition.x"
+    [style.top]="contextMenuPosition.y"
+  ></div>
+
+  <!-- Menu de Contexto (Angular Material) acionado pelo Botão Direito -->
+  <mat-menu #contextMenu="matMenu" class="md-editor-context-menu" xPosition="after">
+    <!-- Cabeçalho Informativo Estilizado -->
+    <div class="md-context-menu-header" (click)="$event.stopPropagation()">
+      <div class="header-icon-pill">
+        <mat-icon>{{ hasSelection() ? 'auto_fix_high' : 'add_circle' }}</mat-icon>
+      </div>
+      <div class="header-text-group">
+        <span class="header-title">{{ hasSelection() ? 'Formatar Seleção' : 'Inserir Markdown' }}</span>
+        <span class="header-subtitle">{{ hasSelection() ? 'Aplicar estilo ao texto marcado' : 'Criar formatação no cursor' }}</span>
+      </div>
+    </div>
+
+    <!-- Opções de Estilo de Texto -->
+    <div class="md-context-section-label">Estilo do Texto</div>
+
+    <button mat-menu-item (click)="applyContextFormat('bold')" class="md-context-item">
+      <div class="item-icon-box bold-icon">
+        <mat-icon>format_bold</mat-icon>
+      </div>
+      <span class="md-menu-label">Negrito</span>
+      <span class="md-menu-badge">**texto**</span>
+    </button>
+
+    <button mat-menu-item (click)="applyContextFormat('italic')" class="md-context-item">
+      <div class="item-icon-box italic-icon">
+        <mat-icon>format_italic</mat-icon>
+      </div>
+      <span class="md-menu-label">Itálico</span>
+      <span class="md-menu-badge">*texto*</span>
+    </button>
+
+    <button mat-menu-item (click)="applyContextFormat('strike')" class="md-context-item">
+      <div class="item-icon-box strike-icon">
+        <mat-icon>strikethrough_s</mat-icon>
+      </div>
+      <span class="md-menu-label">Riscado</span>
+      <span class="md-menu-badge">~~texto~~</span>
+    </button>
+
+    <mat-divider></mat-divider>
+
+    <!-- Opções de Bloco e Estrutura -->
+    <div class="md-context-section-label">Estrutura & Listas</div>
+
+    <button mat-menu-item (click)="applyContextFormat('heading')" class="md-context-item">
+      <div class="item-icon-box heading-icon">
+        <mat-icon>title</mat-icon>
+      </div>
+      <span class="md-menu-label">Título</span>
+      <span class="md-menu-badge">### Título</span>
+    </button>
+
+    <button mat-menu-item (click)="applyContextFormat('quote')" class="md-context-item">
+      <div class="item-icon-box quote-icon">
+        <mat-icon>format_quote</mat-icon>
+      </div>
+      <span class="md-menu-label">Citação</span>
+      <span class="md-menu-badge">&gt; texto</span>
+    </button>
+
+    <button mat-menu-item (click)="applyContextFormat('list')" class="md-context-item">
+      <div class="item-icon-box list-icon">
+        <mat-icon>format_list_bulleted</mat-icon>
+      </div>
+      <span class="md-menu-label">Lista com Marcadores</span>
+      <span class="md-menu-badge">- item</span>
+    </button>
+
+    <button mat-menu-item (click)="applyContextFormat('checklist')" class="md-context-item">
+      <div class="item-icon-box check-icon">
+        <mat-icon>checklist</mat-icon>
+      </div>
+      <span class="md-menu-label">Lista de Tarefas</span>
+      <span class="md-menu-badge">- [ ] item</span>
+    </button>
+
+    <mat-divider></mat-divider>
+
+    <!-- Opção de Hyperlink -->
+    <button mat-menu-item (click)="openContextLinkModal()" class="md-context-item link-item">
+      <div class="item-icon-box link-icon">
+        <mat-icon>link</mat-icon>
+      </div>
+      <span class="md-menu-label">{{ hasSelection() ? 'Criar Hyperlink' : 'Inserir Hyperlink' }}</span>
+      <span class="md-menu-badge link-badge">[link](url)</span>
+    </button>
+  </mat-menu>
+
+  <!-- Rodapé com dicas de formatação e contador -->
+  <div class="markdown-editor-footer">
+    <span class="footer-hint">Formatação Markdown em tempo real · Clique com o botão direito para opções</span>
+    <span class="footer-counter">{{ text.length }}/{{ maxLength }}</span>
+  </div>
+</div>
+
+<!-- ══════════════ MODAL DE CONFIGURAÇÃO DE HYPERLINK ══════════════ -->
+<div class="link-modal-backdrop" *ngIf="showLinkModal()" (click)="closeLinkModal()">
+  <div class="link-modal-card" (click)="$event.stopPropagation()">
+    <!-- Header -->
+    <div class="link-modal-header">
+      <div class="link-modal-title">
+        <div class="link-modal-badge">
+          <mat-icon>link</mat-icon>
+        </div>
+        <div>
+          <h4>{{ linkModalTarget()?.fullMarkdown || linkModalTarget()?.url ? 'Editar Hyperlink' : 'Inserir Hyperlink' }}</h4>
+          <span>Configure o nome visível e a URL de destino</span>
+        </div>
+      </div>
+      <button type="button" class="btn-close-link-modal" (click)="closeLinkModal()" title="Fechar">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <!-- Body -->
+    <div class="link-modal-body">
+      <!-- Campo 1: Nome do Hyperlink (Texto de Exibição) -->
+      <div class="link-field">
+        <label for="link-text-input">
+          <mat-icon>title</mat-icon>
+          <span>Nome / Texto de Exibição</span>
+        </label>
+        <input
+          id="link-text-input"
+          type="text"
+          [(ngModel)]="linkModalText"
+          placeholder="Ex: Acessar Documentação, Site da Empresa..."
+          autofocus
+        />
+        <span class="field-hint">O texto que aparecerá sublinhado na descrição</span>
+      </div>
+
+      <!-- Campo 2: Endereço do Link (URL) -->
+      <div class="link-field">
+        <label for="link-url-input">
+          <mat-icon>link</mat-icon>
+          <span>Endereço do Link (URL) <strong class="req">*</strong></span>
+        </label>
+        <input
+          id="link-url-input"
+          type="text"
+          [(ngModel)]="linkModalUrl"
+          placeholder="https://exemplo.com.br"
+          (keydown.enter)="applyLinkModal()"
+        />
+        <span class="field-hint">Destino para onde o link direcionará ao ser clicado</span>
+      </div>
+
+      <!-- Card de Pré-visualização do Hyperlink -->
+      <div class="link-preview-box" *ngIf="linkModalUrl.trim()">
+        <span class="preview-tag">Pré-visualização do Hyperlink:</span>
+        <div class="preview-result">
+          <mat-icon class="preview-icon">open_in_new</mat-icon>
+          <span class="preview-label">{{ linkModalText.trim() || linkModalUrl.trim() }}</span>
+          <span class="preview-target-url">({{ linkModalUrl.trim() }})</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="link-modal-footer">
+      <button
+        *ngIf="linkModalTarget()?.fullMarkdown || linkModalTarget()?.url"
+        type="button"
+        class="btn-remove-link"
+        (click)="removeLinkFromModal()"
+        title="Remover hyperlink mantendo apenas o texto"
+      >
+        <mat-icon>link_off</mat-icon>
+        <span>Remover Link</span>
+      </button>
+
+      <div class="footer-right-actions">
+        <button type="button" class="btn-cancel-link" (click)="closeLinkModal()">
+          Cancelar
+        </button>
+        <button
+          type="button"
+          class="btn-apply-link"
+          (click)="applyLinkModal()"
+          [disabled]="!linkModalUrl.trim()"
+        >
+          <mat-icon>check</mat-icon>
+          <span>Aplicar Hyperlink</span>
+        </button>
+      </div>
+    </div>
+  </div>
 </div>

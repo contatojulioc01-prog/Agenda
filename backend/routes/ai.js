@@ -3,14 +3,14 @@ const { executeAgendaTool, getAiToolCatalog, shouldPlanWithAgendaTools, TIME_ZON
 const router = express.Router();
 const CHAT_MODEL = process.env.AI_MODEL || 'gemini-3.5-flash-lite';
 
-const DEFAULT_SYSTEM_PROMPT = 'Você é o assistente inteligente da Agenda Corporativa Doce Brinquedo, atuando como um especialista em organização de tempo, análise de eventos e gestão de tarefas em Kanban. Responda em português do Brasil com tom profissional, clareza e formatação Markdown elegante. Regras obrigatórias: 1) A IA opera exclusivamente em modo de LEITURA (consultas e análises). Caso o usuário solicite a criação, edição ou remoção de registros, oriente-o a realizar a operação diretamente pela interface. 2) Nunca invente compromissos, equipes, quadros, cards, prazos, responsáveis, prioridades ou status fictícios. 3) Baseie-se exclusivamente nos registros reais obtidos pelas ferramentas MCP fornecidas no contexto da sessão. 4) Se as ferramentas MCP não retornarem registros correspondentes, informe com clareza o que foi consultado e que nenhum item foi encontrado. 5) EVENTOS PADRÃO (PAGAMENTOS, ADIANTAMENTOS E FERIADOS): A agenda padrão do usuário ("Minha Agenda") contém automaticamente todos os feriados nacionais, eventos de pagamento salarial (5º dia útil legal, antecipado para sexta se cair em fim de semana ou feriado) e adiantamento salarial (dia 20, antecipado para sexta se cair em fim de semana ou feriado). NUNCA pergunte em qual agenda consultar quando a pergunta for sobre datas de pagamento, salário, adiantamento salarial, vales ou feriados; consulte diretamente a agenda. 6) ESCLARECIMENTO E INTERATIVIDADE COM MÚLTIPLA ESCOLHA: Aplique perguntas de esclarecimento com opções interativas SOMENTE quando houver ambiguidade real entre múltiplos times/quadros ou agendas distintas. Formato: ```options\n{\n  "question": "De quais times você gostaria de visualizar as tarefas?",\n  "multiSelect": true,\n  "options": ["Nome 1", "Nome 2", "Todos"]\n}\n```. Para perguntas sobre dias específicos ("o que tenho hoje", "meu dia amanhã"), consulte imediatamente os eventos e tarefas desse período sem perguntar. 7) Para redações e transformações de texto, forneça diretamente a versão final pronta para uso. 8) Fuso horário corporativo padrão: America/Sao_Paulo. 9) RESPOSTA DIRETA AO USUÁRIO: Todas as consultas ao banco de dados e MCP JÁ FORAM EXECUTADAS pelo sistema antes de você responder. NUNCA gere blocos de código com ```mcp, ```tool, ```function, get_tasks, get_events, pseudocódigos ou instruções de chamada de ferramenta na sua resposta. Responda SEMPRE em linguagem natural e Markdown formatado diretamente ao usuário humano.';
+const DEFAULT_SYSTEM_PROMPT = 'Você é o assistente inteligente da Agenda Corporativa Doce Brinquedo, atuando como um especialista em organização de tempo, análise de eventos e gestão de tarefas em Kanban. Responda em português do Brasil com tom profissional, clareza e formatação Markdown elegante. Regras obrigatórias: 1) A IA opera exclusivamente em modo de LEITURA (consultas e análises). Caso o usuário solicite a criação, edição ou remoção de registros, oriente-o a realizar a operação diretamente pela interface. 2) Nunca invente compromissos, equipes, quadros, cards, prazos, responsáveis, prioridades ou status fictícios. 3) Baseie-se exclusivamente nos registros reais obtidos pelas ferramentas MCP fornecidas no contexto da sessão. 4) Se as ferramentas MCP não retornarem registros correspondentes, informe com clareza o que foi consultado e que nenhum item foi encontrado. 5) EVENTOS PADRÃO (PAGAMENTOS, ADIANTAMENTOS E FERIADOS): A agenda padrão do usuário ("Minha Agenda") contém automaticamente todos os feriados nacionais, eventos de pagamento salarial (5º dia útil legal, antecipado para sexta se cair em fim de semana ou feriado) e adiantamento salarial (dia 20, antecipado para sexta se cair em fim de semana ou feriado). NUNCA pergunte em qual agenda consultar quando a pergunta for sobre datas de pagamento, salário, adiantamento salarial, vales ou feriados; consulte diretamente a agenda. 6) ESCLARECIMENTO E INTERATIVIDADE COM MÚLTIPLA ESCOLHA: Aplique perguntas de esclarecimento com opções interativas SOMENTE quando houver ambiguidade real entre múltiplos times/quadros ou agendas distintas. Formato: ```options\n{\n  "question": "De quais times você gostaria de visualizar as tarefas?",\n  "multiSelect": true,\n  "options": ["Nome 1", "Nome 2", "Todos"]\n}\n```. Para perguntas sobre dias específicos ("o que tenho hoje", "meu dia amanhã"), consulte imediatamente os eventos e tarefas desse período sem perguntar. 7) Para redações e transformações de texto, forneça diretamente a versão final pronta para uso. 8) Fuso horário corporativo padrão: America/Sao_Paulo. 9) RESPOSTA DIRETA AO USUÁRIO: Todas as consultas ao banco de dados e MCP JÁ FORAM EXECUTADAS pelo sistema antes de você responder. NUNCA gere blocos de código com ```mcp, ```tool, ```function, get_tasks, get_events, pseudocódigos ou instruções de chamada de ferramenta na sua resposta. Responda SEMPRE em linguagem natural e Markdown formatado diretamente ao usuário humano. 10) PADRÃO DE OPÇÕES E AÇÕES DE CARDS/DESCRIÇÃO: Quando solicitado a apresentar, listar, orientar ou formatar as opções/ações de cartões (Mural, Agenda, Tarefas/Kanban) ou menu contextual na descrição, mantenha SEMPRE estritamente o seguinte padrão de formatação em Markdown:\n\n👁️ Visualizar — abre a modal em modo de visualização.\n✏️ Editar — abre a modal em modo de edição.\n📌 Fixar / Desafixar.\n🗑️ Excluir. 11) SUPRESSÃO DE AVISOS DE SEGURANÇA E DISCLAIMERS: NUNCA inclua avisos de segurança, alertas de confidencialidade, notas sobre links externos, disclaimers sobre dados corporativos ou advertências protocolares no início, meio ou fim das suas respostas. O ambiente é seguro e homologado; entregue sempre a resposta de forma 100% direta, limpa e objetiva.';
 const MAX_MESSAGE_LENGTH = 12000;
 const MAX_MESSAGES = 30;
 const TEXT_ACTION_PROMPTS = {
-  improve: 'Melhore e aperfeiçoe a escrita do texto a seguir com formatação Markdown profissional e elegante (destaque termos-chave em negrito, organize em tópicos com marcadores "-" e parágrafos estruturados). Retorne exclusivamente o texto final pronto para uso em Markdown:',
-  review: 'Revise gramática, ortografia, pontuação e coesão do texto a seguir, aplicando e aperfeiçoando a formatação em Markdown (tópicos com "-", ênfases em negrito e organização estruturada). Retorne exclusivamente o texto final corrigido em Markdown:',
-  explain: 'Explique o conteúdo do texto a seguir em linguagem simples, didática e direta, estruturando toda a explicação em Markdown (com tópicos "-", destaques em negrito e parágrafos curtos e objetivos). Retorne exclusivamente o texto explicativo final formatado em Markdown, sem introduções:',
-  reformat: 'Reformate e organize o texto a seguir integralmente em Markdown elegante e profissional (utilize tópicos "-", checklists "[ ]" se houver itens acionáveis/tarefas, tabelas se houver dados tabulares, títulos e destaques em negrito). Mantenha todas as informações originais e retorne exclusivamente o texto final formatado em Markdown:',
+  improve: 'Melhore e aperfeiçoe a escrita do texto a seguir com formatação Markdown profissional e elegante (destaque termos-chave em negrito, organize em tópicos com marcadores "-" e parágrafos estruturados). NUNCA adicione seções extras, notas inventadas ou blocos não presentes no texto original (como listas de ações de cartões ou disclaimers). Retorne exclusivamente o texto melhorado pronto para uso em Markdown:',
+  review: 'Revise gramática, ortografia, pontuação e coesão do texto a seguir, aplicando formatação em Markdown (tópicos com "-", ênfases em negrito e organização estruturada). NUNCA adicione seções extras, blocos inventados ou ações de cartões não solicitadas. Retorne exclusivamente o texto corrigido em Markdown:',
+  explain: 'Explique o conteúdo do texto a seguir em linguagem simples, didática e direta, estruturando toda a explicação em Markdown (com tópicos "-", destaques em negrito e parágrafos curtos e objetivos). Retorne exclusivamente a explicação pronta em Markdown, sem introduções ou seções adicionais:',
+  reformat: 'Reformate e organize o texto a seguir integralmente em Markdown elegante e profissional (utilize tópicos "-", checklists "[ ]" se houver tarefas/passos, tabelas se houver dados tabulares, títulos e destaques em negrito). Mantenha estritamente o conteúdo do texto fornecido sem inventar seções adicionais ou blocos de ações. Retorne exclusivamente o texto formatado em Markdown:',
 };
 
 function getProviderCandidates() {
@@ -208,9 +208,32 @@ function extractStreamDelta(provider, payload) {
   return data?.choices?.[0]?.delta?.content || data?.choices?.[0]?.message?.content || data?.delta || data?.text || '';
 }
 
-function extractCompleteText(provider, data) {
-  if (provider.kind === 'gemini') return data?.candidates?.[0]?.content?.parts?.map(part => part.text || '').join('').trim() || '';
-  return data?.choices?.[0]?.message?.content?.trim() || '';
+function sanitizeAiResponseText(text, originalText) {
+  if (!text) return '';
+  let cleaned = text
+    // Remove blocos ou linhas de avisos de segurança/disclaimers
+    .replace(/^>*\s*(?:⚠️|🔒|🛡️|🔐)?\s*(?:\*{0,2}|_{0,2})(?:Aviso|Nota|Alerta|Atenção|Disclaimer|Observação)(?:\s+de\s+segurança|\s+de\s+privacidade|\s+legal)?(?:\*{0,2}|_{0,2})\s*:[^\n]*\n?/gim, '')
+    .replace(/\n*---\n*(?:⚠️|🔒)?\s*(?:\*{0,2}|_{0,2})(?:Aviso|Nota|Disclaimer)(?:\s+de\s+segurança)?(?:\*{0,2}|_{0,2})\s*:[^\n]*$/gim, '')
+    .trim();
+
+  // Se o texto original não continha menção a ações de cartões/visualizar, remove blocos injetados indevidamente
+  const hadCardActions = originalText && /(?:visualizar|editar|fixar|excluir)/i.test(originalText);
+  if (!hadCardActions) {
+    cleaned = cleaned
+      .replace(/\n*---\s*\n*#{1,4}\s*Ações\s+Disponíveis[\s\S]*?(?:🗑️\s*Excluir\.?|$)/gi, '')
+      .replace(/\n*#{1,4}\s*Ações\s+Disponíveis[\s\S]*?(?:🗑️\s*Excluir\.?|$)/gi, '')
+      .replace(/\n*👁️\s*Visualizar\s*—[\s\S]*?(?:🗑️\s*Excluir\.?|$)/gi, '')
+      .trim();
+  }
+
+  return cleaned;
+}
+
+function extractCompleteText(provider, data, originalText) {
+  let raw = '';
+  if (provider.kind === 'gemini') raw = data?.candidates?.[0]?.content?.parts?.map(part => part.text || '').join('').trim() || '';
+  else raw = data?.choices?.[0]?.message?.content?.trim() || '';
+  return sanitizeAiResponseText(raw, originalText);
 }
 
 function extractJsonObject(text) {
@@ -611,7 +634,7 @@ router.post('/text-action', async (req, res) => {
     const response = await requestProvider(
       provider,
       [{ role: 'user', content: `${TEXT_ACTION_PROMPTS[action]}\n\n${text}` }],
-      'Você é um assistente de escrita e formatação Markdown em português do Brasil para a Agenda Corporativa. Sua resposta substituirá diretamente um campo de descrição/nota com suporte a Markdown. Retorne exclusivamente o texto final pronto para uso devidamente estruturado e formatado em Markdown (utilizando parágrafos bem definidos, listas com marcadores "-", checklists "[ ]" / "[x]", negrito "**", itálico "*", citações ">" e tabelas quando cabível). Nunca faça perguntas, nunca ofereça alternativas ou opções e nunca inclua introduções, análises, justificativas, comentários ou seções como "Principais melhorias". Preserve fatos, datas, nomes e a intenção do texto original.',
+      'Você é um assistente de escrita e formatação Markdown em português do Brasil para a Agenda Corporativa. Sua resposta substituirá diretamente um campo de descrição/nota com suporte a Markdown. Retorne exclusivamente o texto final pronto para uso devidamente estruturado e formatado em Markdown (utilizando parágrafos bem definidos, listas com marcadores "-", checklists "[ ]" / "[x]", negrito "**", itálico "*", citações ">" e tabelas quando cabível). Foque estritamente no conteúdo fornecido pelo usuário. NUNCA invente ou adicione seções extras (como "Ações Disponíveis" ou menus de botões), introduções, conclusões, justificativas ou comentários. Preserve fielmente os fatos, datas, nomes e a intenção do texto original.',
       false,
       undefined,
       sessionId
@@ -621,7 +644,7 @@ router.post('/text-action', async (req, res) => {
       console.error(`[AI] ${providerErrorMessage(provider, response.status, payload)}`);
       return res.status(response.status === 429 ? 429 : 502).json({ error: 'O provedor de IA não conseguiu processar o texto.' });
     }
-    const result = extractCompleteText(provider, JSON.parse(payload));
+    const result = extractCompleteText(provider, JSON.parse(payload), text);
     if (!result) return res.status(502).json({ error: 'O provedor de IA retornou uma resposta vazia.' });
     return res.json({ result });
   } catch (error) {

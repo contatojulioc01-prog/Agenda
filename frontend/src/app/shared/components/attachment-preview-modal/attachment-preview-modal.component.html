@@ -19,13 +19,37 @@
       </div>
 
       <div class="preview-header-actions">
+        <!-- Alternador entre Formatado (Markdown) e Código Fonte -->
+        <div class="view-mode-toggle" *ngIf="fileInfo().id === 'markdown'">
+          <button
+            type="button"
+            class="toggle-btn"
+            [class.active]="markdownViewMode() === 'rendered'"
+            (click)="markdownViewMode.set('rendered')"
+            matTooltip="Visualização Formatada em Markdown"
+          >
+            <mat-icon>auto_stories</mat-icon>
+            <span>Formatado</span>
+          </button>
+          <button
+            type="button"
+            class="toggle-btn"
+            [class.active]="markdownViewMode() === 'raw'"
+            (click)="markdownViewMode.set('raw')"
+            matTooltip="Código Fonte com Linhas"
+          >
+            <mat-icon>code</mat-icon>
+            <span>Código</span>
+          </button>
+        </div>
+
         <!-- Botão de Copiar Código (para arquivos de código/texto) -->
         <button
           *ngIf="fileInfo().category === 'code' && (rawContent || currentText())"
           type="button"
           class="preview-action-btn copy-btn"
           (click)="copyCode()"
-          [matTooltip]="isCopied() ? 'Copiado!' : 'Copiar código'"
+          [matTooltip]="isCopied() ? 'Copiado!' : 'Copiar texto / código'"
         >
           <mat-icon>{{ isCopied() ? 'check' : 'content_copy' }}</mat-icon>
           <span>{{ isCopied() ? 'Copiado!' : 'Copiar' }}</span>
@@ -51,10 +75,36 @@
     </div>
 
     <!-- Corpo do Visualizador -->
-    <div class="preview-body" [class.code-mode]="fileInfo().category === 'code'">
+    <div
+      class="preview-body"
+      [class.code-mode]="fileInfo().category === 'code' && (fileInfo().id !== 'markdown' || markdownViewMode() === 'raw')"
+      [class.markdown-mode]="fileInfo().id === 'markdown' && markdownViewMode() === 'rendered'"
+    >
 
-      <!-- 1. Código Fonte / Texto Formatado com Syntax Highlighting -->
-      <div class="code-viewer-container" *ngIf="fileInfo().category === 'code'">
+      <!-- 1. Documento Markdown Renderizado com Estilização Completa -->
+      <div class="markdown-viewer-container" *ngIf="fileInfo().id === 'markdown' && markdownViewMode() === 'rendered'">
+        <div class="markdown-viewer-header">
+          <span class="md-badge"><mat-icon>article</mat-icon> Documento Markdown</span>
+          <span class="md-stats" *ngIf="rawContent || currentText()">
+            {{ (rawContent || currentText()).split('\n').length }} linhas
+          </span>
+        </div>
+        <div class="markdown-viewer-viewport">
+          <div class="code-loading-box" *ngIf="contentLoading()">
+            <mat-progress-spinner mode="indeterminate" diameter="28"></mat-progress-spinner>
+            <span>Carregando documento Markdown...</span>
+          </div>
+          <div class="markdown-content-box" *ngIf="!contentLoading()">
+            <app-markdown-text [text]="currentText() || rawContent"></app-markdown-text>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Código Fonte / Texto Formatado com Syntax Highlighting -->
+      <div
+        class="code-viewer-container"
+        *ngIf="fileInfo().category === 'code' && (fileInfo().id !== 'markdown' || markdownViewMode() === 'raw')"
+      >
         <div class="code-viewer-header">
           <span class="code-lang-label">{{ fileInfo().name }}</span>
           <span class="code-stats" *ngIf="rawContent || currentText()">

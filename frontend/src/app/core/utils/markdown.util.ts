@@ -43,8 +43,11 @@ function formatInline(value: string): string {
   });
 
   processed = processed
+    .replace(/\*\*\*([^*\n]+)\*\*\*/g, '<strong><em>$1</em></strong>')
+    .replace(/___([^_\n]+)___/g, '<strong><em>$1</em></strong>')
     .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
     .replace(/__([^_\n]+)__/g, '<strong>$1</strong>')
+    .replace(/~~([^~\n]+)~~/g, '<del>$1</del>')
     .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>')
     .replace(/(^|[^_])_([^_\n]+)_/g, '$1<em>$2</em>');
 
@@ -109,7 +112,31 @@ export function renderBasicMarkdown(markdown: string): string {
       continue;
     }
 
-    const heading = line.match(/^\s*(#{1,6})\s+(.+)$/);
+    // Suporte a blocos de código com ```
+    const codeBlockMatch = line.match(/^\s*```([a-zA-Z0-9_-]*)\s*$/);
+    if (codeBlockMatch) {
+      closeList();
+      closeQuote();
+      const codeLines: string[] = [];
+      index += 1;
+      while (index < lines.length) {
+        if (/^\s*```\s*$/.test(lines[index])) break;
+        codeLines.push(lines[index]);
+        index += 1;
+      }
+      output.push(`<pre class="markdown-code-block"><code>${codeLines.join('\n')}</code></pre>`);
+      continue;
+    }
+
+    // Suporte a linha horizontal (HR)
+    if (/^\s*([-*_]){3,}\s*$/.test(line)) {
+      closeList();
+      closeQuote();
+      output.push('<hr class="markdown-hr">');
+      continue;
+    }
+
+    const heading = line.match(/^\s*(#{1,6})\s+(.*)$/);
     const unordered = line.match(/^\s*[-*]\s+(.*)$/);
     const ordered = line.match(/^\s*\d+[.)]\s+(.*)$/);
     const quote = line.match(/^\s*&gt;\s?(.*)$/);
@@ -118,7 +145,7 @@ export function renderBasicMarkdown(markdown: string): string {
       closeList();
       closeQuote();
       const level = heading[1].length;
-      output.push(`<h${level}>${formatInline(heading[2])}</h${level}>`);
+      output.push(`<h${level}>${heading[2] ? formatInline(heading[2]) : '<br>'}</h${level}>`);
       continue;
     }
 

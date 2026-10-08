@@ -337,7 +337,7 @@ test('envia PDF binário como anexo pré-visualizável para uma tarefa acessíve
     });
     assert.equal(response.status, 201);
     assert.equal((await response.json()).previewable, true);
-    assert.ok(Buffer.isBuffer(inserted[6]));
+    assert.ok(typeof inserted[8] === 'string' && inserted[8].includes('att-'));
   });
 });
 
