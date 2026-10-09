@@ -566,6 +566,32 @@ export class KanbanBoardComponent implements OnDestroy {
     this.isTaskReadOnly.set(false);
   }
 
+  toggleChecklistItemInView(item: { id?: string; text: string; done: boolean; groupTitle?: string }): void {
+    item.done = !item.done;
+    const id = this.editingId();
+    if (id) {
+      this.service.updateTask(id, { checklist: this.draft.checklist });
+    }
+  }
+
+  onTaskDescriptionChangeInView(newDescription: string): void {
+    this.draft.description = newDescription;
+    const id = this.editingId();
+    if (id) {
+      this.service.updateTask(id, { description: newDescription });
+    }
+  }
+
+  toggleCustomFieldInView(col: TableColumnDef): void {
+    const current = !!this.draftCustomFields[col.id];
+    const next = !current;
+    this.draftCustomFields[col.id] = next;
+    const task = this.board()?.tasks.find(t => t.id === this.editingId());
+    if (task) {
+      this.updateCustomField(task, col, next);
+    }
+  }
+
   private openEditDraft(task: KanbanTask): void {
     this.editingId.set(task.id);
     this.draft = {

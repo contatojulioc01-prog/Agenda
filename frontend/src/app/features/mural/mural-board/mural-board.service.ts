@@ -80,6 +80,12 @@ export class MuralBoardApiService {
     });
   }
 
+  atualizarItem(itemId: string, dados: Partial<MuralItem>, userId: string): Observable<MuralItem> {
+    return this.http.put<MuralItem>(`/api/mural/items/${itemId}`, dados, {
+      headers: { 'x-user-id': userId }
+    });
+  }
+
   excluirItem(itemId: string, userId: string): Observable<{ success: boolean }> {
     return this.http.delete<{ success: boolean }>(`/api/mural/items/${itemId}`, {
       headers: { 'x-user-id': userId }

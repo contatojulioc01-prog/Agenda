@@ -48,7 +48,7 @@
           </div>
 
           <div class="view-description-wrap">
-            <app-markdown-text *ngIf="content" [text]="content"></app-markdown-text>
+            <app-markdown-text *ngIf="content" [text]="content" (textChange)="onContentChangeInView($event)"></app-markdown-text>
             <p *ngIf="!content" class="view-empty-desc">Nenhum conteúdo informado.</p>
           </div>
         </div>

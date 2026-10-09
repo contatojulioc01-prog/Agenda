@@ -94,6 +94,13 @@ export class EventModalComponent implements OnInit, OnDestroy {
     return `${formattedDate} · ${time}`;
   }
 
+  onDescriptionChangeInView(newDescription: string): void {
+    this.formData.description = newDescription;
+    if (this.data?.event) {
+      this.eventsService.update(this.data.event.id, { description: newDescription });
+    }
+  }
+
   // ── Skill: Button HTTP Loading ──
   loadingSalvar = false;
   showDeleteConfirmation = false;

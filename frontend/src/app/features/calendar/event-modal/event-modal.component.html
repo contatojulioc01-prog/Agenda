@@ -48,7 +48,7 @@
         </div>
 
         <div class="view-description-wrap">
-          <app-markdown-text *ngIf="formData.description" [text]="formData.description"></app-markdown-text>
+          <app-markdown-text *ngIf="formData.description" [text]="formData.description" (textChange)="onDescriptionChangeInView($event)"></app-markdown-text>
           <p *ngIf="!formData.description" class="view-empty-desc">Nenhuma descrição informada.</p>
         </div>
       </div>

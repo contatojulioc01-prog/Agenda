@@ -334,6 +334,16 @@ export class MuralBoardComponent implements OnInit, OnDestroy {
     }
   }
 
+  onItemContentChange(item: MuralItem, newContent: string): void {
+    item.content = newContent;
+    this.apiService.atualizarItem(item.id, { content: newContent }, this.currentUserId).subscribe({
+      next: (updated) => {
+        this.onItemSalvo({ ...item, ...updated, content: newContent });
+      },
+      error: (err) => console.error('Erro ao atualizar checklist do cartão:', err),
+    });
+  }
+
   onItemExcluido(itemId: string): void {
     this.activeBoard.update(curr => curr ? {
       ...curr,

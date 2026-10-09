@@ -68,12 +68,46 @@ function isTableDivider(cells: string[] | null): boolean {
   return !!cells?.length && cells.every(cell => /^:?-{3,}:?$/.test(cell));
 }
 
+export function toggleMarkdownChecklist(markdown: string, targetIndex: number): string {
+  if (!markdown || targetIndex < 0) return markdown || '';
+
+  const hasCrLf = markdown.includes('\r\n');
+  const lines = markdown.replace(/\r\n/g, '\n').split('\n');
+  let checklistIndex = 0;
+  let inCodeBlock = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    if (/^\s*```/.test(line)) {
+      inCodeBlock = !inCodeBlock;
+      continue;
+    }
+
+    if (inCodeBlock) continue;
+
+    const match = line.match(/^(\s*(?:(?:[-*+]|\d+[.)])\s+)?\[)([ xX])(\]\s*.*)$/);
+    if (match) {
+      if (checklistIndex === targetIndex) {
+        const isCurrentlyChecked = match[2].toLowerCase() === 'x';
+        const newCheckChar = isCurrentlyChecked ? ' ' : 'x';
+        lines[i] = `${match[1]}${newCheckChar}${match[3]}`;
+        return lines.join(hasCrLf ? '\r\n' : '\n');
+      }
+      checklistIndex++;
+    }
+  }
+
+  return markdown;
+}
+
 export function renderBasicMarkdown(markdown: string): string {
   if (!markdown) return '';
   const lines = escapeHtml(markdown || '').replace(/\r\n?/g, '\n').split('\n');
   const output: string[] = [];
   let list: 'ul' | 'ol' | null = null;
   let quoteOpen = false;
+  let checklistIndex = 0;
 
   const closeList = (): void => {
     if (list) output.push(`</${list}>`);
@@ -137,8 +171,9 @@ export function renderBasicMarkdown(markdown: string): string {
     }
 
     const heading = line.match(/^\s*(#{1,6})\s+(.*)$/);
-    const unordered = line.match(/^\s*[-*]\s+(.*)$/);
+    const unordered = line.match(/^\s*[-*+]\s+(.*)$/);
     const ordered = line.match(/^\s*\d+[.)]\s+(.*)$/);
+    const standaloneCheck = line.match(/^\s*\[([ xX])\]\s*(.*)$/);
     const quote = line.match(/^\s*&gt;\s?(.*)$/);
 
     if (heading) {
@@ -157,6 +192,23 @@ export function renderBasicMarkdown(markdown: string): string {
     }
 
     closeQuote();
+
+    if (standaloneCheck) {
+      if (list !== 'ul') { closeList(); output.push('<ul>'); list = 'ul'; }
+      const isChecked = standaloneCheck[1].toLowerCase() === 'x';
+      const checkText = standaloneCheck[2];
+      const checkIndex = checklistIndex++;
+      output.push(
+        `<li class="checklist-item ${isChecked ? 'is-checked' : ''}" data-checklist-index="${checkIndex}">` +
+        `<span class="mat-pseudo-checkbox ${isChecked ? 'mat-pseudo-checkbox-checked' : ''}" role="checkbox" aria-checked="${isChecked}" tabindex="0">` +
+        `<svg viewBox="0 0 24 24" class="mat-pseudo-checkbox-check"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>` +
+        `</span>` +
+        `<span class="checklist-text ${isChecked ? 'done' : ''}">${checkText ? formatInline(checkText) : '<br>'}</span>` +
+        `</li>`
+      );
+      continue;
+    }
+
     if (unordered || ordered) {
       const nextList = unordered ? 'ul' : 'ol';
       if (list !== nextList) { closeList(); output.push(`<${nextList}>`); list = nextList; }
@@ -167,7 +219,15 @@ export function renderBasicMarkdown(markdown: string): string {
       if (checkMatch) {
         const isChecked = checkMatch[1].toLowerCase() === 'x';
         const checkText = checkMatch[2];
-        output.push(`<li class="checklist-item ${isChecked ? 'is-checked' : ''}"><span class="mat-pseudo-checkbox ${isChecked ? 'mat-pseudo-checkbox-checked' : ''}"><svg viewBox="0 0 24 24" class="mat-pseudo-checkbox-check"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span><span class="checklist-text ${isChecked ? 'done' : ''}">${checkText ? formatInline(checkText) : '<br>'}</span></li>`);
+        const checkIndex = checklistIndex++;
+        output.push(
+          `<li class="checklist-item ${isChecked ? 'is-checked' : ''}" data-checklist-index="${checkIndex}">` +
+          `<span class="mat-pseudo-checkbox ${isChecked ? 'mat-pseudo-checkbox-checked' : ''}" role="checkbox" aria-checked="${isChecked}" tabindex="0">` +
+          `<svg viewBox="0 0 24 24" class="mat-pseudo-checkbox-check"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>` +
+          `</span>` +
+          `<span class="checklist-text ${isChecked ? 'done' : ''}">${checkText ? formatInline(checkText) : '<br>'}</span>` +
+          `</li>`
+        );
       } else {
         output.push(`<li>${rawItem ? formatInline(rawItem) : '<br>'}</li>`);
       }

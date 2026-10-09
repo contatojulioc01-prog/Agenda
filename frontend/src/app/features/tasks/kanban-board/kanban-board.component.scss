@@ -370,6 +370,58 @@ input,select,textarea { border:1px solid var(--border); border-radius:8px; backg
     border-color: #e2e8f0;
     color: #475569;
   }
+
+  &.badge-custom-check {
+    background: var(--bg-surface-alt, #f8fafc);
+    border-color: var(--border-light, #e2e8f0);
+    color: var(--text-secondary, #475569);
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.2s ease;
+
+    mat-icon {
+      font-size: 15px;
+      width: 15px;
+      height: 15px;
+      color: var(--text-muted, #94a3b8);
+      transition: all 0.2s ease;
+    }
+
+    &:hover {
+      border-color: var(--brand-400, #818cf8);
+      background: color-mix(in srgb, var(--brand-500, #6366f1) 8%, transparent);
+      color: var(--brand-600, #4f46e5);
+
+      mat-icon {
+        color: var(--brand-500, #6366f1);
+        transform: scale(1.1);
+      }
+    }
+
+    &.checked {
+      background: color-mix(in srgb, var(--brand-500, #6366f1) 12%, transparent);
+      border-color: var(--brand-500, #6366f1);
+      color: var(--brand-600, #4f46e5);
+      font-weight: 600;
+
+      mat-icon {
+        color: var(--brand-500, #6366f1);
+      }
+    }
+  }
+
+  &.badge-custom-prop {
+    background: var(--bg-surface-alt, #f8fafc);
+    border-color: var(--border-light, #e2e8f0);
+    color: var(--text-secondary, #475569);
+
+    mat-icon {
+      font-size: 14px;
+      width: 14px;
+      height: 14px;
+      color: var(--text-muted, #94a3b8);
+    }
+  }
 }
 
 .view-badge-dot {
@@ -433,6 +485,7 @@ input,select,textarea { border:1px solid var(--border); border-radius:8px; backg
   border-radius: 6px;
   font-size: 13.5px;
   color: var(--text-primary);
+  transition: all 0.15s ease;
 
   .check-icon {
     font-size: 18px;
@@ -441,19 +494,45 @@ input,select,textarea { border:1px solid var(--border); border-radius:8px; backg
     color: var(--text-muted);
     margin-top: 1px;
     flex-shrink: 0;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 
     &.done {
       color: var(--brand-500, #6366f1);
     }
   }
 
-  .check-text.done {
-    text-decoration: line-through;
-    color: var(--text-muted);
+  .check-text {
+    flex: 1;
+    line-height: 1.45;
+    transition: all 0.2s ease;
+
+    &.done {
+      text-decoration: line-through;
+      color: var(--text-muted);
+      opacity: 0.75;
+    }
   }
 
   &.grouped {
     margin-left: 14px;
+  }
+
+  &.clickable-check-item {
+    cursor: pointer;
+    user-select: none;
+
+    &:hover {
+      background: color-mix(in srgb, var(--brand-500, #6366f1) 8%, transparent);
+
+      .check-icon:not(.done) {
+        color: var(--brand-500, #6366f1);
+        transform: scale(1.1);
+      }
+    }
+
+    &:active {
+      transform: scale(0.99);
+    }
   }
 }
 

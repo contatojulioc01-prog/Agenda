@@ -224,6 +224,27 @@ export class MarkdownEditorComponent implements AfterViewInit, ControlValueAcces
 
   onEditorClick(event: MouseEvent): void {
     const target = event.target as HTMLElement;
+
+    // 1. Clique no marcador de tarefa / checkbox no editor
+    const taskMark = target.closest('.md-task') as HTMLElement | null;
+    if (taskMark) {
+      const start = this.offsetOfNode(taskMark);
+      if (start >= 0) {
+        const charAt = this.value.slice(start, start + 3);
+        const match = charAt.match(/^\[([ xX])\]$/);
+        if (match) {
+          event.preventDefault();
+          event.stopPropagation();
+          const isDone = match[1].toLowerCase() === 'x';
+          const newChar = isDone ? ' ' : 'x';
+          const nextValue = this.value.slice(0, start + 1) + newChar + this.value.slice(start + 2);
+          this.commit(nextValue, start, start + 3);
+          return;
+        }
+      }
+    }
+
+    // 2. Clique em hyperlinks
     const linkText = target.closest('.md-link, .md-autolink') as HTMLElement | null;
     if (!linkText) return;
 
@@ -691,6 +712,7 @@ export class MarkdownEditorComponent implements AfterViewInit, ControlValueAcces
           const heading = line.match(/^(#{1,6})(\s+)(.*)$/);
           const quote = line.match(/^(\s*>\s?)(.*)$/);
           const list = line.match(/^(\s*)([-*+]|\d+[.)])(\s+)(.*)$/);
+          const standaloneTask = line.match(/^(\s*)\[([ xX])\](\s+|$)(.*)$/);
 
           if (heading) {
             classes += ` md-heading md-h${heading[1].length}`;
@@ -698,6 +720,14 @@ export class MarkdownEditorComponent implements AfterViewInit, ControlValueAcces
           } else if (quote) {
             classes += ' md-quote';
             html = this.mark(quote[1]) + this.inline(quote[2]);
+          } else if (standaloneTask) {
+            classes += ' md-li';
+            const done = standaloneTask[2].toLowerCase() === 'x';
+            if (done) classes += ' md-task-done';
+            html = this.escape(standaloneTask[1]) +
+              `<span class="md-mark md-task${done ? ' is-done' : ''}">[${this.escape(standaloneTask[2])}]</span>` +
+              this.escape(standaloneTask[3]) +
+              this.inline(standaloneTask[4]);
           } else if (list) {
             classes += ' md-li';
             const task = list[4].match(/^\[([ xX])\](\s+|$)(.*)$/);

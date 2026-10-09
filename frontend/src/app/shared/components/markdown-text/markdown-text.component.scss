@@ -42,19 +42,28 @@ app-markdown-text { display: block; min-width: 0; }
   align-items: flex-start;
   gap: 8px;
   margin: 4px 0;
-  padding: 2px 4px;
+  padding: 3px 6px;
   border-radius: 6px;
-  transition: background var(--transition);
+  transition: background 0.15s ease, transform 0.1s ease;
+  user-select: text;
 
   &:hover {
-    background: rgba(0, 0, 0, 0.03);
+    background: color-mix(in srgb, var(--brand-500, #6366f1) 8%, transparent);
+  }
+}
+
+.markdown-text.interactive li.checklist-item {
+  cursor: pointer;
+
+  &:active {
+    transform: scale(0.99);
   }
 }
 
 .markdown-text .mat-pseudo-checkbox {
-  width: 17px;
-  height: 17px;
-  min-width: 17px;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
   border-radius: 4px;
   border: 2px solid var(--text-muted, #94a3b8);
   display: inline-flex;
@@ -65,10 +74,17 @@ app-markdown-text { display: block; min-width: 0; }
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   background: transparent;
   color: transparent;
+  flex-shrink: 0;
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--brand-500, #6366f1);
+    background: color-mix(in srgb, var(--brand-500, #6366f1) 12%, transparent);
+  }
 
   .mat-pseudo-checkbox-check {
-    width: 13px;
-    height: 13px;
+    width: 14px;
+    height: 14px;
     opacity: 0;
     transform: scale(0.5);
     transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
@@ -89,7 +105,7 @@ app-markdown-text { display: block; min-width: 0; }
 
 .markdown-text .checklist-text {
   flex: 1;
-  font-size: 13px;
+  font-size: 13.5px;
   line-height: 1.45;
   color: var(--text-primary);
   transition: all 0.2s ease;
@@ -97,6 +113,6 @@ app-markdown-text { display: block; min-width: 0; }
   &.done {
     text-decoration: line-through;
     color: var(--text-muted, #94a3b8);
-    opacity: 0.8;
+    opacity: 0.75;
   }
 }

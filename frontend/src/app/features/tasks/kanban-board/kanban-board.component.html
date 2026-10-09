@@ -1248,11 +1248,37 @@
                   #{{ label.startsWith('#') ? label.substring(1) : label }}
                 </span>
               </ng-container>
+
+              <!-- Propriedades Customizadas & Checkboxes -->
+              <ng-container *ngFor="let col of activeCustomColumns()">
+                <span
+                  *ngIf="col.type === 'checkbox'"
+                  class="view-badge badge-custom-check clickable"
+                  [class.checked]="!!draftCustomFields[col.id]"
+                  (click)="toggleCustomFieldInView(col)"
+                  role="checkbox"
+                  [attr.aria-checked]="!!draftCustomFields[col.id]"
+                  tabindex="0"
+                  (keydown.enter)="toggleCustomFieldInView(col)"
+                  (keydown.space)="toggleCustomFieldInView(col); $event.preventDefault()"
+                  [matTooltip]="col.label"
+                >
+                  <mat-icon>{{ !!draftCustomFields[col.id] ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>
+                  <span>{{ col.label }}</span>
+                </span>
+                <span
+                  *ngIf="col.type !== 'checkbox' && draftCustomFields[col.id]"
+                  class="view-badge badge-custom-prop"
+                >
+                  <mat-icon>{{ col.icon }}</mat-icon>
+                  <span>{{ col.label }}: {{ draftCustomFields[col.id] }}</span>
+                </span>
+              </ng-container>
             </div>
           </div>
 
           <div class="view-description-wrap">
-            <app-markdown-text *ngIf="draft.description" [text]="draft.description"></app-markdown-text>
+            <app-markdown-text *ngIf="draft.description" [text]="draft.description" (textChange)="onTaskDescriptionChangeInView($event)"></app-markdown-text>
             <p *ngIf="!draft.description" class="view-empty-desc">Nenhuma descrição informada.</p>
           </div>
         </div>
@@ -1265,7 +1291,16 @@
           </div>
           <div class="view-checklist-list">
             <!-- Itens avulsos -->
-            <div class="view-check-item" *ngFor="let item of ungroupedChecklistItems">
+            <div
+              class="view-check-item clickable-check-item"
+              *ngFor="let item of ungroupedChecklistItems"
+              (click)="toggleChecklistItemInView(item)"
+              role="checkbox"
+              [attr.aria-checked]="item.done"
+              tabindex="0"
+              (keydown.enter)="toggleChecklistItemInView(item)"
+              (keydown.space)="toggleChecklistItemInView(item); $event.preventDefault()"
+            >
               <mat-icon class="check-icon" [class.done]="item.done">{{ item.done ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>
               <span class="check-text" [class.done]="item.done">{{ item.text }}</span>
             </div>
@@ -1275,7 +1310,16 @@
                 <mat-icon>folder</mat-icon>
                 <span>{{ group }}</span>
               </div>
-              <div class="view-check-item grouped" *ngFor="let item of checklistItemsForGroup(group)">
+              <div
+                class="view-check-item grouped clickable-check-item"
+                *ngFor="let item of checklistItemsForGroup(group)"
+                (click)="toggleChecklistItemInView(item)"
+                role="checkbox"
+                [attr.aria-checked]="item.done"
+                tabindex="0"
+                (keydown.enter)="toggleChecklistItemInView(item)"
+                (keydown.space)="toggleChecklistItemInView(item); $event.preventDefault()"
+              >
                 <mat-icon class="check-icon" [class.done]="item.done">{{ item.done ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>
                 <span class="check-text" [class.done]="item.done">{{ item.text }}</span>
               </div>

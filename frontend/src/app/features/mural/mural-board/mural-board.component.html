@@ -209,7 +209,7 @@
               <h4 class="card-title">{{ item.title }}</h4>
             </div>
             <div class="card-body" *ngIf="item.content">
-              <app-markdown-text [text]="item.content"></app-markdown-text>
+              <app-markdown-text [text]="item.content" (textChange)="onItemContentChange(item, $event)"></app-markdown-text>
             </div>
             <div class="card-attachments-chips" *ngIf="item.attachments?.length">
               <span
@@ -272,7 +272,7 @@
           </div>
           <div class="card-header-row"><h4 class="card-title">{{ item.title }}</h4></div>
           <div class="card-body" *ngIf="item.content">
-            <app-markdown-text [text]="item.content"></app-markdown-text>
+            <app-markdown-text [text]="item.content" (textChange)="onItemContentChange(item, $event)"></app-markdown-text>
           </div>
           <div class="card-attachments-chips" *ngIf="item.attachments?.length">
             <span

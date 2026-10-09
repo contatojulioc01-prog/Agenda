@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, OnInit, Output, ViewChild, inject, signal } from '@angular/core';
+import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges, ViewChild, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
@@ -45,7 +45,7 @@ export interface MuralColorOption {
   templateUrl: './mural-item-modal.component.html',
   styleUrl: './mural-item-modal.component.scss',
 })
-export class MuralItemModalComponent implements OnInit {
+export class MuralItemModalComponent implements OnInit, OnChanges {
   @ViewChild(MatMenuTrigger) contextMenuTrigger?: MatMenuTrigger;
   @Input() boardId = '';
   @Input() item: MuralItem | null = null;
@@ -74,6 +74,18 @@ export class MuralItemModalComponent implements OnInit {
   isPinned = false;
   attachments: Attachment[] = [];
   pendingFiles: File[] = [];
+
+  onContentChangeInView(newContent: string): void {
+    this.content = newContent;
+    if (this.item) {
+      this.service.atualizarItem(this.item.id, { content: newContent }, this.currentUserId).subscribe({
+        next: (updated) => {
+          this.saved.emit({ ...this.item!, ...updated, content: newContent });
+        },
+        error: (err) => console.error('Erro ao atualizar checklist do mural:', err),
+      });
+    }
+  }
 
   getGroupName(): string | null {
     if (!this.selectedGroupId) return null;
@@ -138,6 +150,17 @@ export class MuralItemModalComponent implements OnInit {
       this.selectedGroupId = this.defaultGroupId;
       this.isPinned = false;
       this.attachments = [];
+    }
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['item'] && this.item) {
+      this.title = this.item.title;
+      this.content = this.item.content;
+      this.selectedColor = this.item.color || '#fef08a';
+      this.selectedGroupId = this.item.groupId;
+      this.isPinned = this.item.isPinned;
+      this.attachments = [...(this.item.attachments || [])];
     }
   }
 

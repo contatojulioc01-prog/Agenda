@@ -105,8 +105,25 @@ app-markdown-editor { display: block; min-width: 0; }
   opacity: .9;
   font-weight: 700;
 }
-.markdown-editor .md-task { color: var(--brand-600, #4f46e5); opacity: .8; }
-.markdown-editor .md-task-done { color: var(--text-muted); text-decoration: line-through; }
+.markdown-editor .md-task {
+  color: var(--brand-600, #4f46e5);
+  font-weight: 750;
+  cursor: pointer;
+  padding: 1px 3px;
+  border-radius: 4px;
+  user-select: none;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: color-mix(in srgb, var(--brand-500, #6366f1) 15%, transparent);
+    color: var(--brand-700, #4338ca);
+  }
+}
+.markdown-editor .md-task-done {
+  color: var(--text-muted);
+  text-decoration: line-through;
+  opacity: 0.8;
+}
 .markdown-editor .md-task-done .md-mark { text-decoration: none; }
 
 .markdown-editor .md-quote {
