@@ -341,7 +341,7 @@
 </div>
 
 <!-- ══════════════ MODAL DE GRUPO / QUADRO ══════════════ -->
-<div class="modal-overlay" *ngIf="groupModalOpen()" (mousedown)="fecharGrupoModal()">
+<div class="modal-overlay" *ngIf="groupModalOpen()">
   <div class="modal-card modal-sm" (mousedown)="$event.stopPropagation()">
     <div class="modal-header">
       <div class="header-main">
@@ -406,7 +406,7 @@
 </div>
 
 <!-- ══════════════ MODAL NOVO MURAL ══════════════ -->
-<div class="modal-overlay" *ngIf="createBoardModalOpen()" (mousedown)="fecharNovoMuralModal()">
+<div class="modal-overlay" *ngIf="createBoardModalOpen()">
   <div class="modal-card modal-sm" (mousedown)="$event.stopPropagation()">
     <div class="modal-header">
       <div class="header-main">
@@ -456,7 +456,7 @@
 </div>
 
 <!-- ══════════════ MODAL CONFIGURAR MURAL ══════════════ -->
-<div class="modal-overlay" *ngIf="boardModalOpen()" (mousedown)="fecharBoardModal()">
+<div class="modal-overlay" *ngIf="boardModalOpen()">
   <div class="modal-card modal-sm" (mousedown)="$event.stopPropagation()">
     <div class="modal-header">
       <div class="header-main">
@@ -520,7 +520,7 @@
 </div>
 
 <!-- ══════════════ MODAL DE TIME & SSO (IDÊNTICO AO TAREFAS) ══════════════ -->
-<div class="team-modal-backdrop" *ngIf="teamModalOpen()" (mousedown)="fecharTimeModal()">
+<div class="team-modal-backdrop" *ngIf="teamModalOpen()">
   <section class="team-modal" (mousedown)="$event.stopPropagation()">
     <header>
       <div>

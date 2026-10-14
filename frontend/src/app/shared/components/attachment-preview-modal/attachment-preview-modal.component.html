@@ -1,5 +1,5 @@
-<div class="attachment-preview-backdrop" (click)="close.emit()">
-  <div class="attachment-preview-card" (click)="$event.stopPropagation()">
+<div class="attachment-preview-backdrop">
+  <div class="attachment-preview-card">
 
     <!-- Header com Informações e Ações -->
     <div class="preview-header">
@@ -45,7 +45,7 @@
 
         <!-- Botão de Copiar Código (para arquivos de código/texto) -->
         <button
-          *ngIf="fileInfo().category === 'code' && (rawContent || currentText())"
+          *ngIf="(fileInfo().category === 'code' || !!currentText() || !!rawContent) && (rawContent || currentText())"
           type="button"
           class="preview-action-btn copy-btn"
           (click)="copyCode()"

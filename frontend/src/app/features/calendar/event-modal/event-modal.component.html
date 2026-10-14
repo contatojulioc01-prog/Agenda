@@ -387,7 +387,7 @@
     </ng-container>
   </div>
 
-  <div class="event-delete-backdrop" *ngIf="showDeleteConfirmation" (mousedown)="showDeleteConfirmation = false">
+  <div class="event-delete-backdrop" *ngIf="showDeleteConfirmation">
     <section class="event-delete-confirmation" role="alertdialog" aria-modal="true" aria-labelledby="event-delete-title" (mousedown)="$event.stopPropagation()">
       <mat-icon>event_busy</mat-icon>
       <h3 id="event-delete-title">Excluir evento</h3>

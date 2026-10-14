@@ -91,6 +91,37 @@ export function detectFileType(fileName: string, mimeType?: string): FileTypeInf
     };
   }
 
+  // 1.1 Arquivos especiais sem extensão ou com ponto inicial
+  const baseName = cleanName.split('/').pop()?.split('\\').pop() || cleanName;
+  if (baseName === 'dockerfile') return { id: 'batch', name: 'Dockerfile', category: 'code', icon: 'terminal', color: '#2496ed', extension: '' };
+  if (baseName === 'makefile') return { id: 'batch', name: 'Makefile', category: 'code', icon: 'terminal', color: '#c1f12e', extension: '' };
+  if (baseName === '.gitignore' || ext === 'gitignore') return { id: 'config', name: 'Git Ignore', category: 'code', icon: 'settings', color: '#f05032', extension: ext ? `.${ext}` : '' };
+  if (baseName.startsWith('.env') || ext === 'env') return { id: 'config', name: 'Environment Config', category: 'code', icon: 'settings', color: '#ecd53f', extension: ext ? `.${ext}` : '' };
+
+  // 1.2 Detecção por Mime-Type (texto / código / json / xml)
+  const cleanMime = (mimeType || '').trim().toLowerCase();
+  if (cleanMime.startsWith('text/') || cleanMime === 'application/json' || cleanMime === 'application/xml' || cleanMime === 'application/javascript' || cleanMime === 'application/typescript' || cleanMime === 'application/x-sh' || cleanMime === 'application/sql' || cleanMime === 'application/x-yaml' || cleanMime === 'application/yaml') {
+    let subId = 'text';
+    let subName = 'Texto';
+    if (cleanMime.includes('json')) { subId = 'json'; subName = 'JSON'; }
+    else if (cleanMime.includes('xml')) { subId = 'xml'; subName = 'XML'; }
+    else if (cleanMime.includes('markdown')) { subId = 'markdown'; subName = 'Markdown'; }
+    else if (cleanMime.includes('javascript')) { subId = 'javascript'; subName = 'JavaScript'; }
+    else if (cleanMime.includes('typescript')) { subId = 'typescript'; subName = 'TypeScript'; }
+    else if (cleanMime.includes('sql')) { subId = 'sql'; subName = 'SQL'; }
+    else if (cleanMime.includes('html')) { subId = 'html'; subName = 'HTML'; }
+    else if (cleanMime.includes('css')) { subId = 'css'; subName = 'CSS'; }
+
+    return {
+      id: subId,
+      name: subName,
+      category: 'code',
+      icon: subId === 'json' ? 'data_object' : (subId === 'markdown' ? 'description' : (subId === 'text' ? 'article' : 'code')),
+      color: '#64748b',
+      extension: ext ? `.${ext}` : '',
+    };
+  }
+
   // 2. Imagens
   if (
     /^(image\/(png|jpe?g|gif|webp|bmp|avif|svg\+xml))$/i.test(mimeType || '') ||

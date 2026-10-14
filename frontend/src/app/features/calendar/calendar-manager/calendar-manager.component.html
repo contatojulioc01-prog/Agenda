@@ -195,7 +195,7 @@
       </div>
     </div>
 
-    <div class="delete-confirmation-backdrop" *ngIf="showDeleteConfirmation" (mousedown)="cancelDelete()">
+    <div class="delete-confirmation-backdrop" *ngIf="showDeleteConfirmation">
       <section class="delete-confirmation-modal" role="dialog" aria-modal="true" aria-labelledby="manager-delete-title" (mousedown)="$event.stopPropagation()">
         <span class="delete-confirmation-icon"><mat-icon>delete_outline</mat-icon></span>
         <h3 id="manager-delete-title">Excluir agenda</h3>

@@ -60,7 +60,7 @@ export class AttachmentPreviewModalComponent implements OnInit, OnChanges {
       this.trustedUrl.set(null);
     }
 
-    if (info.category === 'code') {
+    if (info.category === 'code' || this.rawContent) {
       if (this.rawContent) {
         this.currentText.set(this.rawContent);
         this.contentLoading.set(false);
@@ -90,15 +90,49 @@ export class AttachmentPreviewModalComponent implements OnInit, OnChanges {
     }
   }
 
-  copyCode(): void {
-    const textToCopy = this.currentText() || this.rawContent;
+  async copyCode(): Promise<void> {
+    const textToCopy = this.currentText() || this.rawContent || '';
     if (!textToCopy) return;
-    navigator.clipboard.writeText(textToCopy).then(() => {
+
+    let success = false;
+
+    // Tentativa 1: Navigator Clipboard API (requer contexto seguro)
+    try {
+      if (typeof window !== 'undefined' && window.isSecureContext && navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(textToCopy);
+        success = true;
+      }
+    } catch (err) {
+      console.warn('Clipboard API falhou, tentando fallback síncrono:', err);
+      success = false;
+    }
+
+    // Tentativa 2: Fallback com elemento textarea temporário e execCommand('copy')
+    if (!success && typeof document !== 'undefined') {
+      const textarea = document.createElement('textarea');
+      textarea.value = textToCopy;
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-9999px';
+      textarea.style.top = '-9999px';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      textarea.setSelectionRange(0, textarea.value.length);
+      try {
+        success = document.execCommand('copy');
+      } catch (err) {
+        console.error('Falha no fallback de cópia via execCommand:', err);
+        success = false;
+      }
+      textarea.remove();
+    }
+
+    if (success) {
       this.isCopied.set(true);
       setTimeout(() => this.isCopied.set(false), 2000);
-    }).catch(err => {
-      console.error('Falha ao copiar código:', err);
-    });
+    }
   }
 
   formatarTamanho(bytes?: number): string {
