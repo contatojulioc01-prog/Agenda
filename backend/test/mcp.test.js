@@ -7,7 +7,7 @@ test('publica o catálogo completo de ferramentas MCP com JSON Schema', () => {
   const tools = getAiToolCatalog();
   const names = tools.map(tool => tool.name);
 
-  assert.equal(tools.length, 23);
+  assert.equal(tools.length, 24);
   assert.ok(names.includes('obter_contexto'));
   assert.ok(names.includes('listar_agendas'));
   assert.ok(names.includes('listar_eventos'));
@@ -16,6 +16,9 @@ test('publica o catálogo completo de ferramentas MCP com JSON Schema', () => {
   assert.ok(names.includes('listar_colunas'));
   assert.ok(names.includes('listar_tarefas'));
   assert.ok(names.includes('obter_tarefa'));
+  assert.ok(names.includes('listar_murais'));
+  assert.ok(names.includes('obter_mural'));
+  assert.ok(names.includes('consultar_notas_mural'));
   assert.ok(names.includes('obter_contexto_completo'));
   assert.ok(names.includes('listar_anexos'));
   assert.ok(names.includes('obter_configuracao_notificacoes'));
@@ -31,5 +34,7 @@ test('aciona o planejador MCP apenas para conversas relacionadas à agenda', () 
   assert.equal(shouldPlanWithAgendaTools('Crie uma reunião hoje às 15h'), true);
   assert.equal(shouldPlanWithAgendaTools('O que tenho a fazer na equipe Garotos de Programa?'), true);
   assert.equal(shouldPlanWithAgendaTools('Mostre os cards do time Garotos de Programa'), true);
+  assert.equal(shouldPlanWithAgendaTools('O que tem no meu mural?'), true);
+  assert.equal(shouldPlanWithAgendaTools('Quais os avisos e notas do time dev?'), true);
   assert.equal(shouldPlanWithAgendaTools('Explique o que é fotossíntese'), false);
 });

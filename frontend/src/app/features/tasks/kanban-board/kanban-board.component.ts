@@ -101,6 +101,10 @@ export class KanbanBoardComponent implements OnDestroy {
   readonly sortDirection = signal<'asc' | 'desc'>('asc');
   readonly showSortMenu = signal(false);
   readonly showColumnManager = signal(false);
+  readonly showFilterMenu = signal(false);
+  readonly showMoreMenu = signal(false);
+  readonly hasActiveFilters = computed(() => this.priorityFilter() !== 'all' || this.assigneeFilter() !== 'all');
+  readonly activeFilterCount = computed(() => (this.priorityFilter() !== 'all' ? 1 : 0) + (this.assigneeFilter() !== 'all' ? 1 : 0));
   readonly tableColumns = signal<TableColumnDef[]>(this.loadInitialTableColumns());
   readonly customColumns = computed(() => this.tableColumns().filter(c => c.isCustom));
   readonly activeCustomColumns = computed(() => this.tableColumns().filter(c => c.isCustom && c.visible));
@@ -1088,6 +1092,10 @@ export class KanbanBoardComponent implements OnDestroy {
   closeContextMenus(): void {
     this.closeTeamContextMenu();
     this.closeTaskContextMenu();
+    this.showSortMenu.set(false);
+    this.showColumnManager.set(false);
+    this.showFilterMenu.set(false);
+    this.showMoreMenu.set(false);
   }
 
   viewTaskFromContext(task: KanbanTask): void {
@@ -1372,6 +1380,37 @@ export class KanbanBoardComponent implements OnDestroy {
   toggleSortMenu(event?: Event): void {
     if (event) event.stopPropagation();
     this.showSortMenu.update(v => !v);
+    if (this.showSortMenu()) {
+      this.showColumnManager.set(false);
+      this.showFilterMenu.set(false);
+      this.showMoreMenu.set(false);
+    }
+  }
+
+  toggleFilterMenu(event?: Event): void {
+    if (event) event.stopPropagation();
+    this.showFilterMenu.update(v => !v);
+    if (this.showFilterMenu()) {
+      this.showSortMenu.set(false);
+      this.showColumnManager.set(false);
+      this.showMoreMenu.set(false);
+    }
+  }
+
+  toggleMoreMenu(event?: Event): void {
+    if (event) event.stopPropagation();
+    this.showMoreMenu.update(v => !v);
+    if (this.showMoreMenu()) {
+      this.showSortMenu.set(false);
+      this.showColumnManager.set(false);
+      this.showFilterMenu.set(false);
+    }
+  }
+
+  clearFilters(event?: Event): void {
+    if (event) event.stopPropagation();
+    this.setPriorityFilter('all');
+    this.setAssigneeFilter('all');
   }
 
   toggleSort(option: 'default' | 'dueDate' | 'priority' | 'title' | 'status'): void {
@@ -1742,6 +1781,8 @@ export class KanbanBoardComponent implements OnDestroy {
     this.showColumnManager.update(v => !v);
     if (this.showColumnManager()) {
       this.showSortMenu.set(false);
+      this.showFilterMenu.set(false);
+      this.showMoreMenu.set(false);
     }
   }
 
@@ -1909,15 +1950,17 @@ export class KanbanBoardComponent implements OnDestroy {
   }
 
   currentSortLabel(): string {
+    if (this.sortOption() === 'default') {
+      return 'Ordenar';
+    }
     const map: Record<string, string> = {
-      default: 'Ordenação: Padrão',
-      dueDate: 'Ordenação: Prazo',
-      priority: 'Ordenação: Prioridade',
-      title: 'Ordenação: Assunto',
-      status: 'Ordenação: Status',
+      dueDate: 'Prazo',
+      priority: 'Prioridade',
+      title: 'Assunto',
+      status: 'Status',
     };
-    const label = map[this.sortOption()] || 'Ordenação';
-    return `${label} (${this.sortDirection() === 'asc' ? '↑' : '↓'})`;
+    const label = map[this.sortOption()] || 'Ordenar';
+    return `${label} ${this.sortDirection() === 'asc' ? '↑' : '↓'}`;
   }
 
   autoArchiveLabel(delay?: string): string {

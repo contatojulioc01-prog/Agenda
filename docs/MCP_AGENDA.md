@@ -30,11 +30,17 @@ Exemplo genérico de configuração de cliente:
 
 ## Capacidades
 
-O servidor publica 50 ferramentas que cobrem o domínio funcional da aplicação, três recursos de conhecimento e o prompt `planejar_dia`:
+O servidor publica ferramentas que cobrem o domínio funcional da aplicação em modo somente leitura para o assistente e clientes MCP, recursos de conhecimento e prompts especializados:
 
-- `agenda://manual`: entidades, relacionamentos, permissões, formatos e regras de segurança;
-- `agenda://schema`: catálogo JSON completo das ferramentas, parâmetros e indicação de leitura/exclusão;
+- `agenda://manual`: entidades, relacionamentos, permissões, formatos, regras de segurança e guia completo do Mural;
+- `agenda://schema`: catálogo JSON completo das ferramentas, parâmetros e schemas;
 - `agenda://contexto`: estrutura acessível, permissões, convites, preferências, dispositivos sem segredos e totais do usuário autenticado.
+
+Prompts MCP disponíveis:
+- `planejar_dia`: planeja o dia do usuário consultando eventos e tarefas.
+- `criar_aviso_mural`: orienta a redação de comunicados, avisos e notas corporativas em Markdown para os murais.
+- `descrever_opcoes_card`: formata as opções e ações de cartões e modais no padrão oficial.
+- `resposta_direta_sem_disclaimers`: garante respostas 100% diretas, limpas e sem avisos de segurança.
 
 Ferramentas disponíveis:
 
@@ -46,11 +52,12 @@ Ferramentas disponíveis:
 - Membros e convites de equipe: `listar_membros_equipe`, `listar_convites_equipe`, `convidar_membro_equipe`, `responder_convite_equipe`, `remover_membro_equipe`.
 - Quadros e colunas: `listar_quadros`, `obter_quadro`, `criar_quadro`, `atualizar_quadro`, `excluir_quadro`, `listar_colunas`, `criar_coluna`, `atualizar_coluna`, `excluir_coluna`.
 - Tarefas: `listar_tarefas`, `obter_tarefa`, `criar_tarefa`, `atualizar_tarefa`, `mover_tarefa_para_lixeira`, `listar_lixeira_tarefas`, `restaurar_tarefa`, `excluir_tarefa_permanentemente`.
+- Mural de Avisos e Notas: `listar_murais`, `obter_mural`, `consultar_notas_mural`, `criar_item_mural`, `atualizar_item_mural`, `excluir_item_mural`.
 - Anexos: `listar_anexos`, `excluir_anexo`.
 - Notificações: `obter_configuracao_notificacoes`, `atualizar_preferencias_notificacoes`.
 - Privacidade: `exportar_meus_dados`.
 
-As descrições aceitam Markdown. Tarefas aceitam subtarefas, responsáveis, etiquetas e checklist. Eventos de prazo gerados pelo Kanban só podem ser alterados pela tarefa de origem. Exclusões exigem literalmente `confirmar: true` e todas as operações validam a permissão do usuário autenticado.
+As descrições e notas do mural aceitam Markdown rico. Notas adesivas possuem grupos/seções, cores pastéis acolhedoras, suporte a checklists interativos (`[ ]` / `[x]`), rotação estética e anexos. Tarefas aceitam subtarefas, responsáveis, etiquetas e checklist. Eventos de prazo gerados pelo Kanban só podem ser alterados pela tarefa de origem. Exclusões exigem literalmente `confirmar: true` e todas as operações validam a permissão do usuário autenticado.
 
 O conteúdo binário de anexos não é injetado automaticamente no contexto: o MCP fornece seus metadados. Chaves de dispositivos, hashes, token SSO e a chave do gateway de IA nunca são publicados.
 

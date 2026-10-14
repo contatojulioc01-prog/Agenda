@@ -89,6 +89,7 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
     if (!user?.id || user.id === this.initializedUserId) return;
     this.initializedUserId = user.id;
     this.eventsService.currentUserId.set(user.id);
+    this.appLoading.complete();
     this.calendarsService.loadAll(() => {
       const requestedId = this.route.snapshot.queryParamMap.get('agenda');
       const id = requestedId && this.calendars().some(calendar => calendar.id === requestedId)
@@ -194,6 +195,7 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
       this.loadHolidays(this.selectedDate.getFullYear());
     });
     this.syncService.connect();
+    window.setTimeout(() => this.appLoading.complete(), 600);
   }
 
   ngOnDestroy(): void {

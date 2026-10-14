@@ -79,67 +79,76 @@
   background: var(--bg-hover);
 }
 
-/* Linha ativa — ocupa toda a largura */
-.app-section-tabs .tab-active-row {
+/* Linha superior fixa — Agenda */
+.app-section-tabs .tab-top-btn {
   width: 100%;
   height: 36px;
   border-radius: 8px;
+  border: none;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 7px;
   font-size: 12px;
-  font-weight: 750;
-  color: var(--text-brand);
-  background: var(--bg-surface);
-  box-shadow: var(--shadow-xs), inset 0 1px 0 var(--panel-highlight);
+  font-weight: 650;
+  color: var(--text-muted);
+  background: transparent;
   transition: all var(--transition);
-  cursor: default;
+  cursor: pointer;
 
   mat-icon { font-size: 18px; width: 18px; height: 18px; }
+
+  &:hover {
+    color: var(--text-primary);
+    background: var(--bg-surface);
+  }
+
+  &.active {
+    font-weight: 750;
+    color: var(--text-brand);
+    background: var(--bg-surface);
+    box-shadow: var(--shadow-xs), inset 0 1px 0 var(--panel-highlight);
+    cursor: default;
+  }
 }
 
-/* Linha secundária — as outras tabs lado a lado */
-.app-section-tabs .tab-secondary-row {
+/* Linha inferior fixa — Tarefas e Mural lado a lado */
+.app-section-tabs .tab-bottom-row {
   display: flex;
   gap: 4px;
 
-  button {
+  .tab-bottom-btn {
     flex: 1;
-    height: 30px;
+    min-width: 0;
+    height: 32px;
     border-radius: 7px;
+    border: none;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 5px;
     color: var(--text-muted);
-    font-size: 10.5px;
+    font-size: 11px;
     font-weight: 650;
+    background: transparent;
     transition: all var(--transition);
+    cursor: pointer;
 
-    mat-icon { font-size: 15px; width: 15px; height: 15px; }
-    &:hover { color: var(--text-primary); background: var(--bg-surface); }
-  }
-}
+    mat-icon { font-size: 15px; width: 15px; height: 15px; flex-shrink: 0; }
+    span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* Fallback: se tiver só um button direto */
-.app-section-tabs > button:not(.tab-active-row) {
-  height: 34px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  color: var(--text-muted);
-  font-size: 11.5px;
-  font-weight: 650;
-  transition: all var(--transition);
-  mat-icon { font-size: 17px; width: 17px; height: 17px; }
-  &:hover { color: var(--text-primary); }
-  &.active {
-    color: var(--text-brand);
-    background: var(--bg-surface);
-    box-shadow: var(--shadow-xs), inset 0 1px 0 var(--panel-highlight);
+    &:hover {
+      color: var(--text-primary);
+      background: var(--bg-surface);
+    }
+
+    &.active {
+      font-weight: 750;
+      color: var(--text-brand);
+      background: var(--bg-surface);
+      box-shadow: var(--shadow-xs), inset 0 1px 0 var(--panel-highlight);
+      cursor: default;
+    }
   }
 }
 
@@ -349,7 +358,7 @@
     box-shadow: inset 0 0 0 1px var(--cal-color, var(--brand-500));
   }
 
-  &:hover .btn-cal-menu { opacity: 0.8; }
+  &:hover .btn-cal-menu { opacity: 1; }
 }
 
 .calendar-info {
@@ -408,12 +417,13 @@
   border: none; background: transparent;
   color: var(--text-muted); cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  opacity: 0;
+  opacity: 0.55;
   transition: all var(--transition);
   flex-shrink: 0;
   mat-icon { font-size: 15px; width: 15px; height: 15px; }
 
-  &:hover {
+  &:hover,
+  &:focus-visible {
     opacity: 1 !important;
     background: var(--bg-surface);
     color: var(--text-primary);

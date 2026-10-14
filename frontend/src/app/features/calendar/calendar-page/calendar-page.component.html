@@ -25,23 +25,23 @@
       </div>
 
       <nav class="app-section-tabs" aria-label="Módulos do sistema" [attr.data-active]="activeSection">
-        <!-- Linha superior: seção ativa em destaque -->
-        <button class="tab-active-row" [class.active]="true" [attr.data-section]="activeSection"
-          (click)="setSection(activeSection)">
-          <mat-icon>{{ activeSection === 'calendar' ? 'calendar_month' : activeSection === 'tasks' ? 'view_kanban' :
-            'space_dashboard' }}</mat-icon>
-          <span>{{ activeSection === 'calendar' ? 'Agenda' : activeSection === 'tasks' ? 'Tarefas' : 'Mural' }}</span>
+        <!-- Linha superior fixa: Agenda -->
+        <button type="button" class="tab-top-btn" [class.active]="activeSection === 'calendar'"
+          (click)="setSection('calendar')" id="nav-btn-agenda">
+          <mat-icon>calendar_month</mat-icon>
+          <span>Agenda</span>
         </button>
-        <!-- Linha inferior: demais seções -->
-        <div class="tab-secondary-row">
-          <button *ngIf="activeSection !== 'calendar'" (click)="setSection('calendar')">
-            <mat-icon>calendar_month</mat-icon><span>Agenda</span>
+        <!-- Linha inferior fixa: Tarefas e Mural lado a lado -->
+        <div class="tab-bottom-row">
+          <button type="button" class="tab-bottom-btn" [class.active]="activeSection === 'tasks'"
+            (click)="setSection('tasks')" id="nav-btn-tasks">
+            <mat-icon>view_kanban</mat-icon>
+            <span>Tarefas</span>
           </button>
-          <button *ngIf="activeSection !== 'tasks'" (click)="setSection('tasks')">
-            <mat-icon>view_kanban</mat-icon><span>Tarefas</span>
-          </button>
-          <button *ngIf="activeSection !== 'mural'" (click)="setSection('mural')">
-            <mat-icon>space_dashboard</mat-icon><span>Mural</span>
+          <button type="button" class="tab-bottom-btn" [class.active]="activeSection === 'mural'"
+            (click)="setSection('mural')" id="nav-btn-mural">
+            <mat-icon>space_dashboard</mat-icon>
+            <span>Mural</span>
           </button>
         </div>
       </nav>

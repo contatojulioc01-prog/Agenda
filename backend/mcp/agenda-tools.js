@@ -3,6 +3,7 @@ const db = require('../db');
 const { validateEventInput, validateTaskInput } = require('../validation');
 const eventsRouter = require('../routes/events');
 const kanbanRouter = require('../routes/kanban');
+const muralRouter = require('../routes/mural');
 const { executeSystemTool, systemToolDefinitions, SYSTEM_MANUAL } = require('./system-tools');
 
 const TIME_ZONE = process.env.AGENDA_TIME_ZONE || 'America/Sao_Paulo';
@@ -280,6 +281,35 @@ async function listBoards(userId) {
   }));
 }
 
+async function listMurais(userId) {
+  await muralRouter.ensurePersonalMural(userId);
+  const teamMemberships = await db.all(`
+    SELECT t.*, m.role as my_role
+    FROM kanban_teams t
+    JOIN kanban_team_members m ON m.team_id = t.id
+    WHERE m.user_id = $1
+  `, [userId]);
+  for (const team of teamMemberships) {
+    await muralRouter.ensureTeamMural(team);
+  }
+  const personalBoards = await db.all(`
+    SELECT b.*, (SELECT COUNT(*) FROM mural_items i WHERE i.mural_id = b.id) as item_count
+    FROM mural_boards b WHERE b.owner_id = $1 AND b.scope_type = 'personal' ORDER BY b.created_at
+  `, [userId]);
+  const teamBoards = await db.all(`
+    SELECT b.*, t.name as team_name, m.role as my_role,
+      (SELECT COUNT(*) FROM mural_items i WHERE i.mural_id = b.id) as item_count
+    FROM mural_boards b
+    JOIN kanban_teams t ON t.id = b.team_id
+    JOIN kanban_team_members m ON m.team_id = t.id AND m.user_id = $1
+    WHERE b.scope_type = 'team' ORDER BY b.created_at
+  `, [userId]);
+  return [
+    ...personalBoards.map(b => muralRouter.muralDto(b, 'admin', b.item_count)),
+    ...teamBoards.map(b => ({ ...muralRouter.muralDto(b, b.my_role, b.item_count), teamName: b.team_name }))
+  ];
+}
+
 async function executeAgendaTool(name, args = {}, context = {}) {
   const definition = toolDefinitions.find(tool => tool.name === name);
   if (!definition) fail(`Ferramenta desconhecida: ${name}`);
@@ -291,7 +321,7 @@ async function executeAgendaTool(name, args = {}, context = {}) {
   if (!userId) fail('Usuário autenticado ausente.');
 
   if (name === 'obter_contexto') {
-    const [calendars, boards] = await Promise.all([listCalendars(userId), listBoards(userId)]);
+    const [calendars, boards, murais] = await Promise.all([listCalendars(userId), listBoards(userId), listMurais(userId)]);
     const now = new Date();
     return {
       agora: now.toLocaleString('pt-BR', { timeZone: TIME_ZONE }),
@@ -300,6 +330,7 @@ async function executeAgendaTool(name, args = {}, context = {}) {
       usuarioId: userId,
       agendas: calendars,
       quadros: boards,
+      murais,
     };
   }
 
@@ -558,7 +589,7 @@ const checklistSchema = z.array(z.object({ id: z.string().min(1), text: z.string
 const dayTimesSchema = z.record(z.string(), z.object({ startTime: z.string(), endTime: z.string() }));
 
 const toolDefinitions = [
-  { name: 'obter_contexto', title: 'Obter contexto da Agenda', description: 'Retorna data/hora local, agendas e quadros acessíveis. Use primeiro quando IDs ou a data atual forem necessários.', schema: z.object({}), annotations: { readOnlyHint: true, openWorldHint: false } },
+  { name: 'obter_contexto', title: 'Obter contexto da Agenda', description: 'Retorna data/hora local, agendas, quadros Kanban e murais de notas/avisos acessíveis. Use primeiro quando IDs ou a data atual forem necessários.', schema: z.object({}), annotations: { readOnlyHint: true, openWorldHint: false } },
   { name: 'listar_agendas', title: 'Listar agendas', description: 'Lista somente as agendas que o usuário autenticado pode acessar.', schema: z.object({}), annotations: { readOnlyHint: true, openWorldHint: false } },
   { name: 'listar_eventos', title: 'Listar eventos', description: 'Pesquisa eventos acessíveis por agenda, período e texto.', schema: z.object({ calendarId: z.string().optional(), dataInicial: z.string().optional(), dataFinal: z.string().optional(), busca: z.string().max(160).optional(), limite: z.number().int().min(1).max(200).optional() }), annotations: { readOnlyHint: true, openWorldHint: false } },
   { name: 'obter_evento', title: 'Obter evento', description: 'Obtém os detalhes de um evento acessível.', schema: z.object({ eventoId: z.string() }), annotations: { readOnlyHint: true, openWorldHint: false } },
@@ -585,13 +616,13 @@ function getAiToolCatalog(names) {
 }
 
 function shouldPlanWithAgendaTools(text) {
-  return /\b(agenda|agendas|agendado|agendada|agendados|agendadas|evento|eventos|compromisso|compromissos|reuni[aã]o|reuni[oõ]es|calend[aá]rio|calendarios|kanban|quadro|quadros|coluna|colunas|card|cards|tarefa|tarefas|pend[eê]ncia|pend[eê]ncias|backlog|equipe|equipes|time|times|prazo|prazos|mural|murais|postit|postits|post-it|post-its|aviso|avisos|comunicado|comunicados|recado|recados|nota|notas|hoje|amanh[aã]|ontem|semana|m[eê]s|fazer|atividade|atividades|membro|membros|convite|convites|anexo|anexos|arquivo|arquivos|notifica|notifica[cç][aã]o|notifica[cç][oõ]es|lembrete|lembretes|alerta|alertas|dispositivo|dispositivos|lgpd|meus dados|privacidade|lixeira|restaurar|excluir|criar|listar|organizar|planejar|horario|horarios|hor[aá]rio|hor[aá]rios|periodo|período|turno|turnos|dia|dias|data|datas|segunda|ter[cç]a|quarta|quinta|sexta|s[aá]bado|domingo|jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez|janeiro|fevereiro|mar[cç]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\b/i.test(String(text || ''));
+  return /\b(agenda|agendas|agendado|agendada|agendados|agendadas|evento|eventos|compromisso|compromissos|reuni[aã]o|reuni[oõ]es|calend[aá]rio|calendarios|kanban|quadro|quadros|coluna|colunas|card|cards|tarefa|tarefas|pend[eê]ncia|pend[eê]ncias|backlog|equipe|equipes|time|times|prazo|prazos|mural|murais|postit|postits|post-it|post-its|aviso|avisos|comunicado|comunicados|recado|recados|nota|notas|anota[cç][aã]o|anota[cç][oõ]es|hoje|amanh[aã]|ontem|semana|m[eê]s|fazer|atividade|atividades|membro|membros|convite|convites|anexo|anexos|arquivo|arquivos|notifica|notifica[cç][aã]o|notifica[cç][oõ]es|lembrete|lembretes|alerta|alertas|dispositivo|dispositivos|lgpd|meus dados|privacidade|lixeira|restaurar|excluir|criar|listar|organizar|planejar|horario|horarios|hor[aá]rio|hor[aá]rios|periodo|período|turno|turnos|dia|dias|data|datas|segunda|ter[cç]a|quarta|quinta|sexta|s[aá]bado|domingo|jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez|janeiro|fevereiro|mar[cç]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\b/i.test(String(text || ''));
 }
 
 async function createAgendaMcpServer(userId, broadcast) {
   const { McpServer } = await import('@modelcontextprotocol/server');
   const server = new McpServer({ name: 'doce-agenda-mcp', version: '2.0.0' }, {
-    instructions: `Servidor MCP corporativo da Agenda Doce Brinquedo configurado exclusivamente em modo SOMENTE LEITURA (Read-Only). Contexto autenticado do usuário (${userId}). Fuso horário corporativo: ${TIME_ZONE}. O MCP não realiza operações de gravação, criação, edição ou exclusão de dados. Utilize as ferramentas de leitura para consultar agendas, eventos, quadros Kanban, colunas, tarefas, anexos, murais de notas/avisos, equipes e preferências. Consulte recursos (agenda://manual, agenda://schema, agenda://contexto) para documentação e contexto operacional.`,
+    instructions: `Servidor MCP corporativo da Agenda Doce Brinquedo configurado exclusivamente em modo SOMENTE LEITURA (Read-Only). Contexto autenticado do usuário (${userId}). Fuso horário corporativo: ${TIME_ZONE}. O MCP não realiza operações de gravação, criação, edição ou exclusão de dados. Utilize as ferramentas de leitura para consultar agendas, eventos, quadros Kanban, colunas, tarefas, anexos, murais de notas/avisos, grupos do mural, equipes e preferências. Consulte recursos (agenda://manual, agenda://schema, agenda://contexto) para documentação e contexto operacional.`,
   });
 
   for (const tool of toolDefinitions) {

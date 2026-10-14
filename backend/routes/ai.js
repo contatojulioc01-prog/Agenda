@@ -3,7 +3,7 @@ const { executeAgendaTool, getAiToolCatalog, shouldPlanWithAgendaTools, TIME_ZON
 const router = express.Router();
 const CHAT_MODEL = process.env.AI_MODEL || 'gemini-3.5-flash-lite';
 
-const DEFAULT_SYSTEM_PROMPT = 'Você é o assistente inteligente da Agenda Corporativa Doce Brinquedo, atuando como um especialista em organização de tempo, análise de eventos e gestão de tarefas em Kanban. Responda em português do Brasil com tom profissional, clareza e formatação Markdown elegante. Regras obrigatórias: 1) A IA opera exclusivamente em modo de LEITURA (consultas e análises). Caso o usuário solicite a criação, edição ou remoção de registros, oriente-o a realizar a operação diretamente pela interface. 2) Nunca invente compromissos, equipes, quadros, cards, prazos, responsáveis, prioridades ou status fictícios. 3) Baseie-se exclusivamente nos registros reais obtidos pelas ferramentas MCP fornecidas no contexto da sessão. 4) Se as ferramentas MCP não retornarem registros correspondentes, informe com clareza o que foi consultado e que nenhum item foi encontrado. 5) EVENTOS PADRÃO (PAGAMENTOS, ADIANTAMENTOS E FERIADOS): A agenda padrão do usuário ("Minha Agenda") contém automaticamente todos os feriados nacionais, eventos de pagamento salarial (5º dia útil legal, antecipado para sexta se cair em fim de semana ou feriado) e adiantamento salarial (dia 20, antecipado para sexta se cair em fim de semana ou feriado). NUNCA pergunte em qual agenda consultar quando a pergunta for sobre datas de pagamento, salário, adiantamento salarial, vales ou feriados; consulte diretamente a agenda. 6) ESCLARECIMENTO E INTERATIVIDADE COM MÚLTIPLA ESCOLHA: Aplique perguntas de esclarecimento com opções interativas SOMENTE quando houver ambiguidade real entre múltiplos times/quadros ou agendas distintas. Formato: ```options\n{\n  "question": "De quais times você gostaria de visualizar as tarefas?",\n  "multiSelect": true,\n  "options": ["Nome 1", "Nome 2", "Todos"]\n}\n```. Para perguntas sobre dias específicos ("o que tenho hoje", "meu dia amanhã"), consulte imediatamente os eventos e tarefas desse período sem perguntar. 7) Para redações e transformações de texto, forneça diretamente a versão final pronta para uso. 8) Fuso horário corporativo padrão: America/Sao_Paulo. 9) RESPOSTA DIRETA AO USUÁRIO: Todas as consultas ao banco de dados e MCP JÁ FORAM EXECUTADAS pelo sistema antes de você responder. NUNCA gere blocos de código com ```mcp, ```tool, ```function, get_tasks, get_events, pseudocódigos ou instruções de chamada de ferramenta na sua resposta. Responda SEMPRE em linguagem natural e Markdown formatado diretamente ao usuário humano. 10) PADRÃO DE OPÇÕES E AÇÕES DE CARDS/DESCRIÇÃO: Quando solicitado a apresentar, listar, orientar ou formatar as opções/ações de cartões (Mural, Agenda, Tarefas/Kanban) ou menu contextual na descrição, mantenha SEMPRE estritamente o seguinte padrão de formatação em Markdown:\n\n👁️ Visualizar — abre a modal em modo de visualização.\n✏️ Editar — abre a modal em modo de edição.\n📌 Fixar / Desafixar.\n🗑️ Excluir. 11) SUPRESSÃO DE AVISOS DE SEGURANÇA E DISCLAIMERS: NUNCA inclua avisos de segurança, alertas de confidencialidade, notas sobre links externos, disclaimers sobre dados corporativos ou advertências protocolares no início, meio ou fim das suas respostas. O ambiente é seguro e homologado; entregue sempre a resposta de forma 100% direta, limpa e objetiva.';
+const DEFAULT_SYSTEM_PROMPT = 'Você é o assistente inteligente da Agenda Corporativa Doce Brinquedo, atuando como um especialista em organização de tempo, análise de eventos e calendários, gestão de tarefas em Kanban e gestão de murais corporativos (avisos, comunicados, notas adesivas e post-its). Responda em português do Brasil com tom profissional, clareza e formatação Markdown elegante. Regras obrigatórias: 1) A IA opera exclusivamente em modo de LEITURA (consultas e análises). Caso o usuário solicite a criação, edição ou remoção de registros, oriente-o com passos claros a realizar a operação diretamente pela interface. 2) Nunca invente compromissos, equipes, quadros, cards, prazos, notas do mural, grupos, responsáveis, prioridades ou status fictícios. 3) Baseie-se exclusivamente nos registros reais obtidos pelas ferramentas MCP fornecidas no contexto da sessão. 4) Se as ferramentas MCP não retornarem registros correspondentes, informe com clareza o que foi consultado e que nenhum item foi encontrado. 5) EVENTOS PADRÃO (PAGAMENTOS, ADIANTAMENTOS E FERIADOS): A agenda padrão do usuário ("Minha Agenda") contém automaticamente todos os feriados nacionais, eventos de pagamento salarial (5º dia útil legal, antecipado para sexta se cair em fim de semana ou feriado) e adiantamento salarial (dia 20, antecipado para sexta se cair em fim de semana ou feriado). NUNCA pergunte em qual agenda consultar quando a pergunta for sobre datas de pagamento, salário, adiantamento salarial, vales ou feriados; consulte diretamente a agenda. 6) MURAL CORPORATIVO (NOTAS, AVISOS E COMUNICADOS): O sistema possui Murais Pessoais ("Meu Mural") e Murais de Equipe. Cada mural é dividido em grupos/seções temáticas (ex.: "Avisos & Lembretes", "Ideias & Projetos", "Documentações & Links") e contém notas adesivas (post-its com título, conteúdo em Markdown rico com suporte a checklists "[ ]"/"[x]", listas com marcadores "-", cores pastéis, rotação estética, autor, indicador de fixado no topo e anexos). Quando o usuário perguntar sobre notas, avisos, comunicados ou murais, consulte as ferramentas do mural ("listar_murais", "obter_mural", "consultar_notas_mural") para trazer as informações reais e precisas. 7) ESCLARECIMENTO E INTERATIVIDADE COM MÚLTIPLA ESCOLHA: Aplique perguntas de esclarecimento com opções interativas SOMENTE quando houver ambiguidade real entre múltiplos times/quadros/murais ou agendas distintas. Formato: ```options\n{\n  "question": "De qual mural ou time você gostaria de visualizar as notas?",\n  "multiSelect": true,\n  "options": ["Meu Mural", "Mural do Time Dev", "Todos"]\n}\n```. Para perguntas sobre dias específicos ("o que tenho hoje", "meu dia amanhã"), consulte imediatamente os eventos e tarefas desse período sem perguntar. 8) Para redações e transformações de texto, forneça diretamente a versão final pronta para uso. 9) Fuso horário corporativo padrão: America/Sao_Paulo. 10) RESPOSTA DIRETA AO USUÁRIO: Todas as consultas ao banco de dados e MCP JÁ FORAM EXECUTADAS pelo sistema antes de você responder. NUNCA gere blocos de código com ```mcp, ```tool, ```function, get_tasks, get_events, get_murals, pseudocódigos ou instruções de chamada de ferramenta na sua resposta. Responda SEMPRE em linguagem natural e Markdown formatado diretamente ao usuário humano. 11) PADRÃO DE OPÇÕES E AÇÕES DE CARDS/DESCRIÇÃO: Quando solicitado a apresentar, listar, orientar ou formatar as opções/ações de cartões (Mural, Agenda, Tarefas/Kanban) ou menu contextual na descrição, mantenha SEMPRE estritamente o seguinte padrão de formatação em Markdown:\n\n👁️ Visualizar — abre a modal em modo de visualização.\n✏️ Editar — abre a modal em modo de edição.\n📌 Fixar / Desafixar.\n🗑️ Excluir. 12) SUPRESSÃO DE AVISOS DE SEGURANÇA E DISCLAIMERS: NUNCA inclua avisos de segurança, alertas de confidencialidade, notas sobre links externos, disclaimers sobre dados corporativos ou advertências protocolares no início, meio ou fim das suas respostas. O ambiente é seguro e homologado; entregue sempre a resposta de forma 100% direta, limpa e objetiva.';
 const MAX_MESSAGE_LENGTH = 12000;
 const MAX_MESSAGES = 30;
 const TEXT_ACTION_PROMPTS = {
@@ -297,6 +297,30 @@ const TOOL_ALIASES = {
   event: 'obter_evento',
   evento: 'obter_evento',
 
+  get_murals: 'listar_murais',
+  list_murals: 'listar_murais',
+  search_murals: 'listar_murais',
+  murals: 'listar_murais',
+  murais: 'listar_murais',
+  mural: 'listar_murais',
+
+  get_mural: 'obter_mural',
+  read_mural: 'obter_mural',
+
+  get_notes: 'consultar_notas_mural',
+  list_notes: 'consultar_notas_mural',
+  search_notes: 'consultar_notas_mural',
+  find_notes: 'consultar_notas_mural',
+  get_mural_items: 'consultar_notas_mural',
+  list_mural_items: 'consultar_notas_mural',
+  notas_mural: 'consultar_notas_mural',
+  notas: 'consultar_notas_mural',
+  avisos: 'consultar_notas_mural',
+  recados: 'consultar_notas_mural',
+  postits: 'consultar_notas_mural',
+  post_its: 'consultar_notas_mural',
+  comunicados: 'consultar_notas_mural',
+
   get_notifications: 'obter_configuracao_notificacoes',
   notifications: 'obter_configuracao_notificacoes',
   notificacoes: 'obter_configuracao_notificacoes',
@@ -326,6 +350,26 @@ const ARG_ALIASES = {
   quadro_id: 'quadroId',
   board: 'quadroId',
   quadro: 'quadroId',
+
+  muralid: 'muralId',
+  mural_id: 'muralId',
+  id_mural: 'muralId',
+
+  groupid: 'groupId',
+  group_id: 'groupId',
+  grupo_id: 'groupId',
+  grupo: 'groupId',
+
+  itemid: 'itemId',
+  item_id: 'itemId',
+  notaid: 'itemId',
+  nota_id: 'itemId',
+
+  pinned: 'apenasFixadas',
+  is_pinned: 'apenasFixadas',
+  fixadas: 'apenasFixadas',
+  apenas_fixadas: 'apenasFixadas',
+  only_pinned: 'apenasFixadas',
 
   columnid: 'colunaId',
   column_id: 'colunaId',
@@ -438,13 +482,14 @@ async function autoHeuristicContextFallback(lastUserMessage, userId, broadcast) 
   
   const isTaskRelated = /tarefa|tarefas|card|cards|kanban|quadro|time|times|equipe|equipes|pendencia|pendencias|fazer|atividade|atividades|linkedin|revisao/.test(normalized);
   const isEventRelated = /evento|eventos|agenda|agendas|compromisso|compromissos|reuniao|reunioes|pagamento|adiantamento|salario|vale|feriado|feriados|hoje|amanha/.test(normalized);
+  const isMuralRelated = /mural|murais|nota|notas|aviso|avisos|comunicado|comunicados|recado|recados|postit|postits|post-it|post-its|anotacao|anotacoes/.test(normalized);
 
-  if (isTaskRelated || isEventRelated) {
+  if (isTaskRelated || isEventRelated || isMuralRelated) {
     try {
       const ctx = await executeAgendaTool('obter_contexto', {}, { userId, broadcast });
       transcript.push(`obter_contexto: ${JSON.stringify(ctx).slice(0, 8000)}`);
       
-      const stopwords = new Set(['verifique', 'informe', 'referente', 'sobre', 'para', 'com', 'onde', 'qual', 'quais', 'como', 'quem', 'meu', 'minha', 'dos', 'das', 'time', 'equipe', 'quadro', 'tarefa', 'tarefas', 'cards', 'card', 'agenda', 'evento', 'eventos']);
+      const stopwords = new Set(['verifique', 'informe', 'referente', 'sobre', 'para', 'com', 'onde', 'qual', 'quais', 'como', 'quem', 'meu', 'minha', 'dos', 'das', 'time', 'equipe', 'quadro', 'tarefa', 'tarefas', 'cards', 'card', 'agenda', 'evento', 'eventos', 'mural', 'murais', 'nota', 'notas', 'aviso', 'avisos', 'recado', 'recados', 'postit', 'postits']);
       const words = lastUserMessage.split(/[\s,.;:!?()"'`]+/).filter(w => w.length > 2 && !stopwords.has(w.toLowerCase()));
       const searchTerms = words.join(' ').trim();
 
@@ -467,6 +512,18 @@ async function autoHeuristicContextFallback(lastUserMessage, userId, broadcast) 
         const events = await executeAgendaTool('listar_eventos', evtArgs, { userId, broadcast });
         transcript.push(`listar_eventos: ${JSON.stringify(events).slice(0, 12000)}`);
       }
+
+      if (isMuralRelated) {
+        const muralArgs = {};
+        const teamMatch = (ctx.murais || []).find(m =>
+          (m.teamName && normalized.includes(normalizeLookupText(m.teamName))) ||
+          (m.name && normalized.includes(normalizeLookupText(m.name)))
+        );
+        if (teamMatch) muralArgs.muralId = teamMatch.id;
+        if (searchTerms) muralArgs.busca = searchTerms.slice(0, 80);
+        const notes = await executeAgendaTool('consultar_notas_mural', muralArgs, { userId, broadcast });
+        transcript.push(`consultar_notas_mural: ${JSON.stringify(notes).slice(0, 12000)}`);
+      }
     } catch (err) {
       console.warn('[AI MCP] Fallback heurístico:', err.message);
     }
@@ -483,6 +540,7 @@ async function prepareAgendaContext(provider, messages, req, signal) {
     core: ['obter_contexto', 'obter_contexto_completo'],
     calendar: ['listar_agendas', 'obter_agenda', 'listar_eventos', 'obter_evento', 'listar_membros_agenda', 'listar_convites_agenda'],
     kanban: ['listar_equipes', 'obter_equipe', 'listar_membros_equipe', 'listar_convites_equipe', 'listar_quadros', 'obter_quadro', 'listar_colunas', 'listar_tarefas', 'obter_tarefa', 'listar_lixeira_tarefas'],
+    mural: ['listar_murais', 'obter_mural', 'consultar_notas_mural'],
     attachments: ['listar_anexos'],
     notifications: ['obter_configuracao_notificacoes'],
     privacy: ['exportar_meus_dados'],
@@ -491,10 +549,11 @@ async function prepareAgendaContext(provider, messages, req, signal) {
   const normalizedIntent = normalizeLookupText(lastUserMessage);
   if (/agenda|evento|calendario|compromisso|reuniao|convite|membro/.test(normalizedIntent)) toolGroups.calendar.forEach(name => selectedNames.add(name));
   if (/kanban|quadro|coluna|lista|card|tarefa|equipe|time|backlog|pendencia|fazer|atividade|lixeira|linkedin/.test(normalizedIntent)) toolGroups.kanban.forEach(name => selectedNames.add(name));
+  if (/mural|murais|nota|notas|aviso|avisos|comunicado|comunicados|recado|recados|postit|postits|post-it|post-its|anotacao|anotacoes/.test(normalizedIntent)) toolGroups.mural.forEach(name => selectedNames.add(name));
   if (/anexo|arquivo|documento/.test(normalizedIntent)) toolGroups.attachments.forEach(name => selectedNames.add(name));
   if (/notifica|alerta|lembrete|dispositivo|computador/.test(normalizedIntent)) toolGroups.notifications.forEach(name => selectedNames.add(name));
   if (/lgpd|privacidade|exportar meus dados|meus dados/.test(normalizedIntent)) toolGroups.privacy.forEach(name => selectedNames.add(name));
-  if (selectedNames.size === toolGroups.core.length) [...toolGroups.calendar, ...toolGroups.kanban].forEach(name => selectedNames.add(name));
+  if (selectedNames.size === toolGroups.core.length) [...toolGroups.calendar, ...toolGroups.kanban, ...toolGroups.mural].forEach(name => selectedNames.add(name));
   const catalog = getAiToolCatalog([...selectedNames]).filter(tool => tool.readOnly);
   const transcript = [];
   const plannerSystem = `Você é o planejador de consultas MCP (Somente Leitura) da Agenda Corporativa.
@@ -511,12 +570,18 @@ Quando já tiver os dados necessários ou for conversa geral/saudação:
 Exemplos de chamadas:
 - Usuário: "Verifique referente a Revisão Final do time linkedin"
   {"action":"call","tool":"listar_tarefas","arguments":{"equipe":"LinkedIn","busca":"Revisão Final"}}
-- Usuário: "Quais são as minhas equipes e quadros?"
+- Usuário: "Quais são as minhas equipes, quadros e murais?"
   {"action":"call","tool":"obter_contexto","arguments":{}}
 - Usuário: "O que tenho agendado hoje?"
   {"action":"call","tool":"listar_eventos","arguments":{"dataInicial":"2026-09-23","dataFinal":"2026-09-23"}}
 - Usuário: "Quando cai o pagamento e adiantamento?"
   {"action":"call","tool":"listar_eventos","arguments":{"busca":"pagamento"}}
+- Usuário: "Quais avisos e notas tenho no mural?"
+  {"action":"call","tool":"consultar_notas_mural","arguments":{}}
+- Usuário: "O que está anotado no mural sobre o servidor?"
+  {"action":"call","tool":"consultar_notas_mural","arguments":{"busca":"servidor"}}
+- Usuário: "Mostre o mural do time dev"
+  {"action":"call","tool":"obter_mural","arguments":{"muralId":"mrl-time-dev"}}
 
 Ferramentas disponíveis:
 ${JSON.stringify(catalog)}`;

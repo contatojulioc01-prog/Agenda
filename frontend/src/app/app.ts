@@ -37,23 +37,28 @@ export class App {
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe(event => {
-        if (event.urlAfterRedirects.startsWith('/unauthorized')) this.loading.complete();
+        if (event.urlAfterRedirects.startsWith('/unauthorized')) {
+          this.loading.complete();
+        } else {
+          // Quando a navegação inicial é concluída, sinaliza prontidão
+          window.setTimeout(() => this.loading.complete(), 300);
+        }
       });
 
-    // Evita bloquear a interface indefinidamente em falhas inesperadas de rede.
-    const fallbackTimer = window.setTimeout(() => this.loading.complete(), 10_000);
+    // Fallback de segurança (3.5s) para nunca travar o usuário
+    const fallbackTimer = window.setTimeout(() => this.loading.complete(), 3_500);
     this.destroyRef.onDestroy(() => window.clearTimeout(fallbackTimer));
   }
 
   private scheduleDismiss(): void {
     if (this.dismissScheduled) return;
     this.dismissScheduled = true;
-    const minimumDisplayTime = 1_300;
+    const minimumDisplayTime = 1_500;
     const remainingTime = Math.max(0, minimumDisplayTime - (Date.now() - this.startedAt));
 
     const leaveTimer = window.setTimeout(() => {
       this.loadingLeaving.set(true);
-      const removeTimer = window.setTimeout(() => this.loadingVisible.set(false), 230);
+      const removeTimer = window.setTimeout(() => this.loadingVisible.set(false), 200);
       this.destroyRef.onDestroy(() => window.clearTimeout(removeTimer));
     }, remainingTime);
     this.destroyRef.onDestroy(() => window.clearTimeout(leaveTimer));

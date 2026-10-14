@@ -1107,7 +1107,7 @@
     display: flex;
     align-items: center;
     gap: 2px;
-    opacity: 0;
+    opacity: 0.55;
     transition: opacity 0.15s ease;
   }
 
@@ -1129,12 +1129,15 @@
       height: 15px;
     }
 
-    &:hover {
+    &:hover,
+    &:focus-visible {
       background: var(--bg-surface-alt, rgba(0,0,0,0.08));
       color: var(--text-primary);
+      opacity: 1 !important;
     }
 
-    &.danger:hover {
+    &.danger:hover,
+    &.danger:focus-visible {
       background: #fee2e2;
       color: #ef4444;
     }

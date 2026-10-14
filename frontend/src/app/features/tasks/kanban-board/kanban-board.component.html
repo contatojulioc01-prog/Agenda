@@ -41,9 +41,9 @@
         <mat-icon>print</mat-icon>
         <span class="pill-label">Imprimir</span>
       </button>
-      <button class="secondary-btn expand-pill-btn size-36" (click)="openTeamManager()" matTooltip="Gerenciar times">
+      <button class="secondary-btn expand-pill-btn size-36" (click)="openTeamManager()" matTooltip="Gerenciar times e membros">
         <mat-icon>groups</mat-icon>
-        <span class="pill-label">Gerenciar times</span>
+        <span class="pill-label">Times</span>
       </button>
       <button class="primary-btn expand-pill-btn size-36 primary-pill" (click)="openCreate()" matTooltip="Nova tarefa">
         <mat-icon>add</mat-icon>
@@ -92,154 +92,228 @@
   </nav>
 
   <section class="kanban-filters group-panel">
-    <!-- Seletor de Abas Notion: Tarefas do mês | Atividades mês concluído | Tarefas da semana | Kanban -->
-    <div class="notion-tabs-nav">
-      <button type="button" class="notion-nav-tab expand-pill-btn size-34" [class.active]="activeTab() === 'month_tasks'"
-        (click)="setActiveTab('month_tasks')" matTooltip="Tarefas do mês">
-        <mat-icon>table_chart</mat-icon>
-        <span class="pill-label">Tarefas do mês</span>
-      </button>
-      <button type="button" class="notion-nav-tab expand-pill-btn size-34" [class.active]="activeTab() === 'month_completed'"
-        (click)="setActiveTab('month_completed')" matTooltip="Atividades mês concluído">
-        <mat-icon>done_all</mat-icon>
-        <span class="pill-label">Atividades mês concluído</span>
-      </button>
-      <button type="button" class="notion-nav-tab expand-pill-btn size-34" [class.active]="activeTab() === 'week_tasks'"
-        (click)="setActiveTab('week_tasks')" matTooltip="Tarefas da semana">
-        <mat-icon>date_range</mat-icon>
-        <span class="pill-label">Tarefas da semana</span>
-      </button>
-      <button type="button" class="notion-nav-tab expand-pill-btn size-34" [class.active]="activeTab() === 'kanban'"
-        (click)="setActiveTab('kanban')" matTooltip="Quadro Kanban">
-        <mat-icon>view_kanban</mat-icon>
-        <span class="pill-label">Quadro Kanban</span>
-      </button>
-    </div>
-
-    <!-- Dropdown de Ordenação Notion -->
-    <div class="notion-sort-wrapper" *ngIf="activeTab() !== 'kanban'">
-      <button type="button" class="notion-sort-btn expand-pill-btn size-34" (click)="toggleSortMenu($event)"
-        [class.active]="sortOption() !== 'default'"
-        matTooltip="Alternar ordenação da lista">
-        <mat-icon>swap_vert</mat-icon>
-        <span class="pill-label">{{ currentSortLabel() }}</span>
-      </button>
-      <div class="notion-sort-menu" *ngIf="showSortMenu()" (click)="$event.stopPropagation()">
-        <button type="button" [class.active]="sortOption() === 'default'" (click)="toggleSort('default')">
-          <mat-icon>format_line_spacing</mat-icon><span>Padrão (Posição)</span>
+    <!-- ═════════ 1. VISUALIZAÇÕES (Segmented Control + Ordenar / Colunas) ═════════ -->
+    <div class="filters-views-cluster">
+      <div class="notion-tabs-nav" role="tablist" aria-label="Visualizações do quadro">
+        <button type="button" class="notion-nav-tab" [class.active]="activeTab() === 'month_tasks'"
+          (click)="setActiveTab('month_tasks')" matTooltip="Tarefas do mês">
+          <mat-icon>table_chart</mat-icon>
+          <span>Mês</span>
         </button>
-        <button type="button" [class.active]="sortOption() === 'dueDate'" (click)="toggleSort('dueDate')">
-          <mat-icon>event</mat-icon><span>Prazo</span>
+        <button type="button" class="notion-nav-tab" [class.active]="activeTab() === 'month_completed'"
+          (click)="setActiveTab('month_completed')" matTooltip="Atividades concluídas no mês">
+          <mat-icon>done_all</mat-icon>
+          <span>Concluídas</span>
         </button>
-        <button type="button" [class.active]="sortOption() === 'priority'" (click)="toggleSort('priority')">
-          <mat-icon>flag</mat-icon><span>Prioridade</span>
+        <button type="button" class="notion-nav-tab" [class.active]="activeTab() === 'week_tasks'"
+          (click)="setActiveTab('week_tasks')" matTooltip="Tarefas da semana">
+          <mat-icon>date_range</mat-icon>
+          <span>Semana</span>
         </button>
-        <button type="button" [class.active]="sortOption() === 'title'" (click)="toggleSort('title')">
-          <mat-icon>sort_by_alpha</mat-icon><span>Assunto (Título)</span>
-        </button>
-        <button type="button" [class.active]="sortOption() === 'status'" (click)="toggleSort('status')">
-          <mat-icon>donut_large</mat-icon><span>Status (Coluna)</span>
+        <button type="button" class="notion-nav-tab" [class.active]="activeTab() === 'kanban'"
+          (click)="setActiveTab('kanban')" matTooltip="Quadro Kanban">
+          <mat-icon>view_kanban</mat-icon>
+          <span>Kanban</span>
         </button>
       </div>
-    </div>
 
-    <!-- Dropdown de Gerenciamento de Colunas Notion -->
-    <div class="notion-columns-wrapper" *ngIf="activeTab() !== 'kanban'">
-      <button type="button" class="notion-columns-btn expand-pill-btn size-34" (click)="toggleColumnManager($event)"
-        [class.active]="showColumnManager()"
-        matTooltip="Personalizar e gerenciar colunas">
-        <mat-icon>view_column</mat-icon>
-        <span class="pill-label">Colunas ({{ visibleColumnsCount() }}/{{ tableColumns().length }})</span>
-      </button>
-      <div class="notion-columns-menu" *ngIf="showColumnManager()" (click)="$event.stopPropagation()">
-        <div class="notion-columns-menu-header">
-          <span>Colunas da Tabela</span>
-          <div class="col-actions-quick">
-            <button type="button" class="quick-btn" (click)="setAllColumnsVisibility(true, $event)">Todas</button>
-            <button type="button" class="quick-btn" (click)="setAllColumnsVisibility(false, $event)">Mínimo</button>
-          </div>
+      <!-- Dropdown de Ordenação (apenas em visualização de tabela) -->
+      <div class="notion-sort-wrapper" *ngIf="activeTab() !== 'kanban'">
+        <button type="button" class="action-ghost-btn" (click)="toggleSortMenu($event)"
+          [class.active]="sortOption() !== 'default'"
+          matTooltip="Ordenar tarefas">
+          <mat-icon>swap_vert</mat-icon>
+          <span>{{ currentSortLabel() }}</span>
+        </button>
+        <div class="notion-sort-menu" *ngIf="showSortMenu()" (click)="$event.stopPropagation()">
+          <button type="button" [class.active]="sortOption() === 'default'" (click)="toggleSort('default')">
+            <mat-icon>format_line_spacing</mat-icon><span>Padrão (Posição)</span>
+          </button>
+          <button type="button" [class.active]="sortOption() === 'dueDate'" (click)="toggleSort('dueDate')">
+            <mat-icon>event</mat-icon><span>Prazo</span>
+          </button>
+          <button type="button" [class.active]="sortOption() === 'priority'" (click)="toggleSort('priority')">
+            <mat-icon>flag</mat-icon><span>Prioridade</span>
+          </button>
+          <button type="button" [class.active]="sortOption() === 'title'" (click)="toggleSort('title')">
+            <mat-icon>sort_by_alpha</mat-icon><span>Assunto (Título)</span>
+          </button>
+          <button type="button" [class.active]="sortOption() === 'status'" (click)="toggleSort('status')">
+            <mat-icon>donut_large</mat-icon><span>Status (Coluna)</span>
+          </button>
         </div>
-        <div class="notion-columns-list">
-          <div *ngFor="let col of tableColumns()" class="notion-column-item-row" [class.is-custom]="isCustomColumn(col)">
-            <label class="notion-column-toggle-item" [class.checked]="col.visible">
-              <input type="checkbox" [checked]="col.visible" (change)="toggleColumnVisibility(col.id, $event)"
-                [disabled]="col.id === 'subject' && col.visible && visibleColumnsCount() <= 1">
-              <mat-icon class="col-item-icon">{{ col.icon }}</mat-icon>
-              <span class="col-item-name">{{ col.label }}</span>
-              <span *ngIf="isCustomColumn(col)" class="custom-badge-tag">Personalizada</span>
-            </label>
-            <button *ngIf="isCustomColumn(col)" type="button" class="btn-delete-custom-col"
-              (click)="removeCustomColumn(col.id, $event)"
-              matTooltip="Excluir coluna personalizada permanentemente">
-              <mat-icon>delete_outline</mat-icon>
-            </button>
-          </div>
-        </div>
+      </div>
 
-        <!-- Adicionar Nova Coluna Personalizada -->
-        <div class="notion-add-column-section">
-          <div class="add-col-toggle-row" *ngIf="!showAddColumnPopover()">
-            <button type="button" class="btn-open-add-col" (click)="showAddColumnPopover.set(true)">
-              <mat-icon>add</mat-icon>
-              <span>Nova coluna personalizada</span>
-            </button>
-          </div>
-          <div class="add-col-popover-form" *ngIf="showAddColumnPopover()">
-            <div class="add-col-form-title">
-              <span>Nova Coluna</span>
-              <button type="button" (click)="showAddColumnPopover.set(false)"><mat-icon>close</mat-icon></button>
+      <!-- Dropdown de Colunas (apenas em visualização de tabela) -->
+      <div class="notion-columns-wrapper" *ngIf="activeTab() !== 'kanban'">
+        <button type="button" class="action-ghost-btn" (click)="toggleColumnManager($event)"
+          [class.active]="showColumnManager()"
+          matTooltip="Personalizar colunas visíveis">
+          <mat-icon>view_column</mat-icon>
+          <span>Colunas</span>
+        </button>
+        <div class="notion-columns-menu" *ngIf="showColumnManager()" (click)="$event.stopPropagation()">
+          <div class="notion-columns-menu-header">
+            <span>Colunas da Tabela</span>
+            <div class="col-actions-quick">
+              <button type="button" class="quick-btn" (click)="setAllColumnsVisibility(true, $event)">Todas</button>
+              <button type="button" class="quick-btn" (click)="setAllColumnsVisibility(false, $event)">Mínimo</button>
             </div>
-            <input type="text" [(ngModel)]="newCustomColumnLabel" placeholder="Nome da coluna..." class="add-col-input" autofocus />
-            <select [(ngModel)]="newCustomColumnType" class="add-col-select">
-              <option value="text">Texto</option>
-              <option value="date">Data</option>
-              <option value="number">Número</option>
-              <option value="select">Lista de Seleção</option>
-              <option value="checkbox">Caixa de Seleção (Sim/Não)</option>
-            </select>
-            <input *ngIf="newCustomColumnType === 'select'" type="text" [(ngModel)]="newCustomColumnOptions" placeholder="Opções: Opção 1, Opção 2..." class="add-col-input" />
-            <button type="button" class="btn-save-new-col" (click)="addCustomColumn()" [disabled]="!newCustomColumnLabel.trim()">
-              <mat-icon>check</mat-icon> Adicionar Coluna
-            </button>
+          </div>
+          <div class="notion-columns-list">
+            <div *ngFor="let col of tableColumns()" class="notion-column-item-row" [class.is-custom]="isCustomColumn(col)">
+              <label class="notion-column-toggle-item" [class.checked]="col.visible">
+                <input type="checkbox" [checked]="col.visible" (change)="toggleColumnVisibility(col.id, $event)"
+                  [disabled]="col.id === 'subject' && col.visible && visibleColumnsCount() <= 1">
+                <mat-icon class="col-item-icon">{{ col.icon }}</mat-icon>
+                <span class="col-item-name">{{ col.label }}</span>
+                <span *ngIf="isCustomColumn(col)" class="custom-badge-tag">Personalizada</span>
+              </label>
+              <button *ngIf="isCustomColumn(col)" type="button" class="btn-delete-custom-col"
+                (click)="removeCustomColumn(col.id, $event)"
+                matTooltip="Excluir coluna personalizada">
+                <mat-icon>delete_outline</mat-icon>
+              </button>
+            </div>
+          </div>
+
+          <!-- Adicionar Nova Coluna Personalizada -->
+          <div class="notion-add-column-section">
+            <div class="add-col-toggle-row" *ngIf="!showAddColumnPopover()">
+              <button type="button" class="btn-open-add-col" (click)="showAddColumnPopover.set(true)">
+                <mat-icon>add</mat-icon>
+                <span>Nova coluna personalizada</span>
+              </button>
+            </div>
+            <div class="add-col-popover-form" *ngIf="showAddColumnPopover()">
+              <div class="add-col-form-title">
+                <span>Nova Coluna</span>
+                <button type="button" (click)="showAddColumnPopover.set(false)"><mat-icon>close</mat-icon></button>
+              </div>
+              <input type="text" [(ngModel)]="newCustomColumnLabel" placeholder="Nome da coluna..." class="add-col-input" autofocus />
+              <select [(ngModel)]="newCustomColumnType" class="add-col-select">
+                <option value="text">Texto</option>
+                <option value="date">Data</option>
+                <option value="number">Número</option>
+                <option value="select">Lista de Seleção</option>
+                <option value="checkbox">Caixa de Seleção (Sim/Não)</option>
+              </select>
+              <input *ngIf="newCustomColumnType === 'select'" type="text" [(ngModel)]="newCustomColumnOptions" placeholder="Opções: Opção 1, Opção 2..." class="add-col-input" />
+              <button type="button" class="btn-save-new-col" (click)="addCustomColumn()" [disabled]="!newCustomColumnLabel.trim()">
+                <mat-icon>check</mat-icon> Adicionar Coluna
+              </button>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
-    <label class="search-box"><mat-icon>search</mat-icon><input [ngModel]="search()" (ngModelChange)="setSearch($event)"
-        placeholder="Buscar tarefas, descrições ou etiquetas"></label>
-    <select [ngModel]="priorityFilter()" (ngModelChange)="setPriorityFilter($event)">
-      <option value="all">Todas as prioridades</option>
-      <option value="urgent">Urgente</option>
-      <option value="high">Alta</option>
-      <option value="medium">Média</option>
-      <option value="low">Baixa</option>
-    </select>
-    <select [ngModel]="assigneeFilter()" (ngModelChange)="setAssigneeFilter($event)">
-      <option value="all">Todos os responsáveis</option>
-      <option [value]="auth.currentUser()?.id">{{ auth.currentUser()?.name || 'Eu' }}</option>
-      <option *ngFor="let user of assignableUsers()" [value]="user.id">{{ user.name }}</option>
-    </select>
-    <button class="archive-toggle expand-pill-btn size-34" [class.active]="showArchived()" (click)="toggleArchived()"
-      [matTooltip]="showArchived() ? 'Ver quadro' : 'Ver arquivadas'">
-      <mat-icon>archive</mat-icon>
-      <span class="pill-label">{{ showArchived() ? 'Ver quadro' : 'Arquivadas' }}</span>
-    </button>
-    <button class="archive-toggle trash-open-btn expand-pill-btn size-34" (click)="openTrash()"
-      matTooltip="Abrir lixeira">
-      <mat-icon>delete_outline</mat-icon>
-      <span class="pill-label">Lixeira</span>
-      <span *ngIf="board()?.trashCount" class="trash-count">{{ board()?.trashCount }}</span>
-    </button>
-    <div class="filter-stat overdue" *ngIf="overdueCount()"><mat-icon>schedule</mat-icon>{{ overdueCount() }} atrasada{{
-      overdueCount() > 1 ? 's' : '' }}</div>
+    <!-- ═════════ 2. BUSCA DE TAREFAS (Completa a linha) ═════════ -->
+    <div class="search-box">
+      <mat-icon class="search-icon">search</mat-icon>
+      <input [ngModel]="search()" (ngModelChange)="setSearch($event)" placeholder="Buscar tarefas..." />
+      <button *ngIf="search()" type="button" class="search-clear-btn" (click)="setSearch('')" matTooltip="Limpar busca">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
 
-    <button type="button" class="archive-toggle fullscreen-filter-btn expand-pill-btn size-34"
-      [class.active]="isFullscreen()" (click)="toggleFullscreen()"
-      [matTooltip]="isFullscreen() ? 'Restaurar layout (exibir cabeçalho e menu lateral)' : 'Modo expandido (ocultar cabeçalho e menu lateral)'">
-      <mat-icon>{{ isFullscreen() ? 'unfold_less' : 'aspect_ratio' }}</mat-icon>
-      <span class="pill-label">{{ isFullscreen() ? 'Restaurar layout' : 'Tela cheia' }}</span>
-    </button>
+    <!-- ═════════ 3. FILTROS & AÇÕES COLADOS À DIREITA ═════════ -->
+    <div class="filters-actions-cluster">
+      <!-- Botão Dropdown "Filtros" colado à direita -->
+      <div class="filter-dropdown-wrapper">
+        <button type="button" class="action-ghost-btn filter-pill-btn" [class.active]="hasActiveFilters()"
+          (click)="toggleFilterMenu($event)" matTooltip="Filtrar por prioridade e responsável">
+          <mat-icon>tune</mat-icon>
+          <span>Filtros</span>
+          <span *ngIf="hasActiveFilters()" class="filter-count-badge">{{ activeFilterCount() }}</span>
+        </button>
+
+        <div class="notion-filter-popover" *ngIf="showFilterMenu()" (click)="$event.stopPropagation()">
+          <div class="popover-header">
+            <div class="header-title">
+              <mat-icon>tune</mat-icon>
+              <span>Filtros</span>
+            </div>
+            <button *ngIf="hasActiveFilters()" type="button" class="clear-filters-link" (click)="clearFilters($event)">
+              Limpar filtros
+            </button>
+          </div>
+
+          <div class="popover-section">
+            <label class="popover-label">Prioridade</label>
+            <div class="priority-chips-row">
+              <button type="button" class="chip-filter-btn" [class.active]="priorityFilter() === 'all'" (click)="setPriorityFilter('all')">
+                Todas
+              </button>
+              <button type="button" class="chip-filter-btn urgent" [class.active]="priorityFilter() === 'urgent'" (click)="setPriorityFilter('urgent')">
+                <span class="p-dot"></span> Urgente
+              </button>
+              <button type="button" class="chip-filter-btn high" [class.active]="priorityFilter() === 'high'" (click)="setPriorityFilter('high')">
+                <span class="p-dot"></span> Alta
+              </button>
+              <button type="button" class="chip-filter-btn medium" [class.active]="priorityFilter() === 'medium'" (click)="setPriorityFilter('medium')">
+                <span class="p-dot"></span> Média
+              </button>
+              <button type="button" class="chip-filter-btn low" [class.active]="priorityFilter() === 'low'" (click)="setPriorityFilter('low')">
+                <span class="p-dot"></span> Baixa
+              </button>
+            </div>
+          </div>
+
+          <div class="popover-section">
+            <label class="popover-label">Responsável</label>
+            <select class="popover-select" [ngModel]="assigneeFilter()" (ngModelChange)="setAssigneeFilter($event)">
+              <option value="all">Todos os responsáveis</option>
+              <option [value]="auth.currentUser()?.id">{{ auth.currentUser()?.name || 'Eu' }} (Você)</option>
+              <option *ngFor="let user of assignableUsers()" [value]="user.id">{{ user.name }}</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Indicador de Tarefas Atrasadas -->
+      <div class="filter-stat overdue" *ngIf="overdueCount()">
+        <mat-icon>schedule</mat-icon>
+        <span>{{ overdueCount() }} atrasada{{ overdueCount() > 1 ? 's' : '' }}</span>
+      </div>
+
+      <!-- Badge de Arquivadas Ativas se estiver navegando no arquivo -->
+      <button *ngIf="showArchived()" type="button" class="active-archive-indicator" (click)="toggleArchived()"
+        matTooltip="Visualizando tarefas arquivadas. Clique para voltar ao quadro ativo.">
+        <mat-icon>inventory_2</mat-icon>
+        <span>Arquivadas</span>
+        <mat-icon class="icon-close">close</mat-icon>
+      </button>
+
+      <!-- Botão Modo Tela Cheia NA BARRA (fora dos 3 pontos) -->
+      <button type="button" class="action-ghost-btn icon-only-btn fullscreen-bar-btn" (click)="toggleFullscreen()"
+        [class.active]="isFullscreen()"
+        [matTooltip]="isFullscreen() ? 'Restaurar layout (exibir cabeçalho e menu lateral)' : 'Tela cheia (modo foco)'">
+        <mat-icon>{{ isFullscreen() ? 'unfold_less' : 'aspect_ratio' }}</mat-icon>
+      </button>
+
+      <!-- Dropdown "Mais Opções" (Arquivadas, Lixeira) -->
+      <div class="more-actions-wrapper">
+        <button type="button" class="action-ghost-btn icon-only-btn" (click)="toggleMoreMenu($event)"
+          [class.active]="showMoreMenu() || showArchived()"
+          matTooltip="Mais opções do quadro">
+          <mat-icon>more_horiz</mat-icon>
+        </button>
+
+        <div class="notion-more-menu" *ngIf="showMoreMenu()" (click)="$event.stopPropagation()">
+          <button type="button" class="more-menu-item" [class.active]="showArchived()" (click)="toggleArchived(); showMoreMenu.set(false)">
+            <mat-icon>{{ showArchived() ? 'unarchive' : 'archive' }}</mat-icon>
+            <span>{{ showArchived() ? 'Voltar ao quadro ativo' : 'Tarefas arquivadas' }}</span>
+          </button>
+
+          <button type="button" class="more-menu-item" (click)="openTrash(); showMoreMenu.set(false)">
+            <mat-icon>delete_outline</mat-icon>
+            <span>Lixeira de tarefas</span>
+            <span *ngIf="board()?.trashCount" class="menu-badge">{{ board()?.trashCount }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
   </section>
 
   <div class="loading-state" *ngIf="loading()"><span class="spinner"></span>Carregando quadro...</div>

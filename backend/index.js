@@ -189,6 +189,16 @@ const PORTAL_API = process.env.PORTAL_API || 'http://192.168.13.244:7000';
 const SSO_API_KEY = process.env.SSO_API_KEY || process.env.PORTAL_API_KEY || '';
 const authCache = new Map();
 
+async function fetchWithTimeout(url, options = {}, timeoutMs = 2500) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function extractAuthenticatedUserId(payload) {
   const value = payload?.data?.user || payload?.data || payload?.user || payload;
   return value?.id ? String(value.id) : '';
@@ -205,7 +215,7 @@ async function validateSsoTicketWithPortal(ticket) {
   }
 
   try {
-    const response = await fetch(`${PORTAL_API}/api/apikey/validate-token`, {
+    const response = await fetchWithTimeout(`${PORTAL_API}/api/apikey/validate-token`, {
       method: 'POST',
       headers,
       body: JSON.stringify({ token: cleanTicket })
@@ -244,11 +254,11 @@ async function validateUserToken(token) {
         let response = null;
         if (SSO_API_KEY) {
           try {
-            response = await fetch(`${PORTAL_API}/api/apikey/me`, { headers });
+            response = await fetchWithTimeout(`${PORTAL_API}/api/apikey/me`, { headers });
           } catch {}
         }
         if (!response || !response.ok) {
-          response = await fetch(`${PORTAL_API}/api/auth/me`, { headers: { Authorization: `Bearer ${cleanToken}` } });
+          response = await fetchWithTimeout(`${PORTAL_API}/api/auth/me`, { headers: { Authorization: `Bearer ${cleanToken}` } });
         }
 
         if (response && response.ok) {
@@ -390,7 +400,7 @@ const handleUsersProxy = async (req, res) => {
     // Tenta primeiro o endpoint de API Key (/api/apikey/users) se a chave existir
     if (SSO_API_KEY) {
       try {
-        response = await fetch(`${PORTAL_API}/api/apikey/users`, { headers });
+        response = await fetchWithTimeout(`${PORTAL_API}/api/apikey/users`, { headers });
       } catch (err) {
         console.warn('[PROXY] Falha ao consultar /api/apikey/users:', err.message);
       }
@@ -398,7 +408,7 @@ const handleUsersProxy = async (req, res) => {
 
     // Fallback para o endpoint legado /api/users/all
     if (!response || !response.ok) {
-      response = await fetch(`${PORTAL_API}/api/users/all`, {
+      response = await fetchWithTimeout(`${PORTAL_API}/api/users/all`, {
         headers: authHeader ? { 'Authorization': authHeader } : {}
       });
     }
@@ -447,12 +457,12 @@ app.get('/api/auth/me', async (req, res) => {
     let response = null;
     if (SSO_API_KEY && authHeader) {
       try {
-        response = await fetch(`${PORTAL_API}/api/apikey/me`, { headers });
+        response = await fetchWithTimeout(`${PORTAL_API}/api/apikey/me`, { headers });
       } catch {}
     }
 
     if (!response || !response.ok) {
-      response = await fetch(`${PORTAL_API}/api/auth/me`, {
+      response = await fetchWithTimeout(`${PORTAL_API}/api/auth/me`, {
         headers: authHeader ? { 'Authorization': authHeader } : {}
       });
     }

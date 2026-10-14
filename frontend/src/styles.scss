@@ -1532,114 +1532,144 @@ app-calendar-page {
 }
 
 /* ══════════════════════════════════════════════════════════════════
-   ✨ EXPANDABLE PILL BUTTONS (Icon-only by default, expands on hover)
-   Elimina poluição visual mantendo acessibilidade e elegância moderna
+   ✨ ACTION & PILL BUTTONS (Visíveis, estáveis e de alta usabilidade)
+   Rótulos legíveis e visíveis por padrão, sem expansão brusca no hover,
+   proporcionando excelente affordance, clique preciso e estabilidade de layout.
    ══════════════════════════════════════════════════════════════════ */
 .expand-pill-btn {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 0 !important;
-  padding: 0 !important;
+  gap: 6px !important;
+  padding: 0 12px !important;
   width: auto !important;
-  min-width: var(--pill-size, 34px) !important;
-  max-width: var(--pill-size, 34px) !important;
+  min-width: auto !important;
+  max-width: none !important;
   height: var(--pill-size, 34px) !important;
   box-sizing: border-box !important;
-  overflow: hidden !important;
   white-space: nowrap !important;
-  border-radius: 10px !important;
-  border: 1px solid var(--border) !important;
-  background: var(--bg-hover) !important;
+  border-radius: 9px !important;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent) !important;
+  background: var(--bg-surface) !important;
   color: var(--text-secondary) !important;
+  font-size: 12px !important;
+  font-weight: 550 !important;
+  letter-spacing: -0.01em !important;
   cursor: pointer;
   user-select: none;
   flex-shrink: 0;
   backface-visibility: hidden;
   transform: translateZ(0);
-  transition: max-width 0.38s cubic-bezier(0.16, 1, 0.3, 1),
-    padding 0.38s cubic-bezier(0.16, 1, 0.3, 1),
-    gap 0.38s cubic-bezier(0.16, 1, 0.3, 1),
-    background 0.25s ease,
-    border-color 0.25s ease,
-    box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1),
-    transform 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03) !important;
+  transition: background 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease,
+    box-shadow 0.16s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.16s cubic-bezier(0.16, 1, 0.3, 1) !important;
+
+  /* Se for estritamente ícone único (sem texto/label), mantém proporção quadrada */
+  &:not(:has(.pill-label)) {
+    min-width: var(--pill-size, 34px) !important;
+    width: var(--pill-size, 34px) !important;
+    padding: 0 !important;
+  }
 
   &.size-36 {
     --pill-size: 36px;
-    border-radius: 11px !important;
+    height: 36px !important;
+    padding: 0 13px !important;
+    border-radius: 10px !important;
+    font-size: 12.5px !important;
+
+    &:not(:has(.pill-label)) {
+      min-width: 36px !important;
+      width: 36px !important;
+      padding: 0 !important;
+    }
   }
 
   &.size-34 {
     --pill-size: 34px;
-    border-radius: 10px !important;
+    height: 34px !important;
+    padding: 0 11px !important;
+    border-radius: 9px !important;
+    font-size: 12px !important;
+
+    &:not(:has(.pill-label)) {
+      min-width: 34px !important;
+      width: 34px !important;
+      padding: 0 !important;
+    }
   }
 
   &.size-32 {
     --pill-size: 32px;
-    border-radius: 9px !important;
+    height: 32px !important;
+    padding: 0 9px !important;
+    border-radius: 8px !important;
+    font-size: 11.5px !important;
+
+    &:not(:has(.pill-label)) {
+      min-width: 32px !important;
+      width: 32px !important;
+      padding: 0 !important;
+    }
   }
 
   mat-icon {
-    font-size: 17px !important;
-    width: 17px !important;
-    height: 17px !important;
+    font-size: 16px !important;
+    width: 16px !important;
+    height: 16px !important;
     flex-shrink: 0 !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), color 0.2s ease;
+    color: var(--text-muted);
+    transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), color 0.16s ease;
   }
 
   .pill-label {
-    display: inline-block;
-    max-width: 0;
-    opacity: 0;
-    margin-left: 0;
-    font-size: 12px;
-    font-weight: 600;
-    line-height: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    pointer-events: none;
-    transition: max-width 0.38s cubic-bezier(0.16, 1, 0.3, 1),
-      opacity 0.2s ease-in-out,
-      margin-left 0.38s cubic-bezier(0.16, 1, 0.3, 1);
+    display: inline-block !important;
+    max-width: none !important;
+    opacity: 1 !important;
+    margin-left: 0 !important;
+    font-size: inherit !important;
+    font-weight: 550 !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+    pointer-events: auto !important;
+    color: inherit !important;
   }
 
-  /* Em hover ou foco com teclado, expande suavemente exibindo o nome */
+  /* Micro-interação refinada ao passar o mouse ou focar */
   &:hover,
   &:focus-visible {
-    max-width: 220px !important;
-    padding: 0 12px !important;
-    gap: 6px !important;
     color: var(--text-primary) !important;
-    background: var(--bg-surface) !important;
-    border-color: var(--border-focus, var(--brand-500)) !important;
-    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.09) !important;
+    background: var(--bg-hover) !important;
+    border-color: color-mix(in srgb, var(--brand-500) 40%, var(--border)) !important;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.07), 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+    transform: translateY(-1px) !important;
     z-index: 2;
-
-    .pill-label {
-      max-width: 170px;
-      opacity: 1;
-      margin-left: 3px;
-      transition: max-width 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-        opacity 0.28s cubic-bezier(0.16, 1, 0.3, 1) 0.15s,
-        margin-left 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-    }
 
     mat-icon {
       transform: scale(1.08);
+      color: var(--text-primary);
     }
+  }
+
+  /* Feedback de clique imediato */
+  &:active {
+    transform: translateY(0) !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06) !important;
   }
 
   /* Estado Ativo (Filtro ou modo selecionado) */
   &.active {
     background: var(--bg-active) !important;
-    color: var(--text-brand) !important;
+    color: var(--brand-600, var(--text-brand)) !important;
     border-color: var(--brand-500) !important;
-    box-shadow: var(--shadow-xs) !important;
+    font-weight: 650 !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), inset 0 0 0 1px var(--brand-500) !important;
 
     mat-icon {
       color: var(--brand-500) !important;
@@ -1648,22 +1678,35 @@ app-calendar-page {
 
   /* Variação primária (destaque com gradiente do tema) */
   &.primary-pill {
-    background: linear-gradient(135deg, var(--brand-500), var(--brand-700)) !important;
-    color: #fff !important;
-    border: none !important;
-    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.25) !important;
+    background: linear-gradient(135deg, var(--brand-500), var(--brand-600)) !important;
+    color: #ffffff !important;
+    border: 1px solid transparent !important;
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--brand-500) 30%, transparent) !important;
 
     mat-icon {
-      color: #fff !important;
+      color: #ffffff !important;
     }
 
     .pill-label {
-      color: #fff !important;
+      color: #ffffff !important;
+      font-weight: 600 !important;
     }
 
-    &:hover {
-      box-shadow: 0 5px 16px rgba(245, 158, 11, 0.42) !important;
-      transform: translateY(-1px);
+    &:hover,
+    &:focus-visible {
+      background: linear-gradient(135deg, var(--brand-500), var(--brand-600)) !important;
+      box-shadow: 0 4px 14px color-mix(in srgb, var(--brand-500) 45%, transparent) !important;
+      filter: brightness(1.05);
+      transform: translateY(-1.5px) !important;
+
+      mat-icon {
+        color: #ffffff !important;
+      }
+    }
+
+    &:active {
+      transform: translateY(0) !important;
+      box-shadow: 0 2px 4px color-mix(in srgb, var(--brand-500) 35%, transparent) !important;
     }
   }
 
@@ -1671,7 +1714,7 @@ app-calendar-page {
   .trash-count,
   .pill-badge {
     margin-left: 4px;
-    padding: 1px 5px;
+    padding: 1px 6px;
     font-size: 10px;
     font-weight: 800;
     border-radius: 8px;
@@ -1679,7 +1722,6 @@ app-calendar-page {
     color: #ef4444;
     line-height: 1.2;
     flex-shrink: 0;
-    transition: opacity 0.2s ease;
   }
 }
 

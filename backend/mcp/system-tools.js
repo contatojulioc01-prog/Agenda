@@ -144,8 +144,12 @@ async function executeSystemTool(name, args = {}, context = {}) {
   if (!userId) fail('Usuário autenticado ausente.');
 
   if (name === 'obter_contexto_completo') {
-    await Promise.all([kanban.ensureDefaultCalendar(userId, noBroadcast), kanban.createDefaultPersonalBoard(userId)]);
-    const [calendars, teams, boards, calendarInvitations, teamInvitations, preferences, devices, counts] = await Promise.all([
+    await Promise.all([
+      kanban.ensureDefaultCalendar(userId, noBroadcast),
+      kanban.createDefaultPersonalBoard(userId),
+      mural.ensurePersonalMural(userId),
+    ]);
+    const [calendars, teams, boards, calendarInvitations, teamInvitations, preferences, devices, counts, murais] = await Promise.all([
       db.all(`SELECT DISTINCT c.*, COALESCE(cm.permission, CASE WHEN c.owner_id = $1 THEN 'owner' END) AS my_permission,
         kt.name AS task_team_name FROM calendars c
         LEFT JOIN calendar_members cm ON cm.calendar_id = c.id AND cm.user_id = $1
@@ -168,7 +172,9 @@ async function executeSystemTool(name, args = {}, context = {}) {
       db.all('SELECT id, name, enabled, created_at, last_seen_at FROM notification_devices WHERE user_id = $1 ORDER BY created_at DESC', [userId]),
       db.get(`SELECT
         (SELECT COUNT(DISTINCT e.id) FROM events e JOIN calendars c ON c.id=e.calendar_id LEFT JOIN calendar_members cm ON cm.calendar_id=c.id AND cm.user_id=$1 WHERE c.owner_id=$1 OR cm.user_id=$1) AS events,
-        (SELECT COUNT(DISTINCT kt.id) FROM kanban_tasks kt JOIN kanban_boards b ON b.id=kt.board_id LEFT JOIN kanban_team_members tm ON tm.team_id=b.team_id AND tm.user_id=$1 WHERE kt.deleted_at IS NULL AND ((COALESCE(b.scope_type,'personal')='personal' AND b.owner_id=$1) OR (b.scope_type='team' AND tm.user_id=$1))) AS tasks`, [userId]),
+        (SELECT COUNT(DISTINCT kt.id) FROM kanban_tasks kt JOIN kanban_boards b ON b.id=kt.board_id LEFT JOIN kanban_team_members tm ON tm.team_id=b.team_id AND tm.user_id=$1 WHERE kt.deleted_at IS NULL AND ((COALESCE(b.scope_type,'personal')='personal' AND b.owner_id=$1) OR (b.scope_type='team' AND tm.user_id=$1))) AS tasks,
+        (SELECT COUNT(DISTINCT mi.id) FROM mural_items mi JOIN mural_boards mb ON mb.id=mi.mural_id LEFT JOIN kanban_team_members tm ON tm.team_id=mb.team_id AND tm.user_id=$1 WHERE ((COALESCE(mb.scope_type,'personal')='personal' AND mb.owner_id=$1) OR (mb.scope_type='team' AND tm.user_id=$1))) AS notes`, [userId]),
+      executeSystemTool('listar_murais', {}, { userId, broadcast }),
     ]);
     return {
       userId,
@@ -180,6 +186,7 @@ async function executeSystemTool(name, args = {}, context = {}) {
       calendars: calendars.map(calendarDto),
       teams,
       boards: boards.map(row => ({ ...boardDto(row, row.my_role), teamName: row.team_name || null })),
+      murais,
       invitations: { calendars: calendarInvitations, teams: teamInvitations },
       notifications: {
         preferences: preferences ? {
@@ -192,7 +199,7 @@ async function executeSystemTool(name, args = {}, context = {}) {
         } : { enabled: true, taskEnabled: true, eventEnabled: true, taskTime: '08:30', taskDaysBefore: 1, eventMinutesBefore: 15 },
         devices: devices.map(row => ({ id: row.id, name: row.name, enabled: row.enabled === 1, createdAt: row.created_at, lastSeenAt: row.last_seen_at || null })),
       },
-      totals: { events: Number(counts.events), tasks: Number(counts.tasks) },
+      totals: { events: Number(counts.events), tasks: Number(counts.tasks), notes: Number(counts.notes || 0) },
     };
   }
 
@@ -594,6 +601,83 @@ async function executeSystemTool(name, args = {}, context = {}) {
     };
   }
 
+  if(name==='consultar_notas_mural'){
+    await mural.ensurePersonalMural(userId);
+    const teamMemberships = await db.all(`
+      SELECT t.*, m.role as my_role
+      FROM kanban_teams t
+      JOIN kanban_team_members m ON m.team_id = t.id
+      WHERE m.user_id = $1
+    `, [userId]);
+    for (const team of teamMemberships) {
+      await mural.ensureTeamMural(team);
+    }
+
+    let boardIds = [];
+    if (args.muralId) {
+      const access = await mural.muralAccess(args.muralId, userId);
+      if (!access) fail('Mural não encontrado ou sem permissão de acesso.');
+      boardIds = [args.muralId];
+    } else {
+      const murals = await executeSystemTool('listar_murais', {}, { userId, broadcast });
+      if (args.equipe || args.equipeId) {
+        const matchName = String(args.equipe || '').toLowerCase();
+        const filtered = murals.filter(m =>
+          (args.equipeId && m.teamId === args.equipeId) ||
+          (matchName && (String(m.teamName || '').toLowerCase().includes(matchName) || String(m.name || '').toLowerCase().includes(matchName)))
+        );
+        boardIds = (filtered.length ? filtered : murals).map(m => m.id);
+      } else {
+        boardIds = murals.map(m => m.id);
+      }
+    }
+
+    if (!boardIds.length) return [];
+
+    const values = [boardIds];
+    const where = ['i.mural_id = ANY($1)'];
+
+    if (args.groupId) {
+      values.push(args.groupId);
+      where.push(`i.group_id = $${values.length}`);
+    }
+    if (args.apenasFixadas === true) {
+      where.push('i.is_pinned = 1');
+    }
+    if (args.busca) {
+      values.push(`%${args.busca}%`);
+      where.push(`(i.title ILIKE $${values.length} OR i.content ILIKE $${values.length})`);
+    }
+
+    const limit = Math.max(1, Math.min(Number(args.limite) || 50, 200));
+    values.push(limit);
+
+    const rows = await db.all(`
+      SELECT i.*, b.name AS mural_name, b.scope_type AS mural_scope_type, b.team_id AS mural_team_id,
+        g.title AS group_title, g.color AS group_color
+      FROM mural_items i
+      JOIN mural_boards b ON b.id = i.mural_id
+      LEFT JOIN mural_groups g ON g.id = i.group_id
+      WHERE ${where.join(' AND ')}
+      ORDER BY i.is_pinned DESC, i.created_at DESC
+      LIMIT $${values.length}
+    `, values);
+
+    const items = [];
+    for (const row of rows) {
+      const attachments = await listAttachments('mural_item', row.id);
+      items.push({
+        ...mural.itemDto(row, attachments),
+        muralName: row.mural_name,
+        muralScopeType: row.mural_scope_type,
+        muralTeamId: row.mural_team_id || null,
+        groupTitle: row.group_title || null,
+        groupColor: row.group_color || null,
+      });
+    }
+    return items;
+  }
+
   if(name==='criar_item_mural'){
     const access = await mural.muralAccess(args.muralId, userId, true);
     if (!access) fail('Mural não encontrado ou sem permissão de escrita.');
@@ -741,6 +825,7 @@ const systemToolDefinitions = [
   {name:'listar_lixeira_tarefas',title:'Listar lixeira de tarefas',description:'Lista raízes excluídas; itens expiram em 30 dias.',schema:z.object({quadroId:z.string()}),annotations:read},
   {name:'listar_murais',title:'Listar murais',description:'Lista os murais de avisos e notas (pessoais e de equipes) acessíveis pelo usuário.',schema:z.object({}),annotations:read},
   {name:'obter_mural',title:'Obter mural completo',description:'Retorna grupos, notas (post-its) e anexos de um mural.',schema:z.object({muralId:z.string()}),annotations:read},
+  {name:'consultar_notas_mural',title:'Consultar notas do mural',description:'Pesquisa notas/post-its nos murais acessíveis por termo de busca, equipe, mural específico, grupo ou apenas notas fixadas.',schema:z.object({muralId:z.string().optional(),equipeId:z.string().optional(),equipe:z.string().optional(),groupId:z.string().optional(),busca:z.string().max(160).optional(),apenasFixadas:z.boolean().optional(),limite:z.number().int().min(1).max(200).optional()}),annotations:read},
   {name:'listar_anexos',title:'Listar anexos',description:'Lista metadados dos anexos de evento, tarefa ou item do mural; nunca expõe conteúdo binário automaticamente.',schema:z.object({tipo:z.enum(['event','task','mural_item']),itemId:z.string()}),annotations:read},
   {name:'obter_configuracao_notificacoes',title:'Obter notificações',description:'Retorna preferências e dispositivos sem segredos de autenticação.',schema:z.object({}),annotations:read},
   {name:'exportar_meus_dados',title:'Exportar meus dados',description:'Retorna a exportação estruturada do titular conforme a LGPD, sem chaves secretas.',schema:z.object({}),annotations:read},
@@ -820,18 +905,19 @@ const SYSTEM_MANUAL = `# Manual Operacional e Guia Técnico de QA — Agenda Cor
 - Anexos (Attachments):
   - Suportados em eventos, tarefas e itens do mural.
   - Metadados disponíveis via MCP: fileName, mimeType, byteSize, previewable (imagens e PDFs), createdAt.
-  - Armazenamento físico exclusivo no servidor (C:\\PrivateAppDataApplication\\AgendaAnexos). O banco não armazena binários.
+  - Armazenamento físico exclusivo no servidor. O banco não armazena binários.
   - Limites de segurança: máx 10 MB por arquivo, máx 15 anexos por item, máx 50 MB total por item.
 
-## 7. Mural Corporativo (Avisos, Ideias, Notas e Post-its)
+## 7. Mural Corporativo (Avisos, Ideias, Notas, Comunicados e Post-its)
 - **Estrutura dos Murais:**
   - **Mural Pessoal ("Meu Mural"):** Espaço individual de notas rápidas, ideias, lembretes e anotações do usuário autenticado (\`scope_type = 'personal'\`).
   - **Mural da Equipe / Time:** Espaço compartilhado vinculado a uma equipe (\`scope_type = 'team'\`). Administradores e membros do time têm acesso para colaborar e compartilhar avisos e documentações.
-- **Grupos e Categorias no Mural:**
+- **Grupos e Seções Temáticas no Mural:**
   - Cada mural organiza suas notas em grupos verticais ou seções temáticas (ex.: "Avisos & Lembretes", "Ideias & Projetos", "Documentações & Links").
   - Grupos possuem título, cor e ordenação. Excluir um grupo desvincula suas notas (sem apagá-las), mantendo as anotações seguras.
-- **Notas e Post-its (\`mural_items\`):**
-  - **Título e Conteúdo:** Conteúdo com suporte completo a Markdown rico (tabelas, listas de tarefas, links e formatação).
+- **Notas, Comunicados e Post-its (\`mural_items\`):**
+  - **Título e Conteúdo:** Conteúdo com suporte completo a Markdown rico (tabelas, checklists interativos \`[ ]\` / \`[x]\`, listas com marcadores \`-\`, negrito \`**\`, citações \`>\` e links).
+  - **Checklists Interativos:** Suporte a listas de verificação que podem ser marcadas ou desmarcadas diretamente na visualização ou no editor.
   - **Paleta de Cores de Post-it:** Tons pastéis acolhedores (amarelo \`#fef08a\`, verde \`#bbf7d0\`, azul \`#bae6fd\`, rosa \`#fbcfe8\`, roxo \`#e9d5ff\`, laranja \`#fed7aa\`, etc.).
   - **Fixação no Topo (\`isPinned\`):** Notas fixadas recebem destaque visual no topo do grupo e do mural com badge de fixação.
   - **Rotação Estética:** Cada post-it possui uma leve inclinação orgânica simulando uma nota colada em painel físico.
@@ -840,9 +926,10 @@ const SYSTEM_MANUAL = `# Manual Operacional e Guia Técnico de QA — Agenda Cor
   - Suporte a imagens (JPG, PNG, WebP) e documentos PDF anexados a cada post-it.
   - Os arquivos ficam armazenados de forma segura na pasta local/rede de anexos no servidor.
 - **Diretrizes para Assistência via MCP no Mural:**
-  - Ao redigir avisos e comunicados, utilize linguagem clara, objetiva e profissional com formatação Markdown estruturada (títulos curtos, tópicos e destaques em negrito).
-  - Categorize a nota no grupo apropriado ou sugira a criação de um novo grupo temático se necessário.
-  - Ao consultar recados da equipe, utilize \`obter_mural\` para listar os avisos mais recentes e notas fixadas.
+  - Utilize \`listar_murais\` para identificar todos os murais (pessoais e de equipes) acessíveis.
+  - Utilize \`obter_mural\` para obter todos os grupos, notas completas e anexos de um mural específico.
+  - Utilize \`consultar_notas_mural\` para pesquisar notas e avisos por palavra-chave, equipe, grupo ou status de fixação.
+  - Ao redigir comunicados e notas com o prompt \`criar_aviso_mural\`, utilize linguagem clara, profissional, objetiva e estruturada em Markdown.
 
 ## 8. Lixeira do Kanban e Ciclo de Vida
 - Mover para Lixeira (mover_tarefa_para_lixeira):
