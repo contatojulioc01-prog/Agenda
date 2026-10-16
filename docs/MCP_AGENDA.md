@@ -28,9 +28,9 @@ Exemplo genérico de configuração de cliente:
 }
 ```
 
-## Capacidades
+## Capacidades e Escopo de Permissões
 
-O servidor publica ferramentas que cobrem o domínio funcional da aplicação em modo somente leitura para o assistente e clientes MCP, recursos de conhecimento e prompts especializados:
+O servidor publica ferramentas que cobrem o domínio funcional da aplicação **exclusivamente em modo de visualização e consulta (somente leitura / Read-Only)**. A assistente possui permissão restrita de visualização, sem autorização nem capacidade técnica para criar, alterar ou deletar registros. Recursos de conhecimento e prompts especializados disponíveis:
 
 - `agenda://manual`: entidades, relacionamentos, permissões, formatos, regras de segurança e guia completo do Mural;
 - `agenda://schema`: catálogo JSON completo das ferramentas, parâmetros e schemas;
@@ -39,7 +39,7 @@ O servidor publica ferramentas que cobrem o domínio funcional da aplicação em
 Prompts MCP disponíveis:
 - `planejar_dia`: planeja o dia do usuário consultando eventos e tarefas.
 - `criar_aviso_mural`: orienta a redação de comunicados, avisos e notas corporativas em Markdown para os murais.
-- `descrever_opcoes_card`: formata as opções e ações de cartões e modais no padrão oficial.
+- `descrever_opcoes_card`: apresenta a especificação técnica dos botões do menu contextual de cartões (somente quando expressamente solicitado).
 - `resposta_direta_sem_disclaimers`: garante respostas 100% diretas, limpas e sem avisos de segurança.
 
 Ferramentas disponíveis:

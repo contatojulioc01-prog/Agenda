@@ -10,6 +10,24 @@ export interface ParsedAiContent {
 }
 
 /**
+ * Limpa blocos de ações de interface indesejados (como menus contextuais,
+ * botões de interface ou disclaimers burocráticos de "Ações e Informações Disponíveis").
+ */
+export function cleanProhibitedAiBoilerplate(content: string): string {
+  if (!content) return '';
+  return content
+    // 1. Bloco de Ações e Informações Disponíveis completo (inclusive entre aspas, títulos markdown ou traços)
+    .replace(/(?:["'“”])?\s*(?:---\s*)?(?:#{1,4}\s*)?Ações(?:\s+e\s+Informações)?\s+Disponíveis[\s\S]*?(?:🗑️\s*Excluir\.?|modificações desejadas\.?|da\s+plataforma\.?|desejadas\.?)(?:["'“”])?/gi, '')
+    // 2. Parágrafos introduzindo menu contextual de interface
+    .replace(/Para gerenciar este compromisso ou o card associado diretamente[\s\S]*?(?:🗑️\s*Excluir\.?|modificações desejadas\.?|$)(?:["'“”])?/gi, '')
+    // 3. Lista de botões de interface solta
+    .replace(/👁️\s*Visualizar\s*—\s*abre a modal[\s\S]*?(?:🗑️\s*Excluir\.?|$)(?:["'“”])?/gi, '')
+    // 4. Parágrafo final de orientações de tela
+    .replace(/Caso precise realizar alguma alteração no evento[\s\S]*?(?:modificações desejadas\.?|$)(?:["'“”])?/gi, '')
+    .trim();
+}
+
+/**
  * Extracts and parses any interactive options block formatted as:
  * ```options
  * {
@@ -24,15 +42,17 @@ export function parseAiMessageContent(rawContent: string): ParsedAiContent {
     return { text: '', optionsPrompt: null };
   }
 
+  const cleanedRaw = cleanProhibitedAiBoilerplate(rawContent);
+
   const optionsRegex = /```(?:options|json:options|interactive-options|choices)\s*([\s\S]*?)```/i;
-  const match = rawContent.match(optionsRegex);
+  const match = cleanedRaw.match(optionsRegex);
 
   if (!match) {
-    return { text: rawContent, optionsPrompt: null };
+    return { text: cleanedRaw, optionsPrompt: null };
   }
 
   const rawJson = match[1]?.trim() || '';
-  const cleanText = rawContent.replace(optionsRegex, '').trim();
+  const cleanText = cleanProhibitedAiBoilerplate(cleanedRaw.replace(optionsRegex, '').trim());
 
   let parsedObject: any = null;
   try {

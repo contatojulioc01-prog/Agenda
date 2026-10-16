@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { Subscription } from 'rxjs';
 import { AiConversationMessage, AiService } from '../../../core/services/ai.service';
-import { AiOptionPrompt, ParsedAiContent, parseAiMessageContent } from '../../../core/utils/ai-message-parser.util';
+import { AiOptionPrompt, ParsedAiContent, cleanProhibitedAiBoilerplate, parseAiMessageContent } from '../../../core/utils/ai-message-parser.util';
 import { renderBasicMarkdown } from '../../../core/utils/markdown.util';
 
 @Component({
@@ -90,6 +90,11 @@ export class AiAssistantComponent implements AfterViewInit {
             ...item,
             content: 'A IA não retornou uma resposta. Tente novamente.',
             error: true,
+          }));
+        } else {
+          this.aiService.updateConversationMessage(assistantMessageId, item => ({
+            ...item,
+            content: cleanProhibitedAiBoilerplate(item.content),
           }));
         }
         this.isLoading.set(false);

@@ -833,8 +833,9 @@ const systemToolDefinitions = [
 
 const SYSTEM_MANUAL = `# Manual Operacional e Guia Técnico de QA — Agenda Corporativa Doce Brinquedo
 
-## 1. Visão Geral da Arquitetura e Diretriz de Somente Leitura (Read-Only)
-- **Modo Estrito de Leitura:** O servidor MCP opera exclusivamente em modo **SOMENTE LEITURA (Read-Only)**. Operações de criação, gravação, edição e exclusão de dados estão desabilitadas no protocolo MCP.
+## 1. Visão Geral da Arquitetura e Diretriz de Permissão (Exclusivamente Visualização / Read-Only)
+- **Permissão Exclusiva de Visualização:** A assistente inteligente e o servidor MCP operam exclusivamente com permissão de **SOMENTE VISUALIZAÇÃO E CONSULTA (Read-Only)**. A assistente **NÃO POSSUI permissão para criar, alterar, editar ou deletar/excluir** dados, compromissos ou tarefas.
+- Caso o usuário solicite para a assistente criar, alterar ou excluir registros, ela deve esclarecer que possui permissão somente de visualização e orientar o usuário a utilizar as opções disponíveis na interface da plataforma.
 - O sistema é um ecossistema corporativo completo de produtividade integrando Agendas, Eventos, Equipes, Quadros Kanban, Mural de Avisos & Notas, Subtarefas, Notificações Desktop e LGPD.
 - Todas as operações MCP são executadas no contexto estrito de consulta do usuário autenticado (identificado por ID).
 - O fuso horário de referência é America/Sao_Paulo (ou configurado em AGENDA_TIME_ZONE). Todas as interpretações de datas e horas devem respeitar esse fuso.
@@ -964,13 +965,10 @@ const SYSTEM_MANUAL = `# Manual Operacional e Guia Técnico de QA — Agenda Cor
 - Em consultas sobre atividades do usuário, busque os dados nas ferramentas correspondentes e apresente um resumo claro, organizado e profissional em Markdown.
 - Se nenhuma informação for encontrada para os critérios solicitados, relate com exatidão que nenhum registro foi localizado nos acessos do usuário.
 
-## 12. Padrão Corporativo de Formatação de Opções e Ações de Cartões / Descrição
-Sempre que a IA, o assistente ou as ferramentas MCP forem solicitados a listar, descrever, orientar ou formatar as opções e ações de cartões (Mural, Agenda, Tarefas Kanban) ou de menu contextual na descrição, deve-se manter estritamente o seguinte padrão de formatação em Markdown:
-
-👁️ Visualizar — abre a modal em modo de visualização.
-✏️ Editar — abre a modal em modo de edição.
-📌 Fixar / Desafixar.
-🗑️ Excluir.
+## 12. Consultoria Estratégica, Resolução de Reuniões e Tarefas (Como Prosseguir)
+- Ao ser consultado sobre compromissos, tarefas ou ao receber perguntas como "como posso prosseguir com...", "como conduzir a reunião...", "o que fazer a respeito de...", o assistente e as ferramentas MCP devem analisar profundamente a descrição, pauta e contexto do item e **ajudar a pensar**, opinando construtivamente, sugerindo pautas estruturadas, perguntas-chave, alinhamentos e próximos passos práticos.
+- É **ESTRITAMENTE PROIBIDO** incluir listas de botões de interface ("Visualizar — abre a modal...", "Editar", "Fixar", "Excluir"), blocos como "Ações e Informações Disponíveis" ou orientações robóticas de tela nas respostas consultivas ou de planejamento.
+- A lista técnica de opções de menu contextual (👁️ Visualizar, ✏️ Editar, 📌 Fixar/Desafixar, 🗑️ Excluir) aplica-se exclusivamente se o usuário solicitar expressamente uma documentação técnica dos botões da interface.
 
 ## 13. Diretriz de Supressão Estrita de Avisos e Disclaimers de Segurança
 - A IA, o assistente e o ecossistema MCP operam em um ambiente corporativo interno autenticado e homologado.

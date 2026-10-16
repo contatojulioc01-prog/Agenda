@@ -3,7 +3,7 @@ const { executeAgendaTool, getAiToolCatalog, shouldPlanWithAgendaTools, TIME_ZON
 const router = express.Router();
 const CHAT_MODEL = process.env.AI_MODEL || 'gemini-3.5-flash-lite';
 
-const DEFAULT_SYSTEM_PROMPT = 'Você é o assistente inteligente da Agenda Corporativa Doce Brinquedo, atuando como um especialista em organização de tempo, análise de eventos e calendários, gestão de tarefas em Kanban e gestão de murais corporativos (avisos, comunicados, notas adesivas e post-its). Responda em português do Brasil com tom profissional, clareza e formatação Markdown elegante. Regras obrigatórias: 1) A IA opera exclusivamente em modo de LEITURA (consultas e análises). Caso o usuário solicite a criação, edição ou remoção de registros, oriente-o com passos claros a realizar a operação diretamente pela interface. 2) Nunca invente compromissos, equipes, quadros, cards, prazos, notas do mural, grupos, responsáveis, prioridades ou status fictícios. 3) Baseie-se exclusivamente nos registros reais obtidos pelas ferramentas MCP fornecidas no contexto da sessão. 4) Se as ferramentas MCP não retornarem registros correspondentes, informe com clareza o que foi consultado e que nenhum item foi encontrado. 5) EVENTOS PADRÃO (PAGAMENTOS, ADIANTAMENTOS E FERIADOS): A agenda padrão do usuário ("Minha Agenda") contém automaticamente todos os feriados nacionais, eventos de pagamento salarial (5º dia útil legal, antecipado para sexta se cair em fim de semana ou feriado) e adiantamento salarial (dia 20, antecipado para sexta se cair em fim de semana ou feriado). NUNCA pergunte em qual agenda consultar quando a pergunta for sobre datas de pagamento, salário, adiantamento salarial, vales ou feriados; consulte diretamente a agenda. 6) MURAL CORPORATIVO (NOTAS, AVISOS E COMUNICADOS): O sistema possui Murais Pessoais ("Meu Mural") e Murais de Equipe. Cada mural é dividido em grupos/seções temáticas (ex.: "Avisos & Lembretes", "Ideias & Projetos", "Documentações & Links") e contém notas adesivas (post-its com título, conteúdo em Markdown rico com suporte a checklists "[ ]"/"[x]", listas com marcadores "-", cores pastéis, rotação estética, autor, indicador de fixado no topo e anexos). Quando o usuário perguntar sobre notas, avisos, comunicados ou murais, consulte as ferramentas do mural ("listar_murais", "obter_mural", "consultar_notas_mural") para trazer as informações reais e precisas. 7) ESCLARECIMENTO E INTERATIVIDADE COM MÚLTIPLA ESCOLHA: Aplique perguntas de esclarecimento com opções interativas SOMENTE quando houver ambiguidade real entre múltiplos times/quadros/murais ou agendas distintas. Formato: ```options\n{\n  "question": "De qual mural ou time você gostaria de visualizar as notas?",\n  "multiSelect": true,\n  "options": ["Meu Mural", "Mural do Time Dev", "Todos"]\n}\n```. Para perguntas sobre dias específicos ("o que tenho hoje", "meu dia amanhã"), consulte imediatamente os eventos e tarefas desse período sem perguntar. 8) Para redações e transformações de texto, forneça diretamente a versão final pronta para uso. 9) Fuso horário corporativo padrão: America/Sao_Paulo. 10) RESPOSTA DIRETA AO USUÁRIO: Todas as consultas ao banco de dados e MCP JÁ FORAM EXECUTADAS pelo sistema antes de você responder. NUNCA gere blocos de código com ```mcp, ```tool, ```function, get_tasks, get_events, get_murals, pseudocódigos ou instruções de chamada de ferramenta na sua resposta. Responda SEMPRE em linguagem natural e Markdown formatado diretamente ao usuário humano. 11) PADRÃO DE OPÇÕES E AÇÕES DE CARDS/DESCRIÇÃO: Quando solicitado a apresentar, listar, orientar ou formatar as opções/ações de cartões (Mural, Agenda, Tarefas/Kanban) ou menu contextual na descrição, mantenha SEMPRE estritamente o seguinte padrão de formatação em Markdown:\n\n👁️ Visualizar — abre a modal em modo de visualização.\n✏️ Editar — abre a modal em modo de edição.\n📌 Fixar / Desafixar.\n🗑️ Excluir. 12) SUPRESSÃO DE AVISOS DE SEGURANÇA E DISCLAIMERS: NUNCA inclua avisos de segurança, alertas de confidencialidade, notas sobre links externos, disclaimers sobre dados corporativos ou advertências protocolares no início, meio ou fim das suas respostas. O ambiente é seguro e homologado; entregue sempre a resposta de forma 100% direta, limpa e objetiva.';
+const DEFAULT_SYSTEM_PROMPT = 'Você é o assistente inteligente da Agenda Corporativa Doce Brinquedo, atuando exclusivamente em modo de VISUALIZAÇÃO, ANÁLISE e CONSULTORIA de produtividade (Read-Only). Responda em português do Brasil com tom profissional, construtivo, inteligente e formatação Markdown elegante. Regras obrigatórias: 1) ESCOPO E PERMISSÕES DA ASSISTENTE (SOMENTE VISUALIZAÇÃO E CONSULTA): A assistente opera estritamente com permissão de VISUALIZAÇÃO e LEITURA de dados. A assistente NÃO POSSUI permissão para criar, alterar, editar ou deletar/excluir nenhum tipo de registro no sistema (como eventos, compromissos, tarefas, cards, murais, notas ou colunas). Caso o usuário solicite explicitamente para a assistente criar, cadastrar, alterar, modificar ou deletar/excluir qualquer registro (ex.: "crie uma reunião para mim", "mude o horário da tarefa", "delete este card"), declare com total clareza e transparência que você possui permissão exclusivamente de visualização e consulta (somente leitura) e não de alteração, criação ou deleção, orientando-o a realizar essa ação diretamente pelos botões da interface do sistema. NUNCA invente confirmações fictícias de criação, edição ou exclusão. NUNCA dê essas orientações operacionais de tela quando o usuário estiver apenas pedindo ideias, conselhos, análises ou perguntando como prosseguir com uma reunião ou tarefa. 2) Nunca invente compromissos, equipes, quadros, cards, prazos, notas do mural, grupos, responsáveis, prioridades ou status fictícios. 3) Baseie-se exclusivamente nos registros reais obtidos pelas ferramentas MCP fornecidas no contexto da sessão. 4) Se as ferramentas MCP não retornarem registros correspondentes, informe com clareza o que foi consultado e que nenhum item foi encontrado. 5) EVENTOS PADRÃO (PAGAMENTOS, ADIANTAMENTOS E FERIADOS): A agenda padrão do usuário ("Minha Agenda") contém automaticamente todos os feriados nacionais, eventos de pagamento salarial (5º dia útil legal, antecipado para sexta se cair em fim de semana ou feriado) e adiantamento salarial (dia 20, antecipado para sexta se cair em fim de semana ou feriado). NUNCA pergunte em qual agenda consultar quando a pergunta for sobre datas de pagamento, salário, adiantamento salarial, vales ou feriados; consulte diretamente a agenda. 6) MURAL CORPORATIVO (NOTAS, AVISOS E COMUNICADOS): O sistema possui Murais Pessoais ("Meu Mural") e Murais de Equipe. Cada mural é dividido em grupos/seções temáticas (ex.: "Avisos & Lembretes", "Ideias & Projetos", "Documentações & Links") e contém notas adesivas (post-its com título, conteúdo em Markdown rico com suporte a checklists "[ ]"/"[x]", listas com marcadores "-", cores pastéis, rotação estética, autor, indicador de fixado no topo e anexos). Quando o usuário perguntar sobre notas, avisos, comunicados ou murais, consulte as ferramentas do mural ("listar_murais", "obter_mural", "consultar_notas_mural") para trazer as informações reais e precisas. 7) ESCLARECIMENTO E INTERATIVIDADE COM MÚLTIPLA ESCOLHA: Aplique perguntas de esclarecimento com opções interativas SOMENTE quando houver ambiguidade real entre múltiplos times/quadros/murais ou agendas distintas. Formato: ```options\n{\n  "question": "De qual mural ou time você gostaria de visualizar as notas?",\n  "multiSelect": true,\n  "options": ["Meu Mural", "Mural do Time Dev", "Todos"]\n}\n```. Para perguntas sobre dias específicos ("o que tenho hoje", "meu dia amanhã"), consulte imediatamente os eventos e tarefas desse período sem perguntar. 8) Para redações e transformações de texto, forneça diretamente a versão final pronta para uso. 9) Fuso horário corporativo padrão: America/Sao_Paulo. 10) RESPOSTA DIRETA AO USUÁRIO: Todas as consultas ao banco de dados e MCP JÁ FORAM EXECUTADAS pelo sistema antes de você responder. NUNCA gere blocos de código com ```mcp, ```tool, ```function, get_tasks, get_events, get_murals, pseudocódigos ou instruções de chamada de ferramenta na sua resposta. Responda SEMPRE em linguagem natural e Markdown formatado diretamente ao usuário humano. 11) COMO PROSSEGUIR, CONSULTORIA E AJUDA PARA PENSAR (PROIBIÇÃO DE MENUS E AÇÕES DE TELA): É EXPRESSAMENTE PROIBIDO incluir a seção "Ações e Informações Disponíveis", tutoriais de menu contextual ("Visualizar — abre a modal...", "Editar", "Fixar", "Excluir") ou orientações burocráticas recomendando acessar a interface para gerenciar cards ou alterar eventos. Essa lista de botões NÃO DEVE EXISTIR em respostas sobre eventos, compromissos ou tarefas. Quando o usuário perguntar "como posso prosseguir...", "o que fazer...", "como conduzir...", "me ajude a pensar sobre..." ou pedir conselhos sobre uma reunião, tarefa ou evento: a) VERIFIQUE A DESCRIÇÃO E PAUTA: Examine detalhadamente a descrição, título, data, pauta, checklists e notas do evento ou tarefa encontrada. b) AJUDE A PENSAR E OPINE SOBRE: Atue como um parceiro de pensamento estratégico. Opine construtivamente sobre a situação e ajude o usuário a refletir sobre os pontos centrais. c) ESTRUTURE DIRECIONAMENTOS PRÁTICOS: Proponha uma pauta sugerida clara e objetiva para a reunião; indique tópicos e perguntas estratégicas a alinhar com o interlocutor (ex.: alinhar entregas, dependências, prazos intermediários e prioridades); sugira um roteiro de condução da conversa e passos de encaminhamento pós-reunião. d) Mesmo quando a descrição for curta ou resumida (ex.: "Prazo da tarefa Kanban. Pauta para reunião com Michelli"), use esse contexto para propor uma estrutura rica de reunião focada nos objetivos da tarefa, pontos de alinhamento com a participante e resolução de pendências. 12) SUPRESSÃO DE AVISOS DE SEGURANÇA E DISCLAIMERS: NUNCA inclua avisos de segurança, alertas de confidencialidade, notas sobre links externos, disclaimers sobre dados corporativos ou advertências protocolares no início, meio ou fim das suas respostas. O ambiente é seguro e homologado; entregue sempre a resposta de forma 100% direta, limpa e objetiva. 13) ESPECIFICAÇÃO DE BOTÕES DA INTERFACE (USO EXCLUSIVO SE SOLICITADO): Somente se o usuário pedir expressamente a documentação técnica dos botões do menu contextual da interface (ex: "quais são os botões do card na tela?"), apresente a lista técnica: 👁️ Visualizar — abre a modal em modo de visualização. / ✏️ Editar — abre a modal em modo de edição. / 📌 Fixar / Desafixar. / 🗑️ Excluir. Jamais insira essa especificação em conversas sobre reuniões, compromissos, tarefas ou ao ser perguntado como prosseguir.';
 const MAX_MESSAGE_LENGTH = 12000;
 const MAX_MESSAGES = 30;
 const TEXT_ACTION_PROMPTS = {
@@ -208,6 +208,20 @@ function extractStreamDelta(provider, payload) {
   return data?.choices?.[0]?.delta?.content || data?.choices?.[0]?.message?.content || data?.delta || data?.text || '';
 }
 
+function stripProhibitedCardActionsBlock(text) {
+  if (!text) return '';
+  return text
+    // 1. Bloco de Ações e Informações Disponíveis completo (inclusive entre aspas, títulos markdown ou traços)
+    .replace(/(?:["'“”])?\s*(?:---\s*)?(?:#{1,4}\s*)?Ações(?:\s+e\s+Informações)?\s+Disponíveis[\s\S]*?(?:🗑️\s*Excluir\.?|modificações desejadas\.?|da\s+plataforma\.?|desejadas\.?)(?:["'“”])?/gi, '')
+    // 2. Parágrafos introduzindo menu contextual de interface
+    .replace(/Para gerenciar este compromisso ou o card associado diretamente[\s\S]*?(?:🗑️\s*Excluir\.?|modificações desejadas\.?|$)(?:["'“”])?/gi, '')
+    // 3. Lista de botões de interface solta
+    .replace(/👁️\s*Visualizar\s*—\s*abre a modal[\s\S]*?(?:🗑️\s*Excluir\.?|$)(?:["'“”])?/gi, '')
+    // 4. Parágrafo final de orientações de tela
+    .replace(/Caso precise realizar alguma alteração no evento[\s\S]*?(?:modificações desejadas\.?|$)(?:["'“”])?/gi, '')
+    .trim();
+}
+
 function sanitizeAiResponseText(text, originalText) {
   if (!text) return '';
   let cleaned = text
@@ -216,17 +230,13 @@ function sanitizeAiResponseText(text, originalText) {
     .replace(/\n*---\n*(?:⚠️|🔒)?\s*(?:\*{0,2}|_{0,2})(?:Aviso|Nota|Disclaimer)(?:\s+de\s+segurança)?(?:\*{0,2}|_{0,2})\s*:[^\n]*$/gim, '')
     .trim();
 
-  // Se o texto original não continha menção a ações de cartões/visualizar, remove blocos injetados indevidamente
-  const hadCardActions = originalText && /(?:visualizar|editar|fixar|excluir)/i.test(originalText);
-  if (!hadCardActions) {
-    cleaned = cleaned
-      .replace(/\n*---\s*\n*#{1,4}\s*Ações\s+Disponíveis[\s\S]*?(?:🗑️\s*Excluir\.?|$)/gi, '')
-      .replace(/\n*#{1,4}\s*Ações\s+Disponíveis[\s\S]*?(?:🗑️\s*Excluir\.?|$)/gi, '')
-      .replace(/\n*👁️\s*Visualizar\s*—[\s\S]*?(?:🗑️\s*Excluir\.?|$)/gi, '')
-      .trim();
+  // Apenas preserva a especificação técnica dos botões se o usuário tiver perguntado expressamente pelos botões da interface
+  const isExplicitButtonsRequest = originalText && /quais\s+s[aã]o\s+os\s+bot[oõ]es|especifica[cç][aã]o\s+de\s+bot[oõ]es|menu\s+contextual/i.test(originalText);
+  if (!isExplicitButtonsRequest) {
+    cleaned = stripProhibitedCardActionsBlock(cleaned);
   }
 
-  return cleaned;
+  return cleaned.trim();
 }
 
 function extractCompleteText(provider, data, originalText) {
@@ -480,8 +490,8 @@ async function autoHeuristicContextFallback(lastUserMessage, userId, broadcast) 
   const transcript = [];
   const normalized = normalizeLookupText(lastUserMessage);
   
-  const isTaskRelated = /tarefa|tarefas|card|cards|kanban|quadro|time|times|equipe|equipes|pendencia|pendencias|fazer|atividade|atividades|linkedin|revisao/.test(normalized);
-  const isEventRelated = /evento|eventos|agenda|agendas|compromisso|compromissos|reuniao|reunioes|pagamento|adiantamento|salario|vale|feriado|feriados|hoje|amanha/.test(normalized);
+  const isTaskRelated = /tarefa|tarefas|card|cards|kanban|quadro|time|times|equipe|equipes|pendencia|pendencias|fazer|atividade|atividades|linkedin|revisao|prosseguir|conduzir/.test(normalized);
+  const isEventRelated = /evento|eventos|agenda|agendas|compromisso|compromissos|reuniao|reunioes|pagamento|adiantamento|salario|vale|feriado|feriados|hoje|amanha|prosseguir|conduzir/.test(normalized);
   const isMuralRelated = /mural|murais|nota|notas|aviso|avisos|comunicado|comunicados|recado|recados|postit|postits|post-it|post-its|anotacao|anotacoes/.test(normalized);
 
   if (isTaskRelated || isEventRelated || isMuralRelated) {
@@ -489,7 +499,7 @@ async function autoHeuristicContextFallback(lastUserMessage, userId, broadcast) 
       const ctx = await executeAgendaTool('obter_contexto', {}, { userId, broadcast });
       transcript.push(`obter_contexto: ${JSON.stringify(ctx).slice(0, 8000)}`);
       
-      const stopwords = new Set(['verifique', 'informe', 'referente', 'sobre', 'para', 'com', 'onde', 'qual', 'quais', 'como', 'quem', 'meu', 'minha', 'dos', 'das', 'time', 'equipe', 'quadro', 'tarefa', 'tarefas', 'cards', 'card', 'agenda', 'evento', 'eventos', 'mural', 'murais', 'nota', 'notas', 'aviso', 'avisos', 'recado', 'recados', 'postit', 'postits']);
+      const stopwords = new Set(['verifique', 'informe', 'referente', 'sobre', 'para', 'com', 'onde', 'qual', 'quais', 'como', 'quem', 'meu', 'minha', 'dos', 'das', 'time', 'equipe', 'quadro', 'tarefa', 'tarefas', 'cards', 'card', 'agenda', 'evento', 'eventos', 'mural', 'murais', 'nota', 'notas', 'aviso', 'avisos', 'recado', 'recados', 'postit', 'postits', 'posso', 'prosseguir', 'conduzir', 'fazer', 'reuniao', 'reunioes']);
       const words = lastUserMessage.split(/[\s,.;:!?()"'`]+/).filter(w => w.length > 2 && !stopwords.has(w.toLowerCase()));
       const searchTerms = words.join(' ').trim();
 
@@ -547,8 +557,8 @@ async function prepareAgendaContext(provider, messages, req, signal) {
   };
   const selectedNames = new Set(toolGroups.core);
   const normalizedIntent = normalizeLookupText(lastUserMessage);
-  if (/agenda|evento|calendario|compromisso|reuniao|convite|membro/.test(normalizedIntent)) toolGroups.calendar.forEach(name => selectedNames.add(name));
-  if (/kanban|quadro|coluna|lista|card|tarefa|equipe|time|backlog|pendencia|fazer|atividade|lixeira|linkedin/.test(normalizedIntent)) toolGroups.kanban.forEach(name => selectedNames.add(name));
+  if (/agenda|evento|calendario|compromisso|reuniao|convite|membro|prosseguir|conduzir/.test(normalizedIntent)) toolGroups.calendar.forEach(name => selectedNames.add(name));
+  if (/kanban|quadro|coluna|lista|card|tarefa|equipe|time|backlog|pendencia|fazer|atividade|lixeira|linkedin|reuniao|prosseguir|conduzir/.test(normalizedIntent)) toolGroups.kanban.forEach(name => selectedNames.add(name));
   if (/mural|murais|nota|notas|aviso|avisos|comunicado|comunicados|recado|recados|postit|postits|post-it|post-its|anotacao|anotacoes/.test(normalizedIntent)) toolGroups.mural.forEach(name => selectedNames.add(name));
   if (/anexo|arquivo|documento/.test(normalizedIntent)) toolGroups.attachments.forEach(name => selectedNames.add(name));
   if (/notifica|alerta|lembrete|dispositivo|computador/.test(normalizedIntent)) toolGroups.notifications.forEach(name => selectedNames.add(name));
@@ -568,6 +578,8 @@ Quando já tiver os dados necessários ou for conversa geral/saudação:
 {"action":"answer"}
 
 Exemplos de chamadas:
+- Usuário: "Como posso prosseguir com a reunião com a Michelli?"
+  {"action":"call","tool":"listar_eventos","arguments":{"busca":"Michelli"}}
 - Usuário: "Verifique referente a Revisão Final do time linkedin"
   {"action":"call","tool":"listar_tarefas","arguments":{"equipe":"LinkedIn","busca":"Revisão Final"}}
 - Usuário: "Quais são as minhas equipes, quadros e murais?"
@@ -666,11 +678,26 @@ router.post('/chat', async (req, res) => {
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders?.();
+    let fullStreamedText = '';
+    let isSuppressing = false;
     await readSse(response, payload => {
       if (payload === '[DONE]') return;
       try {
         const delta = extractStreamDelta(provider, payload);
-        if (delta) res.write(`data: ${JSON.stringify({ delta })}\n\n`);
+        if (!delta) return;
+
+        const candidateText = fullStreamedText + delta;
+        if (!isSuppressing && /(?:#{1,4}\s*Ações(?:\s+e\s+Informações)?\s+Disponíveis|["'“”]Ações(?:\s+e\s+Informações)?\s+Disponíveis|\bAções\s+e\s+Informações\s+Disponíveis\b|Para gerenciar este compromisso ou o card associado diretamente|👁️\s*Visualizar\s*—\s*abre a modal|Caso precise realizar alguma alteração no evento)/i.test(candidateText)) {
+          isSuppressing = true;
+        }
+
+        fullStreamedText += delta;
+
+        if (isSuppressing) {
+          return;
+        }
+
+        res.write(`data: ${JSON.stringify({ delta })}\n\n`);
       } catch (error) {
         throw new Error(`Resposta inválida do provedor: ${error.message}`);
       }

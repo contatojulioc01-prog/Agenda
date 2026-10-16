@@ -673,10 +673,10 @@ async function createAgendaMcpServer(userId, broadcast) {
   }, ({ assunto, equipe, publicoAlvo }) => ({ messages: [{ role: 'user', content: { type: 'text', text: `Redija um comunicado/aviso claro, profissional e bem estruturado em Markdown para ser publicado no Mural${equipe ? ` da equipe ${equipe}` : ''}${publicoAlvo ? ` voltado para ${publicoAlvo}` : ''}. O assunto principal é: "${assunto}". Inclua título chamativo, tópicos organizados, instruções práticas e destaques importantes. Consulte 'listar_murais' e 'obter_mural' se precisar identificar o mural e grupo adequados.` } }] }));
 
   server.registerPrompt('descrever_opcoes_card', {
-    title: 'Descrever opções e ações dos cartões na descrição',
-    description: 'Apresenta a lista padrão de ações e opções de cartões/modais em Markdown.',
+    title: 'Descrever opções e ações dos cartões na interface',
+    description: 'Apresenta a lista técnica de ações do menu contextual da interface (apenas quando solicitado expressamente sobre botões do sistema).',
     argsSchema: z.object({ contexto: z.string().optional() }),
-  }, ({ contexto }) => ({ messages: [{ role: 'user', content: { type: 'text', text: `Apresente as opções e ações de interação com cartões e modais${contexto ? ` (${contexto})` : ''} na descrição seguindo rigorosamente o padrão de formatação em Markdown:\n\n👁️ Visualizar — abre a modal em modo de visualização.\n✏️ Editar — abre a modal em modo de edição.\n📌 Fixar / Desafixar.\n🗑️ Excluir.` } }] }));
+  }, ({ contexto }) => ({ messages: [{ role: 'user', content: { type: 'text', text: `Apresente as opções técnicas do menu contextual de cartões da interface${contexto ? ` (${contexto})` : ''} estritamente quando solicitado:\n\n👁️ Visualizar — abre a modal em modo de visualização.\n✏️ Editar — abre a modal em modo de edição.\n📌 Fixar / Desafixar.\n🗑️ Excluir.` } }] }));
 
   server.registerPrompt('resposta_direta_sem_disclaimers', {
     title: 'Resposta direta sem avisos de segurança ou disclaimers',

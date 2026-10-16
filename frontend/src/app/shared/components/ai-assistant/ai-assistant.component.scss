@@ -51,6 +51,28 @@
 .ai-welcome img { width: 100%; height: 100%; object-fit: cover; }
 .ai-welcome h3 { margin: 0 0 7px; color: #2f4057; font-size: 18px; }
 .ai-welcome p { margin: 0; font-size: 12px; line-height: 1.6; }
+.ai-permission-notice {
+  margin: 16px auto 0;
+  max-width: 330px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(47, 155, 216, .08);
+  border: 1px solid rgba(47, 155, 216, .22);
+  border-radius: 10px;
+  color: #3b506c;
+  font-size: 11.5px;
+  line-height: 1.45;
+  text-align: left;
+}
+.ai-permission-notice .notice-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  color: #2f9bd8;
+}
 
 .message { width: calc(50% - 25px); max-width: none; padding: 11px 13px; font-size: 13px; line-height: 1.55; word-break: break-word; }
 .message.user { align-self: flex-end; color: #fff; background: linear-gradient(135deg, #2f9bd8, #227eb7); border-radius: 15px 15px 4px 15px; box-shadow: 0 7px 17px rgba(47, 155, 216, .18); }

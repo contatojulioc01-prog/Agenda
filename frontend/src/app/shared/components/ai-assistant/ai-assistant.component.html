@@ -3,7 +3,7 @@
     <header class="ai-header">
       <div class="ai-heading">
         <span class="ai-logo"><img src="assets/header.jfif" alt="" /></span>
-        <div><h2 id="ai-assistant-title">Assistente IA</h2><span>Agenda inteligente</span></div>
+        <div><h2 id="ai-assistant-title">Assistente IA</h2><span>Consulta e visualização</span></div>
       </div>
       <div class="ai-header-actions">
         <button type="button" class="new-chat" (click)="newConversation()" [disabled]="isLoading()"><mat-icon>add_comment</mat-icon><span>Nova conversa</span></button>
@@ -18,7 +18,11 @@
           <div class="ai-welcome">
             <span><img src="assets/header.jfif" alt="" /></span>
             <h3>Como posso ajudar?</h3>
-            <p>Organize compromissos, visualize tarefas por equipe ou converse sobre qualquer assunto.</p>
+            <p>Consulte sua agenda, visualize tarefas e notas ou solicite análises e sugestões sobre seus compromissos.</p>
+            <div class="ai-permission-notice">
+              <mat-icon class="notice-icon">visibility</mat-icon>
+              <span><strong>Modo Somente Visualização:</strong> a assistente possui permissão estrita de consulta e análise (sem permissão de criação, alteração ou exclusão de dados).</span>
+            </div>
           </div>
         }
         @for (message of messages(); track message.id) {
