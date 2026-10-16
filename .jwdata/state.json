@@ -1,5 +1,5 @@
 {
-  "lastCommit": "5e7ff615-c099-4d3e-a3f9-5ddf5954b9aa",
+  "lastCommit": "799bfe4d-193a-4cdc-8b23-cb72151644c2",
   "commits": [
     {
       "id": "029104f7-7ab2-4d57-b90c-cb17445d7fb0",
@@ -6060,13 +6060,95 @@
       "pushedTo": [
         "prod"
       ]
+    },
+    {
+      "id": "799bfe4d-193a-4cdc-8b23-cb72151644c2",
+      "date": "2026-10-15T17:37:31.971Z",
+      "message": "AI",
+      "changes": {
+        "added": [],
+        "modified": [
+          "backend/.env",
+          "backend/index.js"
+        ],
+        "deleted": []
+      },
+      "snapshot": {
+        "backend/.env": "72c134ae77ede17c86cbd70f84e770c4b4dec452cb420909a9d433ef7ca04991",
+        "backend/.env.example": "1d6f6acb4a593772a5332da85985343f6e5af54efa32ffe744f9403caa07195c",
+        "backend/agenda.db": "17cde3325884d62298688b843141d9acd1af3b913f282c95d88e72dba61da8fd",
+        "backend/async-route.js": "1cecfd2b97b0bcf687cf39f0c1ce2dc2fd451fdc5df6592b1f7397a79bb9d1c6",
+        "backend/db.js": "372d8a2014ddce652caee5a3f4a55eb8dd53d15a8ead9c367643ff91b8286830",
+        "backend/ecosystem.config.cjs": "be060f37cd4d8be6bb7af99d30402b5c82bd7fe79baa32d2d416a9aa651332f6",
+        "backend/index.js": "bfbd846e1bf2c4e2594414a962800b18c61045520d5ff61fd114b48ba7a9267c",
+        "backend/mcp/agenda-tools.js": "bb345c0562a5e2d630c22fffd330e6aa81e870e865c03d29a9d107cb150ece78",
+        "backend/mcp/http-handler.js": "5229d6fd8f20a1a0470241432c871d6521afd36056ba56d3a5a654e73add22d0",
+        "backend/mcp/system-tools.js": "dd5233edaa807ac49e5a1b59dfd913fcedd3859af2a6b346fa30bd886069f244",
+        "backend/package-lock.json": "a934b683e14af0f534c13d5322ef2bc8c97a55d793f80c296e13f65e360ef164",
+        "backend/package.json": "68d89c66e368b93673fe1d210ab69f0caf86c3c3d473fdb1f5e060c8c7e5750a",
+        "backend/public/3rdpartylicenses.txt": "81dc14610d3e1f586d37e114f4a72bf4c51ee275a4447533da976add4c2e2996",
+        "backend/public/assets/Agenda Doce Brinquedo.pdf": "ad4d792cbda1b7baf776f68fb7c249c99d99c1d4225857e71f660f599c3f57b4",
+        "backend/public/assets/AgendaDoceBrinquedo.pdf": "658ec980a98ce4f831d8109c87d1adef9311ede442fe7d86a0a22f9f654e832a",
+        "backend/public/assets/CaduMaverick_.jpg": "b9288446bbf381f6ed76626b6c195fa7832defba92e54563c63ce3ebca45b017",
+        "backend/public/assets/header-transparent.png": "6c48c9e8ec4f88c555e8db4af36d90d8322c557a22cac7b9b1ce440c9a05c8d9",
+        "backend/public/assets/header.jfif": "324252369933f4a073666db720fefefeecdd8d971e93306800c51e1b8d0fc7b6",
+        "backend/public/assets/kanban_print_melhorado (1).pdf": "dfba0a0a84ed75ff0fc7620549c51a5199a6bb069bb091a01eec260b7b80e9b8",
+        "backend/public/assets/livro-doce-brinquedo.svg": "e4c266db56a4f6aaae28c6be679a62b4b5b89598d15e82684f633a0e68a73439",
+        "backend/public/assets/sidebar.jpg": "fcecfcfa1f50a19c041215329e7c48d8c8cd88e56edd654b6e228dbaf3279653",
+        "backend/public/CaduMaverick_.jpg": "b9288446bbf381f6ed76626b6c195fa7832defba92e54563c63ce3ebca45b017",
+        "backend/public/chunk-DDO7IML3.js": "6551baf2b4fcd2d7412d2252f14950905d1bc3c349a9bbd0cff4282db71d92d2",
+        "backend/public/chunk-KZ5HF3LG.js": "7832271a4bdfb9b4fc2c547c5cdb9aa544c360dce59c2f567afbdacd252a5797",
+        "backend/public/downloads/Agenda.Notifier.exe": "15762be24f51ca6015a7cea3f612ff41de578e788c16afc627616b4a23dd7237",
+        "backend/public/favicon-doce.png": "58d60b5dbc87a7f612a0ab6ae5ca624d616819d068b450e4162ebb2046dc9013",
+        "backend/public/favicon.ico": "f9102be80297c0529207607be5277b4f90bca89d65988fa1771b91c7894e815f",
+        "backend/public/header-favicon.jpg": "324252369933f4a073666db720fefefeecdd8d971e93306800c51e1b8d0fc7b6",
+        "backend/public/header.jfif": "324252369933f4a073666db720fefefeecdd8d971e93306800c51e1b8d0fc7b6",
+        "backend/public/index.html": "5aa309c303420518f18bb3c34726f9f5528d8e20f62008add2f41f74f9c1e871",
+        "backend/public/main-X4QUXDV4.js": "b20ee212a3d5c0ae9c5b6ac9b12c942fe5bff09be45cbc549dfe00e31b061d39",
+        "backend/public/media/CaduMaverick_-R4CXFYUG.jpg": "b9288446bbf381f6ed76626b6c195fa7832defba92e54563c63ce3ebca45b017",
+        "backend/public/polyfills-RV3JTMEC.js": "ada6406bce793942b50bd47a7b63d72f69c8964fbc785e25043eedb19da4a32d",
+        "backend/public/prerendered-routes.json": "a79ddcc8a115190e9c19479ed36914741a7d1db74f0a1153529efc80725505fe",
+        "backend/public/sidebar-icon.png": "58d60b5dbc87a7f612a0ab6ae5ca624d616819d068b450e4162ebb2046dc9013",
+        "backend/public/sidebar.jpg": "fcecfcfa1f50a19c041215329e7c48d8c8cd88e56edd654b6e228dbaf3279653",
+        "backend/public/sidebar.png": "3638c4ce6f84f64b97426858ea40ac2d1b8d4e334d61d7ada9b6d37e77e546b6",
+        "backend/public/styles-5UF2VFBE.css": "351b9892b7ed6c49f8c44205267327e46b328eea171cb11e917c4c06e80baa1a",
+        "backend/realtime-auth.js": "6daa6b789c5fc5e06308690918aec593db89e1cd4847d97ab8df389a56e5fff4",
+        "backend/routes/ai.js": "0bc48ca1a90ac8c94a136dbd0c5deacacf618ec86e7e9d13150dc778480b508e",
+        "backend/routes/attachments.js": "cbbebc75565228c72f1ef94be9dbe99957d3df1743f45f14497bdf15f8e55f64",
+        "backend/routes/calendars.js": "813c726bda857a96fe4cbe37ab092840b017a7bf167d84e11edebcf11e68c542",
+        "backend/routes/events.js": "21579cb429dcf2b51b359a85105c1d8a512f0d6af8a013d2f767fb4dcdec78d6",
+        "backend/routes/kanban.js": "209a5719c712b6e48f16810a456abaf267c4ea2f2238b160cc9520cec1a58af6",
+        "backend/routes/members.js": "bec76c4434f630f765fa98b62368f1824d396e5bf4bb6fd0ed263b2cf5b1709f",
+        "backend/routes/mural.js": "dde43946505adef1d65cc1b97550591b263afab2f97e8a4c1de2db39e92b7714",
+        "backend/routes/notifications.js": "45d044c9229517b991adfab485a36d0bd216bbba6fd68a892ee0c445cce78c5f",
+        "backend/routes/privacy.js": "810dc421504cd21df484e5e9ffbcc0a3409a4dcc052d4a64929ce01162f6d777",
+        "backend/scripts/generate-lgpd-report.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "backend/scripts/generate-security-report.js": "03e3c74256e76ceb1c50ac8e1fc0159e472df4e60a66f21c2797b203ec7a0a65",
+        "backend/scripts/migrate-attachments-to-disk.js": "c6b2908dc951e7cce67f23f6cae5f9f632fe535933d98e7e2a4ae7fabf75af7f",
+        "backend/scripts/migrate-sqlite-to-postgres.js": "fbd63c4917c7098a678831e89ffc0a6cca1e7c63f8dd18d610dfea5d77907ae8",
+        "backend/scripts/security-setup.sql": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "backend/scripts/seed-dev.js": "f80b47ac7f6eb0fa7449baaca3965f9842a28c0801f74569ecfe304da45b3335",
+        "backend/scripts/seed-linkedin.js": "81258a8059348731e31ef932231f9c29e67194709a5626e78b3bc6c14e053326",
+        "backend/scripts/setup-postgres.js": "c86cead1fe121927aa615b2c85616cd9193a626d25cbb8ca1a3f372bbfe327f0",
+        "backend/test/ai.test.js": "0e44fdff682c6987cd57577bb284148e14857467f80a57bfb553eb3bfb196bbc",
+        "backend/test/mcp.test.js": "55bd5d2315024ff1cedbb7317845e093c1027ef78e4b9c385ba025745fdafdbd",
+        "backend/test/notifications.test.js": "214f60fc2f6ad07585a9ca04cbb762c26608eda0fa96a5b68bf54db4bdc9c70d",
+        "backend/test/realtime-auth.test.js": "49cde2abb4ba815dd874d4b9468afc2a24d8c737d0c0e9e3bcf6a168b3d66bcd",
+        "backend/test/routes.test.js": "c8b0caa61732f6eb2711491f52391423a68ee93e23a75b4a69b9605827d7174d",
+        "backend/test/validation.test.js": "4617da9aa5f3682ed25ff6515284b49f378e8b2472c9d39e1d2e5935b5ee7a85",
+        "backend/validation.js": "3febf8a0be0dc99a88bb6100ba752a1a629a3dcfee3c83a77c7f8be9b81ba2d9"
+      },
+      "pushed": false,
+      "pushedTo": [
+        "prod"
+      ]
     }
   ],
   "lastPush": {
-    "date": "2026-10-14T19:04:13.141Z",
-    "backupFile": "c:/server/BKS/BKP-Agenda/backup_20261014_160408.tar.gz",
+    "date": "2026-10-15T17:37:43.219Z",
+    "backupFile": "c:/server/BKS/BKP-Agenda/backup_20261015_143738.tar.gz",
     "commitIds": [
-      "5e7ff615-c099-4d3e-a3f9-5ddf5954b9aa"
+      "799bfe4d-193a-4cdc-8b23-cb72151644c2"
     ]
   },
   "lastPushes": {
@@ -6078,10 +6160,10 @@
       ]
     },
     "prod": {
-      "date": "2026-10-14T19:04:13.141Z",
-      "backupFile": "c:/server/BKS/BKP-Agenda/backup_20261014_160408.tar.gz",
+      "date": "2026-10-15T17:37:43.219Z",
+      "backupFile": "c:/server/BKS/BKP-Agenda/backup_20261015_143738.tar.gz",
       "commitIds": [
-        "5e7ff615-c099-4d3e-a3f9-5ddf5954b9aa"
+        "799bfe4d-193a-4cdc-8b23-cb72151644c2"
       ]
     }
   }

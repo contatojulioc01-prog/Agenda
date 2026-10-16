@@ -4,7 +4,7 @@ const path = require('path');
 const dotenv = require('dotenv');
 const envPaths = [path.join(__dirname, '..', '.env'), path.join(__dirname, '.env')];
 for (const envPath of envPaths) {
-  if (fs.existsSync(envPath)) dotenv.config({ path: envPath, override: false, quiet: true });
+  if (fs.existsSync(envPath)) dotenv.config({ path: envPath, override: true, quiet: true });
 }
 
 const express = require('express');
