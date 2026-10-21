@@ -128,6 +128,7 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
   readonly collapsedSidebarSections = signal<Set<string>>(
     new Set(this.userPreferences.collapsedSidebarSections())
   );
+  readonly sidebarCollapsed = signal<boolean>(this.userPreferences.sidebarCollapsed());
   readonly agendaPillsExpanded = signal(this.userPreferences.agendaPillsExpanded());
   readonly notificationSettingsOpen = signal(false);
 
@@ -408,6 +409,17 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
       const next = new Set(current);
       next.has(sectionId) ? next.delete(sectionId) : next.add(sectionId);
       this.userPreferences.setCollapsedSidebarSections(next);
+      return next;
+    });
+  }
+
+  toggleSidebar(): void {
+    this.sidebarCollapsed.update(collapsed => {
+      const next = !collapsed;
+      this.userPreferences.setSidebarCollapsed(next);
+      setTimeout(() => {
+        window.dispatchEvent(new Event('resize'));
+      }, 260);
       return next;
     });
   }

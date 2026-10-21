@@ -34,7 +34,15 @@ function stop(exitCode = 0) {
   if (stopping) return;
   stopping = true;
   for (const child of children) {
-    if (!child.killed) child.kill('SIGTERM');
+    if (child && child.pid) {
+      if (isWindows) {
+        try {
+          spawn('taskkill', ['/pid', String(child.pid), '/t', '/f'], { stdio: 'ignore' });
+        } catch {}
+      } else if (!child.killed) {
+        child.kill('SIGTERM');
+      }
+    }
   }
   setTimeout(() => process.exit(exitCode), 500).unref();
 }

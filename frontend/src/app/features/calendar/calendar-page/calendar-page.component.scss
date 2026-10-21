@@ -18,13 +18,127 @@
 /* ══════════════ SIDEBAR ══════════════ */
 .sidebar {
   width: 260px;
+  min-width: 260px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   background: var(--bg-sidebar);
   border-right: 1px solid var(--border);
-  transition: background var(--transition-slow), border-color var(--transition-slow);
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.25s cubic-bezier(0.4, 0, 0.2, 1), background var(--transition-slow), border-color var(--transition-slow);
   overflow: hidden;
+
+  &.collapsed {
+    width: 72px;
+    min-width: 72px;
+
+    .sidebar-top {
+      padding: 16px 8px 12px;
+    }
+
+    .sidebar-header-row {
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 14px;
+      justify-content: center;
+    }
+
+    .app-brand {
+      justify-content: center;
+      gap: 0;
+    }
+
+    .sidebar-collapse-btn {
+      align-self: center;
+    }
+
+    .app-section-tabs {
+      padding: 4px;
+      margin: 0 0 12px;
+      gap: 4px;
+
+      .tab-top-btn {
+        height: 36px;
+        padding: 0;
+        justify-content: center;
+      }
+
+      .tab-bottom-row.collapsed-row {
+        flex-direction: column;
+        gap: 4px;
+
+        .tab-bottom-btn {
+          width: 100%;
+          height: 36px;
+          padding: 0;
+          justify-content: center;
+
+          mat-icon {
+            font-size: 18px;
+            width: 18px;
+            height: 18px;
+          }
+        }
+      }
+    }
+
+    .btn-create {
+      width: 44px;
+      height: 44px;
+      padding: 0;
+      margin: 0 auto;
+      border-radius: 12px;
+      justify-content: center;
+
+      .btn-create-icon {
+        font-size: 22px;
+        line-height: 1;
+        margin: 0;
+      }
+    }
+
+    .sidebar-user-card {
+      margin: 0 6px 8px;
+      padding: 8px 4px;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+
+      .user-avatar {
+        width: 36px;
+        height: 36px;
+      }
+    }
+
+    .user-card-actions.collapsed-actions {
+      display: flex;
+      flex-direction: row;
+      gap: 4px;
+      justify-content: center;
+      width: 100%;
+      margin: 0;
+
+      .btn-logout {
+        width: 26px;
+        height: 26px;
+
+        mat-icon {
+          font-size: 16px;
+          width: 16px;
+          height: 16px;
+        }
+      }
+    }
+
+    .sidebar-bottom {
+      padding: 8px 4px 12px;
+      justify-content: center;
+
+      app-theme-toggle {
+        transform: scale(0.76);
+        transform-origin: center;
+      }
+    }
+  }
 }
 
 .sidebar-top {
@@ -32,12 +146,55 @@
   flex-shrink: 0;
 }
 
+/* Header com Logo e Botão de Expandir/Recolher */
+.sidebar-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  gap: 8px;
+}
+
+.sidebar-collapse-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all var(--transition);
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+  }
+
+  &:hover {
+    background: var(--bg-surface);
+    color: var(--brand-500);
+    border-color: color-mix(in srgb, var(--brand-500) 40%, var(--border));
+    box-shadow: var(--shadow-xs);
+  }
+}
+
 /* Logo / Brand */
 .app-brand {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 20px;
+  min-width: 0;
+}
+
+.app-brand-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
 .app-brand-icon {
@@ -507,6 +664,13 @@
   text-overflow: ellipsis;
 }
 
+.user-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
 .btn-logout {
   width: 28px;
   height: 28px;
@@ -529,6 +693,94 @@
     background: #fee2e2;
     color: #ef4444;
   }
+}
+
+/* ── Conteúdo colapsado (rail de ícones e bolinhas) ── */
+.sidebar-collapsed-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 4px;
+  }
+}
+
+.collapsed-cals-list {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.collapsed-cal-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition);
+  position: relative;
+
+  .collapsed-cal-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s;
+    box-shadow: 0 0 0 2px var(--bg-sidebar);
+  }
+
+  &:hover {
+    background: var(--bg-hover);
+    border-color: var(--border);
+
+    .collapsed-cal-indicator {
+      transform: scale(1.25);
+    }
+  }
+
+  &.is-active {
+    background: color-mix(in srgb, var(--cal-color, var(--brand-500)) 12%, var(--bg-surface));
+    border-color: color-mix(in srgb, var(--cal-color, var(--brand-500)) 30%, transparent);
+
+    .collapsed-cal-indicator {
+      box-shadow: 0 0 0 2px var(--bg-sidebar), 0 0 8px var(--cal-color, var(--brand-500));
+    }
+  }
+
+  &:not(.is-active) {
+    opacity: 0.45;
+
+    &:hover {
+      opacity: 0.9;
+    }
+  }
+}
+
+.collapsed-section-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--bg-hover);
+  color: var(--brand-500);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  mat-icon { font-size: 20px; width: 20px; height: 20px; }
 }
 
 /* ── Área central rolável da sidebar ── */

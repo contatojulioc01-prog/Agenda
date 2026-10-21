@@ -17,6 +17,7 @@ export interface UserPreferences {
   calendarView: StoredCalendarView;
   collapsedSidebarSections: string[];
   agendaPillsExpanded: boolean;
+  sidebarCollapsed: boolean;
 }
 
 const THEMES: StoredTheme[] = [
@@ -35,6 +36,7 @@ export class UserPreferencesService {
   readonly calendarView = computed(() => this.state().calendarView);
   readonly collapsedSidebarSections = computed(() => this.state().collapsedSidebarSections);
   readonly agendaPillsExpanded = computed(() => this.state().agendaPillsExpanded);
+  readonly sidebarCollapsed = computed(() => this.state().sidebarCollapsed);
 
   setTheme(theme: StoredTheme): void {
     this.update({ theme });
@@ -50,6 +52,10 @@ export class UserPreferencesService {
 
   setAgendaPillsExpanded(agendaPillsExpanded: boolean): void {
     this.update({ agendaPillsExpanded });
+  }
+
+  setSidebarCollapsed(sidebarCollapsed: boolean): void {
+    this.update({ sidebarCollapsed });
   }
 
   private update(changes: Partial<UserPreferences>): void {
@@ -81,6 +87,9 @@ export class UserPreferencesService {
         agendaPillsExpanded: typeof saved.agendaPillsExpanded === 'boolean'
           ? saved.agendaPillsExpanded
           : defaults.agendaPillsExpanded,
+        sidebarCollapsed: typeof saved.sidebarCollapsed === 'boolean'
+          ? saved.sidebarCollapsed
+          : defaults.sidebarCollapsed,
       };
     } catch {
       return defaults;
@@ -107,6 +116,7 @@ export class UserPreferencesService {
       calendarView: 'month',
       collapsedSidebarSections: [],
       agendaPillsExpanded: true,
+      sidebarCollapsed: false,
     };
   }
 }

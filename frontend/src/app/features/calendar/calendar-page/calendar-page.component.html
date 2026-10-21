@@ -6,42 +6,53 @@
 <div class="page-layout" (click)="closeCalendarContextMenus()">
 
   <!-- ══════════════ SIDEBAR ══════════════ -->
-  <aside class="sidebar">
+  <aside class="sidebar" [class.collapsed]="sidebarCollapsed()">
     <div class="sidebar-top">
-      <!-- Logo -->
-      <div class="app-brand">
-        <div class="app-brand-icon" [class.realm-angel]="themeService.realm() === 'angel'"
-          [class.realm-demon]="themeService.realm() === 'demon'" [class.realm-cadu]="themeService.realm() === 'cadu'"
-          (click)="themeService.cycleRealm()"
-          [title]="themeService.realm() === 'angel' ? '😇 Modo Angelical ativo — clique para Modo Demoníaco' : themeService.realm() === 'demon' ? '😈 Modo Demoníaco ativo — clique para Modo Cadu Maverick' : themeService.realm() === 'cadu' ? '🏄‍♂️ Modo Cadu Maverick ativo — clique para sair' : '✨ Clique para alternar reinos épicos'"
-          style="cursor: pointer;">
-          <img src="sidebar.png" alt="Sidebar Logo"
-            style="width: 100%; height: 100%; object-fit: contain; background: transparent;">
+      <!-- Header com Marca e Botão de Expandir/Recolher -->
+      <div class="sidebar-header-row">
+        <div class="app-brand" (click)="themeService.cycleRealm()">
+          <div class="app-brand-icon" [class.realm-angel]="themeService.realm() === 'angel'"
+            [class.realm-demon]="themeService.realm() === 'demon'" [class.realm-cadu]="themeService.realm() === 'cadu'"
+            [title]="themeService.realm() === 'angel' ? '😇 Modo Angelical ativo — clique para Modo Demoníaco' : themeService.realm() === 'demon' ? '😈 Modo Demoníaco ativo — clique para Modo Cadu Maverick' : themeService.realm() === 'cadu' ? '🏄‍♂️ Modo Cadu Maverick ativo — clique para sair' : '✨ Clique para alternar reinos épicos'"
+            style="cursor: pointer;">
+            <img src="sidebar.png" alt="Sidebar Logo"
+              style="width: 100%; height: 100%; object-fit: contain; background: transparent;">
+          </div>
+          <div class="app-brand-text" *ngIf="!sidebarCollapsed()">
+            <div class="app-brand-name">Agenda</div>
+            <div class="app-brand-sub">Corporativa</div>
+          </div>
         </div>
-        <div>
-          <div class="app-brand-name">Agenda</div>
-          <div class="app-brand-sub">Corporativa</div>
-        </div>
+
+        <button type="button" class="sidebar-collapse-btn" (click)="toggleSidebar()"
+          [matTooltip]="sidebarCollapsed() ? 'Expandir barra lateral' : 'Recolher barra lateral'"
+          matTooltipPosition="right"
+          [attr.aria-label]="sidebarCollapsed() ? 'Expandir barra lateral' : 'Recolher barra lateral'">
+          <mat-icon>{{ sidebarCollapsed() ? 'chevron_right' : 'chevron_left' }}</mat-icon>
+        </button>
       </div>
 
       <nav class="app-section-tabs" aria-label="Módulos do sistema" [attr.data-active]="activeSection">
         <!-- Linha superior fixa: Agenda -->
         <button type="button" class="tab-top-btn" [class.active]="activeSection === 'calendar'"
-          (click)="setSection('calendar')" id="nav-btn-agenda">
+          (click)="setSection('calendar')" id="nav-btn-agenda"
+          [matTooltip]="sidebarCollapsed() ? 'Agenda' : ''" matTooltipPosition="right">
           <mat-icon>calendar_month</mat-icon>
-          <span>Agenda</span>
+          <span *ngIf="!sidebarCollapsed()">Agenda</span>
         </button>
         <!-- Linha inferior fixa: Tarefas e Mural lado a lado -->
-        <div class="tab-bottom-row">
+        <div class="tab-bottom-row" [class.collapsed-row]="sidebarCollapsed()">
           <button type="button" class="tab-bottom-btn" [class.active]="activeSection === 'tasks'"
-            (click)="setSection('tasks')" id="nav-btn-tasks">
+            (click)="setSection('tasks')" id="nav-btn-tasks"
+            [matTooltip]="sidebarCollapsed() ? 'Tarefas' : ''" matTooltipPosition="right">
             <mat-icon>view_kanban</mat-icon>
-            <span>Tarefas</span>
+            <span *ngIf="!sidebarCollapsed()">Tarefas</span>
           </button>
           <button type="button" class="tab-bottom-btn" [class.active]="activeSection === 'mural'"
-            (click)="setSection('mural')" id="nav-btn-mural">
+            (click)="setSection('mural')" id="nav-btn-mural"
+            [matTooltip]="sidebarCollapsed() ? 'Mural' : ''" matTooltipPosition="right">
             <mat-icon>space_dashboard</mat-icon>
-            <span>Mural</span>
+            <span *ngIf="!sidebarCollapsed()">Mural</span>
           </button>
         </div>
       </nav>
@@ -49,24 +60,68 @@
       <!-- Botão criar evento -->
       <button *ngIf="activeSection === 'calendar'" class="btn-create" [disabled]="isTaskCalendarSelected()"
         (click)="openCreateModal()" id="btn-create-event"
-        [matTooltip]="isTaskCalendarSelected() ? 'Os eventos desta agenda são gerenciados pelos cards de tarefas' : 'Criar novo evento'">
+        [matTooltip]="sidebarCollapsed() ? (isTaskCalendarSelected() ? 'Gerenciada por Tarefas' : 'Criar novo evento') : (isTaskCalendarSelected() ? 'Os eventos desta agenda são gerenciados pelos cards de tarefas' : 'Criar novo evento')"
+        matTooltipPosition="right">
         <span class="btn-create-icon">＋</span>
-        <span>{{ isTaskCalendarSelected() ? 'Gerenciada por Tarefas' : 'Criar evento' }}</span>
+        <span *ngIf="!sidebarCollapsed()">{{ isTaskCalendarSelected() ? 'Gerenciada por Tarefas' : 'Criar evento' }}</span>
       </button>
       <button *ngIf="activeSection === 'tasks'" class="btn-create" (click)="openTaskCreate()" id="btn-create-task"
-        matTooltip="Criar nova tarefa">
+        [matTooltip]="sidebarCollapsed() ? 'Criar tarefa' : 'Criar nova tarefa'" matTooltipPosition="right">
         <span class="btn-create-icon">＋</span>
-        <span>Criar tarefa</span>
+        <span *ngIf="!sidebarCollapsed()">Criar tarefa</span>
       </button>
       <button *ngIf="activeSection === 'mural'" class="btn-create" (click)="openMuralCreate()" id="btn-create-mural"
-        matTooltip="Criar novo cartão no mural">
+        [matTooltip]="sidebarCollapsed() ? 'Criar cartão' : 'Criar novo cartão no mural'" matTooltipPosition="right">
         <span class="btn-create-icon">＋</span>
-        <span>Criar cartão</span>
+        <span *ngIf="!sidebarCollapsed()">Criar cartão</span>
       </button>
     </div>
 
     <!-- Conteúdo central rolável -->
-    <div class="sidebar-content" [hidden]="activeSection !== 'calendar'">
+    <!-- Conteúdo central colapsado -->
+    <div class="sidebar-collapsed-content" *ngIf="sidebarCollapsed()">
+      <!-- Agenda: lista compacta de bolinhas de agendas -->
+      <div class="collapsed-cals-list" *ngIf="activeSection === 'calendar'">
+        <button *ngFor="let cal of myCalendars()" type="button" class="collapsed-cal-btn"
+          [style.--cal-color]="cal.color"
+          [class.is-active]="calendarsService.visibleCalendarIds().has(cal.id)"
+          (click)="toggleCalendarVisibility(cal.id)"
+          [matTooltip]="cal.name + (calendarsService.visibleCalendarIds().has(cal.id) ? ' (Visível)' : ' (Oculta)')"
+          matTooltipPosition="right">
+          <span class="collapsed-cal-indicator" [style.background]="cal.color"></span>
+        </button>
+        <button *ngFor="let cal of sharedCalendars()" type="button" class="collapsed-cal-btn shared"
+          [style.--cal-color]="cal.color"
+          [class.is-active]="calendarsService.visibleCalendarIds().has(cal.id)"
+          (click)="toggleCalendarVisibility(cal.id)"
+          [matTooltip]="cal.name + ' (Compartilhada)'"
+          matTooltipPosition="right">
+          <span class="collapsed-cal-indicator" [style.background]="cal.color"></span>
+        </button>
+        <button *ngFor="let cal of taskCalendars()" type="button" class="collapsed-cal-btn task"
+          [style.--cal-color]="cal.color"
+          [class.is-active]="calendarsService.visibleCalendarIds().has(cal.id)"
+          (click)="toggleCalendarVisibility(cal.id)"
+          [matTooltip]="cal.taskTeamName || 'Tarefas'"
+          matTooltipPosition="right">
+          <span class="collapsed-cal-indicator" [style.background]="cal.color"></span>
+        </button>
+      </div>
+
+      <!-- Mural: murais ativos -->
+      <div class="collapsed-cals-list" *ngIf="activeSection === 'mural'">
+        <button *ngFor="let b of muralService.boards()" type="button" class="collapsed-cal-btn"
+          [class.is-active]="muralService.activeBoard()?.id === b.id"
+          (click)="muralService.loadBoard(b.id)"
+          [matTooltip]="b.name"
+          matTooltipPosition="right">
+          <span class="collapsed-cal-indicator" [style.background]="b.color"></span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Conteúdo central rolável -->
+    <div class="sidebar-content" [hidden]="sidebarCollapsed() || activeSection !== 'calendar'">
       <!-- Mini calendário -->
       <app-mini-calendar [selectedDate]="selectedDate" [holidays]="holidays" [events]="displayedEvents()"
         (dateSelected)="onMiniCalDateSelected($event)"
@@ -185,7 +240,7 @@
       </div>
     </div>
 
-    <div class="sidebar-content tasks-sidebar" [hidden]="activeSection !== 'tasks'">
+    <div class="sidebar-content tasks-sidebar" [hidden]="sidebarCollapsed() || activeSection !== 'tasks'">
       <div class="tasks-sidebar-hero">
         <span class="tasks-sidebar-icon"><mat-icon>task_alt</mat-icon></span>
         <h2>Central de tarefas</h2>
@@ -210,7 +265,7 @@
     </div>
 
     <!-- ══════════════ MURAL SIDEBAR ══════════════ -->
-    <div class="sidebar-content tasks-sidebar mural-sidebar" [hidden]="activeSection !== 'mural'">
+    <div class="sidebar-content tasks-sidebar mural-sidebar" [hidden]="sidebarCollapsed() || activeSection !== 'mural'">
       <div class="tasks-sidebar-hero mural-sidebar-hero">
         <span class="tasks-sidebar-icon mural-sidebar-icon"><mat-icon>space_dashboard</mat-icon></span>
         <h2>Mural Corporativo</h2>
@@ -267,26 +322,28 @@
     <div class="sidebar-footer">
       <!-- Perfil do Usuário -->
       <div class="sidebar-user-card" *ngIf="currentUser() as user">
-        <div class="user-avatar has-img">
+        <div class="user-avatar has-img" [matTooltip]="sidebarCollapsed() ? (user.name + ' (' + (user.departamentName || 'Corporativo') + ')') : ''" matTooltipPosition="right">
           <img [src]="user.avatar || defaultAvatar" [alt]="user.name"
             (error)="$any($event.target).src = defaultAvatar" />
         </div>
-        <div class="user-info">
+        <div class="user-info" *ngIf="!sidebarCollapsed()">
           <span class="user-name" [matTooltip]="user.name">{{ user.name }}</span>
           <span class="user-dept">{{ user.departamentName || 'Corporativo' }}</span>
         </div>
-        <button class="btn-logout btn-notifications" (click)="notificationSettingsOpen.set(true)"
-          matTooltip="Notificações do Windows" aria-label="Configurar notificações">
-          <mat-icon>notifications</mat-icon>
-        </button>
-        <button class="btn-logout" (click)="logout()" matTooltip="Encerrar sessão" aria-label="Sair">
-          <mat-icon>logout</mat-icon>
-        </button>
+        <div class="user-card-actions" [class.collapsed-actions]="sidebarCollapsed()">
+          <button class="btn-logout btn-notifications" (click)="notificationSettingsOpen.set(true)"
+            matTooltip="Notificações do Windows" matTooltipPosition="right" aria-label="Configurar notificações">
+            <mat-icon>notifications</mat-icon>
+          </button>
+          <button class="btn-logout" (click)="logout()" matTooltip="Encerrar sessão" matTooltipPosition="right" aria-label="Sair">
+            <mat-icon>logout</mat-icon>
+          </button>
+        </div>
       </div>
 
       <!-- Toggle tema fixo -->
       <div class="sidebar-bottom">
-        <span class="theme-label">Tema</span>
+        <span class="theme-label" *ngIf="!sidebarCollapsed()">Tema</span>
         <app-theme-toggle></app-theme-toggle>
       </div>
     </div>
