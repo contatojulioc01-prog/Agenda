@@ -167,10 +167,6 @@
         cdkDrag
         [cdkDragData]="group"
         [style.--group-color]="group.color"
-        [class.drag-over]="dragOverGroupId === group.id"
-        (dragover)="onGroupDragOver($event, group.id)"
-        (dragleave)="onGroupDragLeave()"
-        (drop)="onDropInGroup($event, group.id)"
       >
         <div class="drag-placeholder group-drag-placeholder" *cdkDragPlaceholder></div>
         <div class="group-header">
@@ -178,7 +174,7 @@
             <mat-icon class="group-drag-handle" cdkDragHandle matTooltip="Arraste para reordenar este quadro">drag_indicator</mat-icon>
             <span class="column-accent" [style.background]="group.color" [style.box-shadow]="'0 0 7px ' + group.color"></span>
             <span class="column-title">{{ group.title }}</span>
-            <span class="column-count">{{ (itemsByGroup().get(group.id) || []).length }}</span>
+            <span class="column-count">{{ itemsForGroup(group.id).length }}</span>
           </div>
           <div class="group-actions">
             <button class="icon-btn" (click)="moverGrupo(group, -1, $event)" [disabled]="isFirstGroup(group)" matTooltip="Mover para esquerda"><mat-icon>chevron_left</mat-icon></button>
@@ -189,19 +185,26 @@
           </div>
         </div>
 
-        <div class="group-items-grid">
+        <div
+          class="group-items-grid"
+          cdkDropList
+          [id]="'mural-group-' + group.id"
+          [cdkDropListData]="itemsForGroup(group.id)"
+          [cdkDropListConnectedTo]="dropListGroupIds()"
+          cdkDropListOrientation="mixed"
+          (cdkDropListDropped)="onItemDropped($event, group.id)"
+        >
           <div
-            *ngFor="let item of (itemsByGroup().get(group.id) || [])"
+            *ngFor="let item of itemsForGroup(group.id); trackBy: trackItemById"
             class="sticky-card"
+            cdkDrag
+            [cdkDragData]="item"
             [style.background]="item.color"
             [class.pinned]="item.isPinned"
-            [class.dragging]="draggingItemId === item.id"
-            draggable="true"
-            (dragstart)="onDragStart($event, item)"
-            (dragend)="onDragEnd()"
             (click)="abrirVisualizarItem(item)"
             (contextmenu)="openMuralItemContextMenu($event, item)"
           >
+            <div class="card-drag-placeholder" *cdkDragPlaceholder></div>
             <div class="card-pin" [class.active]="item.isPinned" (click)="alternarFixacao($event, item)" matTooltip="{{ item.isPinned ? 'Desafixar' : 'Fixar' }}">
               <mat-icon>push_pin</mat-icon>
             </div>
@@ -231,7 +234,7 @@
           </div>
 
           <!-- Empty group placeholder (drop target) -->
-          <div class="empty-group-placeholder" *ngIf="!(itemsByGroup().get(group.id) || []).length" (click)="abrirNovoItem(group.id)">
+          <div class="empty-group-placeholder" *ngIf="!itemsForGroup(group.id).length" (click)="abrirNovoItem(group.id)">
             <mat-icon>note_add</mat-icon>
             <span>Clique ou arraste um cartão aqui</span>
           </div>
@@ -242,10 +245,6 @@
     <!-- Notas Soltas -->
     <div class="mural-ungrouped-section"
       *ngIf="ungroupedItems().length || !activeBoard()?.groups?.length"
-      [class.drag-over]="dragOverGroupId === 'ungrouped'"
-      (dragover)="onGroupDragOver($event, 'ungrouped')"
-      (dragleave)="onGroupDragLeave()"
-      (drop)="onDropInGroup($event, null)"
     >
       <div class="section-title-divider">
         <mat-icon>push_pin</mat-icon>
@@ -253,20 +252,27 @@
         <span class="column-count" *ngIf="ungroupedItems().length">{{ ungroupedItems().length }}</span>
       </div>
 
-      <div class="ungrouped-wall-grid">
+      <div
+        class="ungrouped-wall-grid"
+        cdkDropList
+        id="mural-group-ungrouped"
+        [cdkDropListData]="itemsForGroup(null)"
+        [cdkDropListConnectedTo]="dropListGroupIds()"
+        cdkDropListOrientation="mixed"
+        (cdkDropListDropped)="onItemDropped($event, null)"
+      >
         <div
-          *ngFor="let item of ungroupedItems()"
+          *ngFor="let item of itemsForGroup(null); trackBy: trackItemById"
           class="sticky-card loose-card"
+          cdkDrag
+          [cdkDragData]="item"
           [style.background]="item.color"
-          [style.transform]="'rotate(' + item.rotation + 'deg)'"
+          [style.--card-rot]="item.rotation + 'deg'"
           [class.pinned]="item.isPinned"
-          [class.dragging]="draggingItemId === item.id"
-          draggable="true"
-          (dragstart)="onDragStart($event, item)"
-          (dragend)="onDragEnd()"
           (click)="abrirVisualizarItem(item)"
           (contextmenu)="openMuralItemContextMenu($event, item)"
         >
+          <div class="card-drag-placeholder" *cdkDragPlaceholder></div>
           <div class="card-pin" [class.active]="item.isPinned" (click)="alternarFixacao($event, item)">
             <mat-icon>push_pin</mat-icon>
           </div>
@@ -289,6 +295,11 @@
             <span class="card-author" *ngIf="item.createdByName"><mat-icon>person</mat-icon>{{ item.createdByName }}</span>
             <span class="card-date">{{ formatarData(item.createdAt) }}</span>
           </div>
+        </div>
+
+        <div class="empty-group-placeholder" *ngIf="!itemsForGroup(null).length" (click)="abrirNovoItem(null)">
+          <mat-icon>note_add</mat-icon>
+          <span>Nenhum cartão solto. Arraste ou clique para adicionar.</span>
         </div>
       </div>
     </div>

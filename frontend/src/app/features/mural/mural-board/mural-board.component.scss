@@ -334,13 +334,13 @@
   display: flex;
   flex-direction: column;
   gap: 9px;
-  transition: transform .2s cubic-bezier(.34,1.56,.64,1), box-shadow .2s, opacity .2s;
+  transition: box-shadow .2s, opacity .2s;
   color: #1e293b;
   border: 1px solid rgba(0,0,0,.06);
   user-select: none;
 
-  &:hover {
-    transform: translateY(-4px) scale(1.015) !important;
+  &:hover:not(.cdk-drag-placeholder) {
+    transform: translateY(-4px) scale(1.015);
     box-shadow: 0 14px 28px rgba(0,0,0,.14), 0 2px 6px rgba(0,0,0,.06);
     z-index: 10;
   }
@@ -859,12 +859,63 @@
   opacity: 0.95;
 }
 
+/* Animação fluida de reposicionamento dos cards trocando de lugar */
 .cdk-drag-animating {
-  transition: transform 250ms cubic-bezier(0, 0, 0.2, 1);
+  transition: transform 250ms cubic-bezier(0.2, 0, 0, 1) !important;
 }
 
 .mural-groups-row.cdk-drop-list-dragging .mural-group-frame:not(.cdk-drag-placeholder) {
   transition: transform 250ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.group-items-grid.cdk-drop-list-dragging .sticky-card:not(.cdk-drag-placeholder),
+.ungrouped-wall-grid.cdk-drop-list-dragging .sticky-card:not(.cdk-drag-placeholder) {
+  transition: transform 250ms cubic-bezier(0.2, 0, 0, 1) !important;
+  will-change: transform;
+
+  &:hover {
+    transform: none;
+  }
+}
+
+.group-items-grid.cdk-drop-list-receiving,
+.ungrouped-wall-grid.cdk-drop-list-receiving {
+  background: color-mix(in srgb, var(--brand-500, #f59e0b) 4%, transparent);
+  border-radius: 12px;
+  transition: background 0.2s ease;
+}
+
+.card-drag-placeholder {
+  min-height: 140px;
+  border: 2px dashed var(--brand-500, #f59e0b);
+  background: color-mix(in srgb, var(--brand-500, #f59e0b) 12%, transparent);
+  border-radius: 12px;
+  box-sizing: border-box;
+  margin: 0;
+  transition: transform 250ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.sticky-card.cdk-drag-preview {
+  box-sizing: border-box;
+  width: 290px;
+  max-width: 320px;
+  border-radius: 12px;
+  box-shadow: 0 22px 46px rgba(0, 0, 0, 0.35), 0 8px 18px rgba(0, 0, 0, 0.18) !important;
+  opacity: 0.96;
+  cursor: grabbing !important;
+  z-index: 10000;
+  pointer-events: none;
+  transform: rotate(2deg) scale(1.03);
+  transition: none !important;
+  animation: none !important;
+
+  .card-pin, .card-attachments-chips, .card-footer {
+    pointer-events: none;
+  }
+}
+
+.sticky-card.cdk-drag-placeholder {
+  opacity: 0;
 }
 
 .color-presets-row {

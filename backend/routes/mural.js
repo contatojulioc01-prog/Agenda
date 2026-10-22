@@ -170,7 +170,7 @@ router.get('/boards/:id', asyncRoute(async (req, res) => {
 
   const { mural, role } = access;
   const groups = await db.all('SELECT * FROM mural_groups WHERE mural_id = $1 ORDER BY position, created_at', [mural.id]);
-  const itemRows = await db.all('SELECT * FROM mural_items WHERE mural_id = $1 ORDER BY is_pinned DESC, position ASC, created_at DESC', [mural.id]);
+  const itemRows = await db.all('SELECT * FROM mural_items WHERE mural_id = $1 ORDER BY position ASC, is_pinned DESC, created_at DESC', [mural.id]);
 
   const items = [];
   for (const row of itemRows) {
@@ -310,6 +310,31 @@ router.put('/boards/:id/groups/reorder', asyncRoute(async (req, res) => {
   const updatedGroups = await db.all('SELECT * FROM mural_groups WHERE mural_id = $1 ORDER BY position, created_at', [req.params.id]);
   req.broadcast?.({ type: 'mural_updated', muralId: req.params.id });
   res.json(updatedGroups.map(groupDto));
+}));
+
+// PUT /api/mural/boards/:id/items/reorder
+router.put('/boards/:id/items/reorder', asyncRoute(async (req, res) => {
+  const uid = userId(req);
+  const access = await muralAccess(req.params.id, uid, true);
+  if (!access) return res.status(404).json({ error: 'Mural não encontrado ou sem permissão' });
+
+  const { items } = req.body;
+  if (!Array.isArray(items)) return res.status(400).json({ error: 'items deve ser um array' });
+
+  await db.transaction(async tx => {
+    for (const item of items) {
+      if (item.groupId !== undefined) {
+        await tx.run('UPDATE mural_items SET position = $1, group_id = $2 WHERE id = $3 AND mural_id = $4',
+          [Number(item.position), item.groupId || null, item.id, req.params.id]);
+      } else {
+        await tx.run('UPDATE mural_items SET position = $1 WHERE id = $2 AND mural_id = $3',
+          [Number(item.position), item.id, req.params.id]);
+      }
+    }
+  });
+
+  req.broadcast?.({ type: 'mural_updated', muralId: req.params.id });
+  res.json({ success: true });
 }));
 
 // POST /api/mural/boards/:id/groups

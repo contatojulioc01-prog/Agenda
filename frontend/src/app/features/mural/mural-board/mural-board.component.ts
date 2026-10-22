@@ -205,7 +205,7 @@ export class MuralBoardComponent implements OnInit, OnDestroy {
     });
   });
 
-  // Grouped items mapping
+  // Grouped items mapping (ordenados por position)
   readonly itemsByGroup = computed(() => {
     const items = this.filteredItems();
     const map = new Map<string, MuralItem[]>();
@@ -215,12 +215,27 @@ export class MuralBoardComponent implements OnInit, OnDestroy {
       list.push(item);
       map.set(key, list);
     }
+    map.forEach(list => list.sort((a, b) => a.position - b.position));
     return map;
   });
+
+  itemsForGroup(groupId: string | null): MuralItem[] {
+    const key = groupId || 'ungrouped';
+    return this.itemsByGroup().get(key) || [];
+  }
 
   readonly ungroupedItems = computed(() => {
     return this.itemsByGroup().get('ungrouped') || [];
   });
+
+  readonly dropListGroupIds = computed(() => {
+    const groups = this.activeBoard()?.groups || [];
+    return [...groups.map(g => 'mural-group-' + g.id), 'mural-group-ungrouped'];
+  });
+
+  trackItemById(_index: number, item: MuralItem): string {
+    return item.id;
+  }
 
   constructor() {
     this.route.paramMap.subscribe(params => {
@@ -648,58 +663,78 @@ export class MuralBoardComponent implements OnInit, OnDestroy {
     });
   }
 
-  // ══ Drag & Drop ══
-  onDragStart(event: DragEvent, item: MuralItem): void {
-    this.draggingItem = item;
-    this.draggingItemId = item.id;
-    if (event.dataTransfer) {
-      event.dataTransfer.effectAllowed = 'move';
-      event.dataTransfer.setData('text/plain', item.id);
+  // ══ Drag & Drop dos Cartões (CDK Drag & Drop com reordenação fluida) ══
+  onItemDropped(event: CdkDragDrop<MuralItem[]>, targetGroupId: string | null): void {
+    const board = this.activeBoard();
+    if (!board) return;
+
+    const item = event.item.data as MuralItem;
+    if (!item) return;
+
+    const sourceGroupId = item.groupId ?? null;
+    const isSameGroup = event.previousContainer === event.container;
+
+    if (isSameGroup && event.previousIndex === event.currentIndex) {
+      return;
     }
-  }
 
-  onDragEnd(): void {
-    this.draggingItemId = null;
-    this.draggingItem = null;
-    this.dragOverGroupId = null;
-  }
+    // Listas ordenadas por posição atual
+    const sourceItems = [...this.itemsForGroup(sourceGroupId)];
+    const targetItems = isSameGroup ? sourceItems : [...this.itemsForGroup(targetGroupId)];
 
-  onGroupDragOver(event: DragEvent, groupId: string): void {
-    event.preventDefault();
-    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
-    this.dragOverGroupId = groupId;
-  }
-
-  onGroupDragLeave(): void {
-    this.dragOverGroupId = null;
-  }
-
-  onDropInGroup(event: DragEvent, groupId: string | null): void {
-    event.preventDefault();
-    this.dragOverGroupId = null;
-    const item = this.draggingItem;
-    if (!item || item.groupId === groupId) return;
-
-    // Optimistic update
-    this.activeBoard.update(curr => curr ? {
-      ...curr,
-      items: curr.items.map(i => i.id === item.id ? { ...i, groupId } : i)
-    } : null);
-
-    // Persist
-    this.apiService.moverItemParaGrupo(item.id, groupId, this.currentUserId).subscribe({
-      error: (err) => {
-        console.error('Erro ao mover item:', err);
-        // Rollback
-        this.activeBoard.update(curr => curr ? {
-          ...curr,
-          items: curr.items.map(i => i.id === item.id ? { ...i, groupId: item.groupId } : i)
-        } : null);
+    if (isSameGroup) {
+      moveItemInArray(sourceItems, event.previousIndex, event.currentIndex);
+    } else {
+      const fromIndex = sourceItems.findIndex(i => i.id === item.id);
+      if (fromIndex >= 0) {
+        sourceItems.splice(fromIndex, 1);
       }
+      targetItems.splice(event.currentIndex, 0, { ...item, groupId: targetGroupId });
+    }
+
+    // Normalizar sequencialmente as posições (0, 1, 2, ...)
+    const changedItems: { id: string; position: number; groupId?: string | null }[] = [];
+
+    sourceItems.forEach((it, index) => {
+      it.position = index;
+      changedItems.push({ id: it.id, position: index, groupId: sourceGroupId });
     });
 
-    this.draggingItem = null;
-    this.draggingItemId = null;
+    if (!isSameGroup) {
+      targetItems.forEach((it, index) => {
+        it.position = index;
+        changedItems.push({ id: it.id, position: index, groupId: targetGroupId });
+      });
+    }
+
+    const changedMap = new Map(changedItems.map(ch => [ch.id, ch]));
+
+    // Atualização otimista imediata no signal ativo para o DOM reposicionar suavemente
+    this.activeBoard.update(curr => {
+      if (!curr) return null;
+      return {
+        ...curr,
+        items: curr.items.map(it => {
+          const ch = changedMap.get(it.id);
+          if (ch) {
+            return {
+              ...it,
+              position: ch.position,
+              groupId: ch.groupId !== undefined ? ch.groupId : it.groupId
+            };
+          }
+          return it;
+        })
+      };
+    });
+
+    // Persistir nova sequência e grupos no backend
+    this.apiService.reordenarItens(board.id, changedItems, this.currentUserId).subscribe({
+      error: (err) => {
+        console.error('Erro ao salvar nova sequência dos cartões:', err);
+        this.muralService.loadBoard(board.id);
+      }
+    });
   }
 
   // ══ Team Management (Exato ao Tarefas) ══

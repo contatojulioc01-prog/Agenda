@@ -62,6 +62,12 @@ export class MuralBoardApiService {
     });
   }
 
+  reordenarItens(muralId: string, items: { id: string; position: number; groupId?: string | null }[], userId: string): Observable<{ success: boolean }> {
+    return this.http.put<{ success: boolean }>(`/api/mural/boards/${muralId}/items/reorder`, { items }, {
+      headers: { 'x-user-id': userId }
+    });
+  }
+
   reordenarMurais(boardIds: string[], userId: string): Observable<{ success: boolean }> {
     return this.http.put<{ success: boolean }>('/api/mural/boards/reorder', { boardIds }, {
       headers: { 'x-user-id': userId }
