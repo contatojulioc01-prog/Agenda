@@ -13,6 +13,6 @@
     "test": "npm --prefix frontend test"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=26.0.0"
   }
 }

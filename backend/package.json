@@ -17,16 +17,19 @@
     "seed:linkedin": "node scripts/seed-linkedin.js"
   },
   "dependencies": {
-    "@modelcontextprotocol/node": "^2.0.0",
-    "@modelcontextprotocol/server": "^2.0.0",
-    "cors": "^2.8.5",
-    "dotenv": "^17.4.2",
-    "express": "^4.18.3",
-    "express-rate-limit": "^8.7.0",
+    "@modelcontextprotocol/node": "^2.1.2",
+    "@modelcontextprotocol/server": "^2.4.0",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.9",
+    "express": "^5.3.0",
+    "express-rate-limit": "^8.7.1",
     "helmet": "^8.3.0",
-    "pg": "^8.23.0",
-    "sql.js": "^1.10.2",
-    "ws": "^8.16.0",
-    "zod": "^4.6.5"
+    "pg": "^8.23.1",
+    "sql.js": "^1.15.2",
+    "ws": "^8.22.0",
+    "zod": "^4.6.7"
+  },
+  "engines": {
+    "node": ">=26.0.0"
   }
 }
