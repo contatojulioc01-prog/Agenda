@@ -14,6 +14,7 @@ function connectionConfig() {
     return {
       connectionString: process.env.DATABASE_URL,
       ssl: sslEnabled ? { rejectUnauthorized: true } : false,
+      client_encoding: 'UTF8',
     };
   }
 
@@ -34,6 +35,7 @@ function connectionConfig() {
     user: process.env.PGUSER || 'postgres',
     password: String(process.env.PGPASSWORD || ''),
     ssl: sslConfig,
+    client_encoding: 'UTF8',
   };
 }
 
@@ -44,7 +46,7 @@ async function initDb() {
   if (pool) return pool;
   pool = new Pool({ ...connectionConfig(), max: Number(process.env.PGPOOL_MAX || 10) });
   pool.on('error', error => console.error('[DB] Erro inesperado no pool PostgreSQL:', error));
-  pool.on('connect', client => { client.query("SET client_encoding = 'UTF8'").catch(() => {}); });
+
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS calendars (
