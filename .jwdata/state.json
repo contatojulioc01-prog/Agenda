@@ -1,5 +1,5 @@
 {
-  "lastCommit": "d4056013-5a46-4424-9b7c-611ccf6c9fdc",
+  "lastCommit": "e2a7a86c-da8c-482c-a27d-46b0c6da6f7b",
   "commits": [
     {
       "id": "029104f7-7ab2-4d57-b90c-cb17445d7fb0",
@@ -6482,13 +6482,134 @@
       "pushedTo": [
         "prod"
       ]
+    },
+    {
+      "id": "e2a7a86c-da8c-482c-a27d-46b0c6da6f7b",
+      "date": "2026-11-06T13:34:13.180Z",
+      "message": "Commit sem mensagem",
+      "changes": {
+        "added": [
+          "backend/public/chunk-4AUPVSDL.js",
+          "backend/public/chunk-H77TGO55.js",
+          "backend/public/main-QTIVHVGV.js",
+          "backend/public/polyfills-LVNOU2XZ.js",
+          "backend/public/styles-2373OLXF.css"
+        ],
+        "modified": [
+          "backend/.env",
+          "backend/.env.example",
+          "backend/db.js",
+          "backend/index.js",
+          "backend/mcp/agenda-tools.js",
+          "backend/mcp/http-handler.js",
+          "backend/mcp/system-tools.js",
+          "backend/package-lock.json",
+          "backend/package.json",
+          "backend/public/assets/livro-doce-brinquedo.svg",
+          "backend/public/index.html",
+          "backend/realtime-auth.js",
+          "backend/routes/ai.js",
+          "backend/routes/attachments.js",
+          "backend/routes/calendars.js",
+          "backend/routes/events.js",
+          "backend/routes/kanban.js",
+          "backend/routes/mural.js",
+          "backend/routes/notifications.js",
+          "backend/routes/privacy.js",
+          "backend/scripts/migrate-attachments-to-disk.js",
+          "backend/scripts/seed-dev.js",
+          "backend/scripts/seed-linkedin.js",
+          "backend/test/ai.test.js",
+          "backend/test/mcp.test.js",
+          "backend/test/notifications.test.js",
+          "backend/test/realtime-auth.test.js",
+          "backend/test/routes.test.js",
+          "backend/validation.js"
+        ],
+        "deleted": [
+          "backend/public/assets/Agenda Doce Brinquedo.pdf",
+          "backend/public/assets/AgendaDoceBrinquedo.pdf",
+          "backend/public/assets/kanban_print_melhorado (1).pdf",
+          "backend/public/chunk-DDO7IML3.js",
+          "backend/public/chunk-KZ5HF3LG.js",
+          "backend/public/main-NFOIBSFZ.js",
+          "backend/public/polyfills-RV3JTMEC.js",
+          "backend/public/prerendered-routes.json",
+          "backend/public/styles-5UF2VFBE.css"
+        ]
+      },
+      "snapshot": {
+        "backend/.env": "6c0a4a0d97c8e832d04badcec4de806d0d9e8d13d34135163a7f4075158936d3",
+        "backend/.env.example": "e65692243ec1b88d228d455dacd36835403b854119213cc561758a710ec94335",
+        "backend/agenda.db": "17cde3325884d62298688b843141d9acd1af3b913f282c95d88e72dba61da8fd",
+        "backend/async-route.js": "1cecfd2b97b0bcf687cf39f0c1ce2dc2fd451fdc5df6592b1f7397a79bb9d1c6",
+        "backend/db.js": "4b724490091a6de14ba02f74b23a627ae7a9f067861802f281b627db24005721",
+        "backend/ecosystem.config.cjs": "be060f37cd4d8be6bb7af99d30402b5c82bd7fe79baa32d2d416a9aa651332f6",
+        "backend/index.js": "2061fd094953cb3a0cd071ab5073f73b6e07143632ad5858e65fc69f92f32a74",
+        "backend/mcp/agenda-tools.js": "a8a65850b47b4d734ac4e17a788baae0620f760e1bc7c87fd1a0b94326949d15",
+        "backend/mcp/http-handler.js": "6bf2ab7fdbf562184560f27437597199abc6298e8ebbe4bb135783d4171f499f",
+        "backend/mcp/system-tools.js": "69875da3f0814a7b5279586c03d041a751594a352ed14c5b737ec0156c6a2aab",
+        "backend/package-lock.json": "9f8973f5c0b5e3b8565f6fec56971477b845419e6f266cc80c7dad9ec6f57555",
+        "backend/package.json": "cbc2976036e9a0b0e25b7e5079c674de31635bfc110d56fcff00dabe92b80084",
+        "backend/public/3rdpartylicenses.txt": "81dc14610d3e1f586d37e114f4a72bf4c51ee275a4447533da976add4c2e2996",
+        "backend/public/assets/CaduMaverick_.jpg": "b9288446bbf381f6ed76626b6c195fa7832defba92e54563c63ce3ebca45b017",
+        "backend/public/assets/header-transparent.png": "6c48c9e8ec4f88c555e8db4af36d90d8322c557a22cac7b9b1ce440c9a05c8d9",
+        "backend/public/assets/header.jfif": "324252369933f4a073666db720fefefeecdd8d971e93306800c51e1b8d0fc7b6",
+        "backend/public/assets/livro-doce-brinquedo.svg": "5b208923f3ff4d6fa45e8b84d7cf5b118b052111906c9ee0a7de276c11ed4c5b",
+        "backend/public/assets/sidebar.jpg": "fcecfcfa1f50a19c041215329e7c48d8c8cd88e56edd654b6e228dbaf3279653",
+        "backend/public/CaduMaverick_.jpg": "b9288446bbf381f6ed76626b6c195fa7832defba92e54563c63ce3ebca45b017",
+        "backend/public/chunk-4AUPVSDL.js": "2726e6fa6ad4404c520a9ec08a5b0689f3a9beff465f3ef2e59eed1cfbbd35f5",
+        "backend/public/chunk-H77TGO55.js": "90e00c27a8e52b8ab5471b7a27dd369168dd5e57f855dbbddc94a4031e551960",
+        "backend/public/downloads/Agenda.Notifier.exe": "15762be24f51ca6015a7cea3f612ff41de578e788c16afc627616b4a23dd7237",
+        "backend/public/favicon-doce.png": "58d60b5dbc87a7f612a0ab6ae5ca624d616819d068b450e4162ebb2046dc9013",
+        "backend/public/favicon.ico": "f9102be80297c0529207607be5277b4f90bca89d65988fa1771b91c7894e815f",
+        "backend/public/header-favicon.jpg": "324252369933f4a073666db720fefefeecdd8d971e93306800c51e1b8d0fc7b6",
+        "backend/public/header.jfif": "324252369933f4a073666db720fefefeecdd8d971e93306800c51e1b8d0fc7b6",
+        "backend/public/index.html": "07a07b32012fdf1107264693aba00c188700dba84b97a2c287d68450e982c030",
+        "backend/public/main-QTIVHVGV.js": "65ff86f1863a8a182b3ee169e80baa3157c6d36d2d1fa017fb3ce65d15838db5",
+        "backend/public/media/CaduMaverick_-R4CXFYUG.jpg": "b9288446bbf381f6ed76626b6c195fa7832defba92e54563c63ce3ebca45b017",
+        "backend/public/polyfills-LVNOU2XZ.js": "f1b35a3b4db37b73ca0281d6b6247701465ff9e56a7a7b3aff9784518dc2c30a",
+        "backend/public/sidebar-icon.png": "58d60b5dbc87a7f612a0ab6ae5ca624d616819d068b450e4162ebb2046dc9013",
+        "backend/public/sidebar.jpg": "fcecfcfa1f50a19c041215329e7c48d8c8cd88e56edd654b6e228dbaf3279653",
+        "backend/public/sidebar.png": "3638c4ce6f84f64b97426858ea40ac2d1b8d4e334d61d7ada9b6d37e77e546b6",
+        "backend/public/styles-2373OLXF.css": "6af979309206f1bb4f30967c4238c14d463234c6f212f86dcebd039a5e27b641",
+        "backend/realtime-auth.js": "3e4febeab7f5ff55f6769572dad5f5b96f92682524420551f2602f855f5edba8",
+        "backend/routes/ai.js": "b98f23613e11012b2ddda0c8e0c9f6dedc11d00f53e12779cf664aee2da4a00a",
+        "backend/routes/attachments.js": "74cbd45d4029519d1d816c942b97adb0d7a826b6f7827b57aed0b61ca1fe0c16",
+        "backend/routes/calendars.js": "3c6672f50b1d8ae8f0e2c95a63c4095a24b95ac15f500f47b621f56c9e513657",
+        "backend/routes/events.js": "18f65aa354bace0a1e67905039a509a0edb5e0e956c272d96c132be8513ae916",
+        "backend/routes/kanban.js": "02ce84551009fd229741f871bf95c57a600476c3bb204711f52843075cb15ca5",
+        "backend/routes/members.js": "bec76c4434f630f765fa98b62368f1824d396e5bf4bb6fd0ed263b2cf5b1709f",
+        "backend/routes/mural.js": "a8b0cc57efd834e2d40ef96ff788db5054068b907f170442bc5e42b5ee0bec6f",
+        "backend/routes/notifications.js": "f7bf1861d0bffff32466cd22ff66c79f98fbb21fd5c6511f6701fe1dd837129f",
+        "backend/routes/privacy.js": "dd152b85cb84b5a431bf529211977cbb2f250c4f937c8e9b1f1eb98d25d43b74",
+        "backend/scripts/generate-lgpd-report.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "backend/scripts/generate-security-report.js": "03e3c74256e76ceb1c50ac8e1fc0159e472df4e60a66f21c2797b203ec7a0a65",
+        "backend/scripts/migrate-attachments-to-disk.js": "ac99efaffd4706537919d1eefb50866449b9c66a6e203d185735cd943be7422a",
+        "backend/scripts/migrate-sqlite-to-postgres.js": "fbd63c4917c7098a678831e89ffc0a6cca1e7c63f8dd18d610dfea5d77907ae8",
+        "backend/scripts/security-setup.sql": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "backend/scripts/seed-dev.js": "cc2bd0844c2ce007eb9d50aaeb778fab8beed69be203564686c524cb4572d72c",
+        "backend/scripts/seed-linkedin.js": "79ba014542d9a8237a30a98c9ec24da351ac17ac49028c059859dc71479b74c4",
+        "backend/scripts/setup-postgres.js": "c86cead1fe121927aa615b2c85616cd9193a626d25cbb8ca1a3f372bbfe327f0",
+        "backend/test/ai.test.js": "9bd23390141de90e9180e9091cd086ed5197fa318893eddebba47388212094a7",
+        "backend/test/mcp.test.js": "e1d5d99e6e8106b1c2ecdc045fee64b15f6ee3d934f2a18f70f8c9fd397369cf",
+        "backend/test/notifications.test.js": "f093196a65d656767845e2fb40e9969b8872c5065b2c9bb21c7ed28b41af4154",
+        "backend/test/realtime-auth.test.js": "8ab6670297e70f72c7e74e0779675f2b5d94461c093ab1dbffc30f5a3e6fe170",
+        "backend/test/routes.test.js": "c15b782a05114a205602c73ba5365a7e17dccf92e4e4b2e441e116ea4c2c1d12",
+        "backend/test/validation.test.js": "4617da9aa5f3682ed25ff6515284b49f378e8b2472c9d39e1d2e5935b5ee7a85",
+        "backend/validation.js": "09e016e37fbfa900336799aab071d1871924c1949fe32b3b137e5ec2203cff23"
+      },
+      "pushed": false,
+      "pushedTo": [
+        "prod"
+      ]
     }
   ],
   "lastPush": {
-    "date": "2026-10-21T20:21:46.776Z",
-    "backupFile": "c:/server/BKS/BKP-Agenda/backup_20261021_172140.tar.gz",
+    "date": "2026-11-06T13:42:55.447Z",
+    "backupFile": "c:/server/BKS/BKP-Agenda/backup_20261106_104244.tar.gz",
     "commitIds": [
-      "d4056013-5a46-4424-9b7c-611ccf6c9fdc"
+      "e2a7a86c-da8c-482c-a27d-46b0c6da6f7b"
     ]
   },
   "lastPushes": {
@@ -6500,10 +6621,10 @@
       ]
     },
     "prod": {
-      "date": "2026-10-21T20:21:46.776Z",
-      "backupFile": "c:/server/BKS/BKP-Agenda/backup_20261021_172140.tar.gz",
+      "date": "2026-11-06T13:42:55.447Z",
+      "backupFile": "c:/server/BKS/BKP-Agenda/backup_20261106_104244.tar.gz",
       "commitIds": [
-        "d4056013-5a46-4424-9b7c-611ccf6c9fdc"
+        "e2a7a86c-da8c-482c-a27d-46b0c6da6f7b"
       ]
     }
   }

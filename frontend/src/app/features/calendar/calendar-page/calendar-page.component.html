@@ -420,7 +420,7 @@
       </div>
 
       <!-- Barra de Filtros Rápidos de Agendas (Pills) -->
-      <div class="agenda-pills-bar" [class.is-collapsed]="!agendaPillsExpanded()" *ngIf="calendars().length > 0">
+      <div class="agenda-pills-bar" [class.is-collapsed]="!agendaPillsExpanded()" *ngIf="activePillCalendars().length > 0">
         <button type="button" class="pills-toggle" (click)="toggleAgendaPills()"
           [attr.aria-expanded]="agendaPillsExpanded()" aria-controls="agenda-pills-list"
           [matTooltip]="agendaPillsExpanded() ? 'Ocultar seleção de agendas' : 'Mostrar seleção de agendas'">
@@ -429,7 +429,7 @@
         </button>
 
         <div class="pills-scroll" id="agenda-pills-list" *ngIf="agendaPillsExpanded()">
-          <button *ngFor="let cal of calendars()" class="agenda-pill"
+          <button *ngFor="let cal of activePillCalendars()" class="agenda-pill"
             [class.active]="calendarsService.visibleCalendarIds().has(cal.id)"
             (click)="toggleCalendarVisibility(cal.id)"
             [matTooltip]="calendarDisplayName(cal) + ' · Clique para exibir esta agenda'">

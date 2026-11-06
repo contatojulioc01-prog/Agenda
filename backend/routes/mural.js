@@ -295,7 +295,7 @@ router.delete('/boards/:id', asyncRoute(async (req, res) => {
     await tx.run('DELETE FROM mural_items WHERE mural_id = $1', [req.params.id]);
     await tx.run('DELETE FROM mural_groups WHERE mural_id = $1', [req.params.id]);
     await tx.run('DELETE FROM mural_boards WHERE id = $1', [req.params.id]);
-    if (access.board.scope_type === 'personal') {
+    if (access.mural?.scope_type === 'personal') {
       try {
         const remaining = await tx.get("SELECT COUNT(*) as count FROM mural_boards WHERE owner_id = $1 AND scope_type = 'personal'", [uid]);
         if (Number(remaining?.count || 0) === 0) {

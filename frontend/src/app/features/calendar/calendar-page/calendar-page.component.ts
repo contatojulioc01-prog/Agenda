@@ -429,6 +429,10 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
     return this.calendars().filter(calendar => calendar.isTaskCalendar);
   }
 
+  activePillCalendars(): Calendar[] {
+    return this.calendars().filter(calendar => !calendar.isHidden);
+  }
+
   calendarDisplayName(calendar: Calendar): string {
     return calendar.isTaskCalendar && calendar.taskTeamName
       ? `${calendar.taskTeamName} · Tarefas`

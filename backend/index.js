@@ -1,10 +1,22 @@
 const fs = require('fs');
 const path = require('path');
 
+const explicitPgDatabase = process.env.PGDATABASE;
+const explicitNodeEnv = process.env.NODE_ENV;
+
 const dotenv = require('dotenv');
 const envPaths = [path.join(__dirname, '..', '.env'), path.join(__dirname, '.env')];
 for (const envPath of envPaths) {
   if (fs.existsSync(envPath)) dotenv.config({ path: envPath, override: true, quiet: true });
+}
+
+if (explicitNodeEnv) {
+  process.env.NODE_ENV = explicitNodeEnv;
+}
+if (explicitPgDatabase) {
+  process.env.PGDATABASE = explicitPgDatabase;
+} else if (process.env.NODE_ENV === 'development') {
+  process.env.PGDATABASE = 'agenda_dev';
 }
 
 const express = require('express');
@@ -597,7 +609,7 @@ initDb().then(async () => {
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Rota nao encontrada' }));
 
   if (frontendPath) {
-    app.get('*', (_req, res) => {
+    app.get('/{*splat}', (_req, res) => {
       res.setHeader('Cache-Control', 'no-cache');
       res.sendFile(path.join(frontendPath, 'index.html'));
     });
