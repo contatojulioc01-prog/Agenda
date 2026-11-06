@@ -278,6 +278,36 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
     });
   }
 
+  hideCalendar(cal: Calendar, ev?: Event): void {
+    if (ev) ev.stopPropagation();
+    this.calendarsService.hideCalendar(cal.id, success => {
+      if (success) {
+        this.eventsService.unloadCalendar(cal.id);
+        const nextId = [...this.calendarsService.visibleCalendarIds()][0];
+        if (nextId) this.selectOnlyCalendar(nextId);
+      }
+    });
+  }
+
+  unhideCalendar(cal: Calendar, ev?: Event): void {
+    if (ev) ev.stopPropagation();
+    this.calendarsService.unhideCalendar(cal.id, success => {
+      if (success) {
+        this.selectOnlyCalendar(cal.id);
+      }
+    });
+  }
+
+  hideCalendarFromContext(cal: Calendar): void {
+    this.hideCalendar(cal);
+    this.closeCalendarContextMenus();
+  }
+
+  unhideCalendarFromContext(cal: Calendar): void {
+    this.unhideCalendar(cal);
+    this.closeCalendarContextMenus();
+  }
+
   openCalendarContextMenu(mouseEvent: MouseEvent, calendar: Calendar): void {
     mouseEvent.preventDefault();
     mouseEvent.stopPropagation();
@@ -382,7 +412,12 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
 
   myCalendars(): Calendar[] {
     const uid = this.currentUser()?.id;
-    return this.calendars().filter(c => c.owner_id === uid && !c.isTaskCalendar);
+    return this.calendars().filter(c => c.owner_id === uid && !c.isTaskCalendar && !c.isHidden);
+  }
+
+  hiddenCalendars(): Calendar[] {
+    const uid = this.currentUser()?.id;
+    return this.calendars().filter(c => c.owner_id === uid && !c.isTaskCalendar && !!c.isHidden);
   }
 
   sharedCalendars(): Calendar[] {

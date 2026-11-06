@@ -7,7 +7,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { KanbanService } from '../../../core/services/kanban.service';
-import { KanbanColumn, KanbanTask, KanbanTaskInput, KanbanTeam, KanbanTeamMember, TaskPriority } from '../../../core/models/kanban.model';
+import { KanbanBoardSummary, KanbanColumn, KanbanTask, KanbanTaskInput, KanbanTeam, KanbanTeamMember, TaskPriority } from '../../../core/models/kanban.model';
 import { DEFAULT_AVATAR } from '../../../core/models/user.model';
 import { Attachment } from '../../../core/models/attachment.model';
 import { AttachmentsService } from '../../../core/services/attachments.service';
@@ -205,6 +205,8 @@ export class KanbanBoardComponent implements OnDestroy {
   readonly attachmentPreviewCurrent = signal<Attachment | null>(null);
   readonly trustedAttachmentPreviewUrl = signal<SafeResourceUrl | null>(null);
   readonly teamDeleteLoading = signal(false);
+  readonly boardDeleteTarget = signal<KanbanBoardSummary | null>(null);
+  readonly boardDeleteLoading = signal(false);
   readonly taskDeleteLoading = signal(false);
   readonly trashActionLoading = signal(false);
   readonly printingSingleTask = signal(false);
@@ -1145,8 +1147,16 @@ export class KanbanBoardComponent implements OnDestroy {
     });
   }
 
+  personalBoard(): KanbanBoardSummary | undefined {
+    return this.boards().find(board => board.scopeType !== 'team');
+  }
+
   personalBoardId(): string | undefined {
-    return this.boards().find(board => board.scopeType !== 'team')?.id;
+    return this.personalBoard()?.id;
+  }
+
+  personalBoardName(): string {
+    return this.personalBoard()?.name || 'Minhas tarefas';
   }
 
   openTeamManager(team?: KanbanTeam): void {
@@ -1305,9 +1315,33 @@ export class KanbanBoardComponent implements OnDestroy {
     this.closeBoardNameDialog();
   }
 
+  canDeleteCurrentBoard(): boolean {
+    const current = this.board();
+    return !!current && current.scopeType !== 'team';
+  }
+
+  requestDeleteCurrentBoard(): void {
+    const current = this.board();
+    if (!current) return;
+    this.boardDeleteTarget.set(current);
+  }
+
+  cancelBoardDeletion(): void {
+    this.boardDeleteTarget.set(null);
+  }
+
+  confirmBoardDeletion(): void {
+    const board = this.boardDeleteTarget();
+    if (!board || this.boardDeleteLoading()) return;
+
+    this.boardDeleteLoading.set(true);
+    this.service.deleteBoard(board.id);
+    this.boardDeleteTarget.set(null);
+    this.boardDeleteLoading.set(false);
+  }
+
   removeBoard(): void {
-    const board = this.board();
-    if (board && confirm(`Excluir o quadro “${board.name}” e todas as tarefas? Esta ação não pode ser desfeita.`)) this.service.deleteBoard(board.id);
+    this.requestDeleteCurrentBoard();
   }
 
   assigneeName(id: string | null): string {

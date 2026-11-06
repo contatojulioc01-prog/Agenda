@@ -35,6 +35,12 @@ router.get('/', asyncRoute(async (req, res) => {
     ORDER BY c.created_at ASC
   `, [userId, userId, userId]);
 
+  let hiddenIds = new Set();
+  try {
+    const hiddenRows = await db.all("SELECT REPLACE(key, 'hidden_calendar:', '') as id FROM user_preferences WHERE user_id = $1 AND key LIKE 'hidden_calendar:%' AND value = '1'", [userId]);
+    hiddenIds = new Set((hiddenRows || []).map(r => r.id));
+  } catch {}
+
   const result = await Promise.all(rows.map(async cal => {
     const members = await db.all('SELECT * FROM calendar_members WHERE calendar_id = $1', [cal.id]);
     return {
@@ -42,6 +48,7 @@ router.get('/', asyncRoute(async (req, res) => {
       isPrivate: cal.is_private === 1,
       isDefault: cal.is_default === 1,
       isTaskCalendar: cal.is_task_calendar === 1,
+      isHidden: hiddenIds.has(cal.id),
       taskTeamName: cal.task_team_name || null,
       members,
     };
@@ -136,6 +143,34 @@ router.delete('/:id', asyncRoute(async (req, res) => {
   });
   req.broadcast({ type: 'calendar_deleted', calendarId: id });
   res.json({ success: true });
+}));
+
+router.post('/:id/hide', asyncRoute(async (req, res) => {
+  const userId = req.headers['x-user-id'];
+  if (!userId) return res.status(400).json({ error: 'x-user-id header obrigatório' });
+  const { id } = req.params;
+  const calendar = await db.get('SELECT * FROM calendars WHERE id = $1', [id]);
+  if (!calendar) return res.status(404).json({ error: 'Agenda não encontrada' });
+  try {
+    await db.run(`INSERT INTO user_preferences (user_id, key, value)
+      VALUES ($1, $2, '1')
+      ON CONFLICT (user_id, key) DO UPDATE SET value = '1'`, [userId, `hidden_calendar:${id}`]);
+  } catch {}
+  req.broadcast?.({ type: 'calendar_visibility_changed', calendarId: id, userId, isHidden: true });
+  res.json({ success: true, isHidden: true });
+}));
+
+router.post('/:id/unhide', asyncRoute(async (req, res) => {
+  const userId = req.headers['x-user-id'];
+  if (!userId) return res.status(400).json({ error: 'x-user-id header obrigatório' });
+  const { id } = req.params;
+  const calendar = await db.get('SELECT * FROM calendars WHERE id = $1', [id]);
+  if (!calendar) return res.status(404).json({ error: 'Agenda não encontrada' });
+  try {
+    await db.run("DELETE FROM user_preferences WHERE user_id = $1 AND key = $2", [userId, `hidden_calendar:${id}`]);
+  } catch {}
+  req.broadcast?.({ type: 'calendar_visibility_changed', calendarId: id, userId, isHidden: false });
+  res.json({ success: true, isHidden: false });
 }));
 
 module.exports = router;

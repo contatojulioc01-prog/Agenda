@@ -515,6 +515,19 @@
     box-shadow: inset 0 0 0 1px var(--cal-color, var(--brand-500));
   }
 
+  &.is-hidden-item {
+    opacity: 0.6;
+    border-left-style: dashed;
+
+    &:hover {
+      opacity: 0.95;
+    }
+
+    .btn-cal-menu {
+      opacity: 0.9;
+    }
+  }
+
   &:hover .btn-cal-menu { opacity: 1; }
 }
 

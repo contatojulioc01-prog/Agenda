@@ -24,6 +24,8 @@
           <h1 class="board-name">{{ board()?.name || 'Kanban' }}</h1>
           <button class="icon-btn" (click)="renameBoard()"
             matTooltip="Renomear quadro"><mat-icon>edit</mat-icon></button>
+          <button class="icon-btn danger-hover" *ngIf="canDeleteCurrentBoard()" (click)="requestDeleteCurrentBoard()"
+            matTooltip="Excluir quadro"><mat-icon>delete_outline</mat-icon></button>
         </div>
         <span class="board-subtitle">{{ board()?.scopeType === 'team' ? 'Time · ' + (board()?.teamName ||
           currentTeam()?.name || '') : 'Espaço pessoal' }} · {{ totalActive() }} tarefas · {{ completedCount() }}
@@ -62,7 +64,7 @@
     <div class="tabs-list-wrap">
       <button *ngIf="personalBoardId() as personalId" [class.active]="board()?.id === personalId"
         (click)="switchBoard(personalId)">
-        <mat-icon>person</mat-icon><span>Meu Kanban</span>
+        <mat-icon>person</mat-icon><span>{{ personalBoardName() }}</span>
       </button>
       <button *ngFor="let team of teams()" [class.active]="board()?.teamId === team.id"
         (click)="switchBoard(team.boardId)" (contextmenu)="openTeamContextMenu($event, team)">
@@ -1053,6 +1055,31 @@
         [disabled]="trashActionLoading()" (click)="confirmPermanentDeletion()"><mat-icon>{{ trashActionLoading() ?
           'hourglass_top' : 'delete_forever' }}</mat-icon>{{ trashActionLoading() ? 'Excluindo...' : 'Excluir
         permanentemente' }}</button></footer>
+  </section>
+</div>
+
+<div class="column-dialog-backdrop" *ngIf="boardDeleteTarget() as targetBoard">
+  <section class="column-dialog team-delete-dialog" role="dialog" aria-modal="true" aria-labelledby="board-delete-title"
+    (mousedown)="$event.stopPropagation()">
+    <header>
+      <span class="column-dialog-icon delete"><mat-icon>delete_forever</mat-icon></span>
+      <div>
+        <h2 id="board-delete-title">Excluir quadro</h2>
+        <p>Esta ação não poderá ser desfeita.</p>
+      </div>
+      <button class="icon-btn" type="button" (click)="cancelBoardDeletion()"><mat-icon>close</mat-icon></button>
+    </header>
+    <div class="column-dialog-body delete-copy">
+      <p>Deseja excluir o quadro <strong>{{ targetBoard.name }}</strong>?</p>
+      <div class="blocked-warning"><mat-icon>warning_amber</mat-icon><span>Todas as listas, tarefas e anexos deste quadro serão excluídos permanentemente.</span></div>
+    </div>
+    <footer>
+      <button class="cancel-btn" type="button" [disabled]="boardDeleteLoading()"
+        (click)="cancelBoardDeletion()">Cancelar</button>
+      <button class="delete-confirm-btn" type="button" [disabled]="boardDeleteLoading()"
+        (click)="confirmBoardDeletion()"><mat-icon>{{ boardDeleteLoading() ? 'hourglass_top' : 'delete_forever'
+          }}</mat-icon>{{ boardDeleteLoading() ? 'Excluindo...' : 'Excluir quadro' }}</button>
+    </footer>
   </section>
 </div>
 

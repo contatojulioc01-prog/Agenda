@@ -18,6 +18,7 @@ export interface Calendar {
   isPrivate: boolean;
   isDefault?: boolean;
   isTaskCalendar?: boolean;
+  isHidden?: boolean;
   taskTeamName?: string | null;
   owner_id: string;
   created_at: string;

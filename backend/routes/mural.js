@@ -67,6 +67,10 @@ function itemDto(item, attachments = []) {
 }
 
 async function ensurePersonalMural(uid) {
+  try {
+    const dismissed = await db.get("SELECT 1 FROM user_preferences WHERE user_id = $1 AND key = 'mural_personal_deleted' AND value = '1'", [uid]);
+    if (dismissed) return null;
+  } catch { }
   let mural = await db.get("SELECT * FROM mural_boards WHERE owner_id = $1 AND scope_type = 'personal' ORDER BY created_at LIMIT 1", [uid]);
   if (mural) return mural;
   const boardId = id('mrl');
@@ -216,6 +220,11 @@ router.post('/boards', asyncRoute(async (req, res) => {
   });
 
   const created = await db.get('SELECT * FROM mural_boards WHERE id = $1', [boardId]);
+  if (scopeType === 'personal') {
+    try {
+      await db.run("DELETE FROM user_preferences WHERE user_id = $1 AND key = 'mural_personal_deleted'", [uid]);
+    } catch { }
+  }
   req.broadcast?.({ type: 'mural_updated', muralId: boardId });
   res.status(201).json(muralDto(created, 'admin', 0));
 }));
@@ -276,7 +285,7 @@ router.delete('/boards/:id', asyncRoute(async (req, res) => {
     const atts = await db.all(`SELECT file_path FROM attachments WHERE owner_type = 'mural_item' AND owner_id = ANY($1)`, [itemIds]);
     for (const att of atts) {
       if (att.file_path && fs.existsSync(att.file_path)) {
-        try { await fs.promises.unlink(att.file_path); } catch {}
+        try { await fs.promises.unlink(att.file_path); } catch { }
       }
     }
     await db.run(`DELETE FROM attachments WHERE owner_type = 'mural_item' AND owner_id = ANY($1)`, [itemIds]);
@@ -286,6 +295,16 @@ router.delete('/boards/:id', asyncRoute(async (req, res) => {
     await tx.run('DELETE FROM mural_items WHERE mural_id = $1', [req.params.id]);
     await tx.run('DELETE FROM mural_groups WHERE mural_id = $1', [req.params.id]);
     await tx.run('DELETE FROM mural_boards WHERE id = $1', [req.params.id]);
+    if (access.board.scope_type === 'personal') {
+      try {
+        const remaining = await tx.get("SELECT COUNT(*) as count FROM mural_boards WHERE owner_id = $1 AND scope_type = 'personal'", [uid]);
+        if (Number(remaining?.count || 0) === 0) {
+          await tx.run(`INSERT INTO user_preferences (user_id, key, value)
+            VALUES ($1, 'mural_personal_deleted', '1')
+            ON CONFLICT (user_id, key) DO UPDATE SET value = '1'`, [uid]);
+        }
+      } catch { }
+    }
   });
 
   req.broadcast?.({ type: 'mural_deleted', muralId: req.params.id });
@@ -510,7 +529,7 @@ router.delete('/items/:id', asyncRoute(async (req, res) => {
   const atts = await db.all(`SELECT file_path FROM attachments WHERE owner_type = 'mural_item' AND owner_id = $1`, [item.id]);
   for (const att of atts) {
     if (att.file_path && fs.existsSync(att.file_path)) {
-      try { await fs.promises.unlink(att.file_path); } catch {}
+      try { await fs.promises.unlink(att.file_path); } catch { }
     }
   }
   await db.run(`DELETE FROM attachments WHERE owner_type = 'mural_item' AND owner_id = $1`, [item.id]);

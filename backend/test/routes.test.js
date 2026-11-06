@@ -538,3 +538,125 @@ test('lista e manipula mural pessoal, grupos e notas', async () => {
     assert.equal(item.title, 'Nota de Teste');
   });
 });
+
+test('permite excluir Meu Mural e não recria automaticamente', async () => {
+  let muralDeleted = false;
+  await withRouter('../routes/mural', fakeDb => {
+    fakeDb.transaction = async fn => fn({ run: fakeDb.run, get: fakeDb.get, all: fakeDb.all });
+    fakeDb.get = async sql => {
+      if (sql.includes('user_preferences')) return muralDeleted ? { 1: 1 } : null;
+      if (sql.includes('FROM mural_boards WHERE id')) return { id: 'mrl-1', name: 'Meu Mural', scope_type: 'personal', owner_id: 'user-1' };
+      if (sql.includes('FROM mural_boards WHERE owner_id')) return muralDeleted ? null : { id: 'mrl-1', name: 'Meu Mural', scope_type: 'personal', owner_id: 'user-1' };
+      if (sql.includes('COUNT(*) as count FROM mural_boards')) return { count: 0 };
+      return null;
+    };
+    fakeDb.all = async sql => {
+      if (sql.includes('FROM mural_boards') && sql.includes("scope_type = 'personal'")) {
+        return muralDeleted ? [] : [{ id: 'mrl-1', name: 'Meu Mural', scope_type: 'personal', owner_id: 'user-1', item_count: 0 }];
+      }
+      if (sql.includes('FROM mural_items')) return [];
+      if (sql.includes('FROM kanban_teams')) return [];
+      return [];
+    };
+    fakeDb.run = async sql => {
+      if (sql.includes('DELETE FROM mural_boards')) muralDeleted = true;
+      return { rowCount: 1 };
+    };
+  }, async baseUrl => {
+    const delRes = await fetch(`${baseUrl}/boards/mrl-1`, { method: 'DELETE', headers: { 'x-user-id': 'user-1' } });
+    assert.equal(delRes.status, 200);
+    assert.equal(muralDeleted, true);
+
+    const listRes = await fetch(`${baseUrl}/boards`, { headers: { 'x-user-id': 'user-1' } });
+    assert.equal(listRes.status, 200);
+    const boards = await listRes.json();
+    assert.equal(boards.length, 0);
+  });
+});
+
+test('permite excluir quadro pessoal Minhas tarefas no Kanban', async () => {
+  let boardDeleted = false;
+  await withRouter('../routes/kanban', fakeDb => {
+    fakeDb.transaction = async fn => fn({ run: fakeDb.run, get: fakeDb.get, all: fakeDb.all });
+    fakeDb.get = async sql => {
+      if (sql.includes('user_preferences')) return boardDeleted ? { 1: 1 } : null;
+      if (sql.includes('FROM kanban_boards WHERE id')) return { id: 'brd-1', name: 'Minhas tarefas', scope_type: 'personal', owner_id: 'user-1' };
+      if (sql.includes('FROM kanban_boards WHERE owner_id')) return boardDeleted ? null : { id: 'brd-1', name: 'Minhas tarefas', scope_type: 'personal', owner_id: 'user-1' };
+      if (sql.includes('COUNT(*) as count FROM kanban_boards')) return { count: 0 };
+      return null;
+    };
+    fakeDb.all = async sql => {
+      if (sql.includes('FROM kanban_boards') && !boardDeleted) {
+        return [{ id: 'brd-1', name: 'Minhas tarefas', scope_type: 'personal', owner_id: 'user-1', my_role: 'admin', task_count: 0, trash_count: 0 }];
+      }
+      if (sql.includes('FROM kanban_task_events')) return [];
+      if (sql.includes('FROM kanban_team_members')) return [];
+      return [];
+    };
+    fakeDb.run = async sql => {
+      if (sql.includes('DELETE FROM kanban_boards')) boardDeleted = true;
+      return { rowCount: 1 };
+    };
+  }, async baseUrl => {
+    const delRes = await fetch(`${baseUrl}/boards/brd-1`, { method: 'DELETE', headers: { 'x-user-id': 'user-1' } });
+    assert.equal(delRes.status, 200);
+    assert.equal(boardDeleted, true);
+
+    const listRes = await fetch(`${baseUrl}/boards`, { headers: { 'x-user-id': 'user-1' } });
+    assert.equal(listRes.status, 200);
+    const boards = await listRes.json();
+    assert.equal(boards.length, 0);
+  });
+});
+
+test('permite ocultar e remover de ocultado Minha Agenda', async () => {
+  let hidden = false;
+  await withRouter('../routes/calendars', fakeDb => {
+    fakeDb.transaction = async fn => fn({ run: fakeDb.run, get: fakeDb.get, all: fakeDb.all });
+    fakeDb.get = async sql => {
+      if (sql.includes('FROM calendars WHERE id')) return { id: 'cal-default-1', name: 'Minha Agenda', is_default: 1, owner_id: 'user-1' };
+      if (sql.includes('FROM calendars WHERE owner_id')) return { id: 'cal-default-1' };
+      return null;
+    };
+    fakeDb.all = async sql => {
+      if (sql.includes('FROM calendars c')) {
+        return [{ id: 'cal-default-1', name: 'Minha Agenda', is_default: 1, is_private: 1, is_task_calendar: 0, owner_id: 'user-1' }];
+      }
+      if (sql.includes('FROM user_preferences')) {
+        return hidden ? [{ id: 'cal-default-1' }] : [];
+      }
+      if (sql.includes('FROM calendar_members')) return [];
+      return [];
+    };
+    fakeDb.run = async sql => {
+      if (sql.includes('INSERT INTO user_preferences')) hidden = true;
+      if (sql.includes('DELETE FROM user_preferences')) hidden = false;
+      return { rowCount: 1 };
+    };
+  }, async baseUrl => {
+    // 1. Inicialmente não ocultada
+    let listRes = await fetch(`${baseUrl}/`, { headers: { 'x-user-id': 'user-1' } });
+    let calendars = await listRes.json();
+    assert.equal(calendars[0].isHidden, false);
+
+    // 2. Ocultar
+    const hideRes = await fetch(`${baseUrl}/cal-default-1/hide`, { method: 'POST', headers: { 'x-user-id': 'user-1' } });
+    assert.equal(hideRes.status, 200);
+    const hideJson = await hideRes.json();
+    assert.equal(hideJson.isHidden, true);
+
+    listRes = await fetch(`${baseUrl}/`, { headers: { 'x-user-id': 'user-1' } });
+    calendars = await listRes.json();
+    assert.equal(calendars[0].isHidden, true);
+
+    // 3. Remover de ocultado (unhide)
+    const unhideRes = await fetch(`${baseUrl}/cal-default-1/unhide`, { method: 'POST', headers: { 'x-user-id': 'user-1' } });
+    assert.equal(unhideRes.status, 200);
+    const unhideJson = await unhideRes.json();
+    assert.equal(unhideJson.isHidden, false);
+
+    listRes = await fetch(`${baseUrl}/`, { headers: { 'x-user-id': 'user-1' } });
+    calendars = await listRes.json();
+    assert.equal(calendars[0].isHidden, false);
+  });
+});

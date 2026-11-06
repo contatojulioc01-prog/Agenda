@@ -88,6 +88,10 @@ async function createBoard({ name, description = '', color = '#4f46e5', ownerId,
 }
 
 async function createDefaultPersonalBoard(uid) {
+  try {
+    const dismissed = await db.get("SELECT 1 FROM user_preferences WHERE user_id = $1 AND key = 'kanban_personal_deleted' AND value = '1'", [uid]);
+    if (dismissed) return null;
+  } catch {}
   const existing = await db.get("SELECT * FROM kanban_boards WHERE owner_id = $1 AND COALESCE(scope_type, 'personal') = 'personal' ORDER BY created_at LIMIT 1", [uid]);
   return existing || createBoard({ name: 'Meu Kanban', description: 'Meu espaço pessoal de tarefas', ownerId: uid });
 }
@@ -545,6 +549,9 @@ router.post('/boards', asyncRoute(async (req, res) => {
   if (!isOptionalString(req.body.description, 1000)) return res.status(400).json({ error: 'Descrição inválida' });
   if (req.body.color !== undefined && !isHexColor(req.body.color)) return res.status(400).json({ error: 'Cor inválida' });
   const board = await db.transaction(tx => createBoard({ name, description: req.body.description, color: req.body.color, ownerId: userId(req) }, tx));
+  try {
+    await db.run("DELETE FROM user_preferences WHERE user_id = $1 AND key = 'kanban_personal_deleted'", [userId(req)]);
+  } catch {}
   req.broadcast({ type: 'kanban_updated', boardId: board.id });
   res.status(201).json(boardDto(board, 'admin'));
 }));
@@ -599,6 +606,16 @@ router.delete('/boards/:boardId', asyncRoute(async (req, res) => {
     await tx.run('DELETE FROM kanban_tasks WHERE board_id = $1', [access.board.id]);
     await tx.run('DELETE FROM kanban_columns WHERE board_id = $1', [access.board.id]);
     await tx.run('DELETE FROM kanban_boards WHERE id = $1', [access.board.id]);
+    if (access.board.scope_type !== 'team') {
+      try {
+        const remaining = await tx.get("SELECT COUNT(*) as count FROM kanban_boards WHERE owner_id = $1 AND COALESCE(scope_type, 'personal') = 'personal'", [userId(req)]);
+        if (Number(remaining?.count || 0) === 0) {
+          await tx.run(`INSERT INTO user_preferences (user_id, key, value)
+            VALUES ($1, 'kanban_personal_deleted', '1')
+            ON CONFLICT (user_id, key) DO UPDATE SET value = '1'`, [userId(req)]);
+        }
+      } catch {}
+    }
   });
   req.broadcast({ type: 'kanban_updated', boardId: access.board.id });
   res.json({ success: true });

@@ -164,6 +164,10 @@
               <button class="btn-cal-menu" (click)="openEditCalendar(cal)" matTooltip="Editar agenda">
                 <mat-icon>edit</mat-icon>
               </button>
+              <button *ngIf="cal.isDefault" class="btn-cal-menu" (click)="hideCalendar(cal, $event)"
+                matTooltip="Ocultar agenda">
+                <mat-icon>visibility_off</mat-icon>
+              </button>
               <button *ngIf="!cal.isDefault" class="btn-cal-menu danger" (click)="removeCalendar(cal)"
                 matTooltip="Excluir agenda">
                 <mat-icon>delete_outline</mat-icon>
@@ -233,6 +237,34 @@
               <button class="btn-cal-menu solo-btn" (click)="selectOnlyCalendar(cal.id, $event)"
                 matTooltip="Ver apenas esta agenda">
                 <mat-icon>filter_center_focus</mat-icon>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Agendas Ocultadas ── -->
+      <div class="sidebar-section hidden-calendars-section" *ngIf="hiddenCalendars().length > 0">
+        <div class="sidebar-section-header">
+          <button type="button" class="sidebar-section-toggle" (click)="toggleSidebarSection('hidden-calendars')"
+            [attr.aria-expanded]="!isSidebarSectionCollapsed('hidden-calendars')" aria-controls="hidden-calendars-list">
+            <mat-icon>{{ isSidebarSectionCollapsed('hidden-calendars') ? 'chevron_right' : 'expand_more' }}</mat-icon>
+            <span class="sidebar-section-title">Ocultadas ({{ hiddenCalendars().length }})</span>
+          </button>
+        </div>
+        <div class="calendar-list" id="hidden-calendars-list" *ngIf="!isSidebarSectionCollapsed('hidden-calendars')">
+          <div *ngFor="let cal of hiddenCalendars()" class="calendar-item is-hidden-item"
+            [style.--cal-color]="cal.color" (contextmenu)="openCalendarContextMenu($event, cal)">
+            <div class="calendar-info">
+              <span class="calendar-name" [matTooltip]="cal.name">{{ cal.name }}</span>
+              <span class="lock-icon" matTooltip="Agenda ocultada">
+                <mat-icon>visibility_off</mat-icon>
+              </span>
+            </div>
+            <div class="calendar-actions" (click)="$event.stopPropagation()">
+              <button class="btn-cal-menu unhide-btn" (click)="unhideCalendar(cal, $event)"
+                matTooltip="Remover de ocultado (Exibir agenda)">
+                <mat-icon>visibility</mat-icon>
               </button>
             </div>
           </div>
@@ -445,11 +477,15 @@
 
 <div class="agenda-context-menu" *ngIf="calendarContextMenu() as menu" [style.left.px]="menu.x" [style.top.px]="menu.y"
   (click)="$event.stopPropagation()">
-  <button type="button"
+  <button type="button" *ngIf="!menu.calendar.isHidden"
     (click)="selectCalendarFromContext(menu.calendar)"><mat-icon>filter_center_focus</mat-icon>Exibir esta
     agenda</button>
-  <button type="button" *ngIf="calendarsService.canEdit(menu.calendar.id)"
+  <button type="button" *ngIf="calendarsService.canEdit(menu.calendar.id) && !menu.calendar.isHidden"
     (click)="editCalendarFromContext(menu.calendar)"><mat-icon>edit</mat-icon>Editar agenda</button>
+  <button type="button" *ngIf="menu.calendar.isDefault && !menu.calendar.isHidden"
+    (click)="hideCalendarFromContext(menu.calendar)"><mat-icon>visibility_off</mat-icon>Ocultar agenda</button>
+  <button type="button" *ngIf="menu.calendar.isHidden"
+    (click)="unhideCalendarFromContext(menu.calendar)"><mat-icon>visibility</mat-icon>Remover de ocultado</button>
   <button type="button" class="danger" *ngIf="calendarsService.isOwner(menu.calendar.id) && !menu.calendar.isDefault"
     (click)="deleteCalendarFromContext(menu.calendar)"><mat-icon>delete_outline</mat-icon>Excluir agenda</button>
 </div>

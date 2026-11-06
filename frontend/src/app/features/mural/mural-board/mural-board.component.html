@@ -70,7 +70,7 @@
                   <button type="button" class="menu-action-btn" (click)="selecionarMural(b.id); abrirEditarMural()" matTooltip="Configurar Mural">
                     <mat-icon>settings</mat-icon>
                   </button>
-                  <button type="button" class="menu-action-btn danger" *ngIf="boards().length > 1" (click)="excluirMuralPorId(b, $event)" matTooltip="Excluir Mural">
+                  <button type="button" class="menu-action-btn danger" (click)="excluirMuralPorId(b, $event)" matTooltip="Excluir Mural">
                     <mat-icon>delete_outline</mat-icon>
                   </button>
                 </div>
@@ -304,8 +304,18 @@
       </div>
     </div>
 
+    <!-- Estado Vazio (Sem Murais) -->
+    <div class="mural-empty-state" *ngIf="!loading() && boards().length === 0">
+      <div class="empty-icon-box"><mat-icon>dashboard_customize</mat-icon></div>
+      <h2>Nenhum mural disponível</h2>
+      <p>Você pode criar um novo mural pessoal ou criar/participar de um time.</p>
+      <button class="primary-btn" (click)="abrirCriarMural()">
+        <mat-icon>add</mat-icon><span>Criar novo mural</span>
+      </button>
+    </div>
+
     <!-- Estado Vazio -->
-    <div class="mural-empty-state" *ngIf="!loading() && !filteredItems().length && !activeBoard()?.groups?.length">
+    <div class="mural-empty-state" *ngIf="!loading() && boards().length > 0 && !filteredItems().length && !activeBoard()?.groups?.length">
       <div class="empty-icon-box"><mat-icon>sticky_note_2</mat-icon></div>
       <h2>Mural pronto!</h2>
       <p>Fixe comunicados, notas, fotos e documentos importantes no seu mural.</p>
@@ -652,3 +662,28 @@
   (close)="fecharPreview()"
   (download)="baixarAnexo()"
 ></app-attachment-preview-modal>
+
+<!-- ══════════════ MODAL DE CONFIRMAÇÃO DE EXCLUSÃO DE MURAL ══════════════ -->
+<div class="team-modal-backdrop" *ngIf="boardToDelete() as targetBoard">
+  <section class="team-modal" (mousedown)="$event.stopPropagation()">
+    <header>
+      <div>
+        <h2>Excluir mural</h2>
+        <p>Esta ação não poderá ser desfeita.</p>
+      </div>
+      <button class="icon-btn" (click)="cancelarExclusaoMuralModal()"><mat-icon>close</mat-icon></button>
+    </header>
+    <div class="team-management">
+      <p style="margin: 16px 0; font-size: 14px; color: var(--text-primary, #1e293b);">
+        Deseja realmente excluir o mural <strong>"{{ targetBoard.name }}"</strong> e todas as suas notas?
+      </p>
+    </div>
+    <div class="team-form-actions" style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px;">
+      <button type="button" class="cancel-btn" [disabled]="loadingExcluirMuralModal()" (click)="cancelarExclusaoMuralModal()">Cancelar</button>
+      <button type="button" class="primary-btn" style="background: #dc2626;" [disabled]="loadingExcluirMuralModal()" (click)="confirmarExclusaoMuralModal()">
+        <mat-progress-spinner *ngIf="loadingExcluirMuralModal()" mode="indeterminate" diameter="16" class="button-spinner"></mat-progress-spinner>
+        <span>{{ loadingExcluirMuralModal() ? 'Excluindo...' : 'Sim, excluir mural' }}</span>
+      </button>
+    </div>
+  </section>
+</div>

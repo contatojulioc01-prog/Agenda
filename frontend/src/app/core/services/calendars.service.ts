@@ -67,9 +67,12 @@ export class CalendarsService {
           }));
           this.calendars.set(finalList);
 
-          // Tornar todas visíveis por padrão
+          // Tornar visível por padrão (priorizando não ocultadas)
+          const nonHidden = finalList.filter(calendar => !calendar.isHidden);
           const currentId = [...this.visibleCalendarIds()][0];
-          const selectedId = finalList.some(calendar => calendar.id === currentId) ? currentId : finalList[0]?.id;
+          const selectedId = nonHidden.some(calendar => calendar.id === currentId)
+            ? currentId
+            : (nonHidden[0]?.id || finalList[0]?.id);
           this.visibleCalendarIds.set(new Set(selectedId ? [selectedId] : []));
           this.isLoading.set(false);
           afterLoad?.(finalList);
@@ -143,6 +146,43 @@ export class CalendarsService {
         const nextId = selected === id || !remaining.some(calendar => calendar.id === selected) ? remaining[0]?.id : selected;
         this.visibleCalendarIds.set(new Set(nextId ? [nextId] : []));
         onComplete?.(true);
+      });
+  }
+
+  /** Oculta agenda para o usuário */
+  hideCalendar(id: string, onComplete?: (success: boolean) => void): void {
+    this.http.post<{ success: boolean; isHidden: boolean }>(`${getBackendUrl()}/api/calendars/${id}/hide`, {}, { headers: this.headers })
+      .pipe(catchError(err => {
+        this.error.set(err.error?.error || 'Não foi possível ocultar a agenda.');
+        return of(null);
+      }))
+      .subscribe(res => {
+        if (res?.success) {
+          this.calendars.update(list => list.map(c => c.id === id ? { ...c, isHidden: true } : c));
+          const remaining = this.calendars().filter(c => !c.isHidden);
+          const currentVisible = [...this.visibleCalendarIds()][0];
+          if (currentVisible === id) {
+            const next = remaining[0];
+            this.visibleCalendarIds.set(new Set(next ? [next.id] : []));
+          }
+        }
+        onComplete?.(!!res?.success);
+      });
+  }
+
+  /** Remove de ocultado (reexibe) a agenda para o usuário */
+  unhideCalendar(id: string, onComplete?: (success: boolean) => void): void {
+    this.http.post<{ success: boolean; isHidden: boolean }>(`${getBackendUrl()}/api/calendars/${id}/unhide`, {}, { headers: this.headers })
+      .pipe(catchError(err => {
+        this.error.set(err.error?.error || 'Não foi possível reexibir a agenda.');
+        return of(null);
+      }))
+      .subscribe(res => {
+        if (res?.success) {
+          this.calendars.update(list => list.map(c => c.id === id ? { ...c, isHidden: false } : c));
+          this.selectOnly(id);
+        }
+        onComplete?.(!!res?.success);
       });
   }
 

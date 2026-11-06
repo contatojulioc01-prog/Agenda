@@ -259,6 +259,15 @@ async function initDb() {
       updated_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP::text)
     );
 
+    CREATE TABLE IF NOT EXISTS user_preferences (
+      user_id TEXT NOT NULL,
+      key TEXT NOT NULL,
+      value TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP::text),
+      updated_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP::text),
+      PRIMARY KEY (user_id, key)
+    );
+
     CREATE TABLE IF NOT EXISTS agenda_migrations (
       id TEXT PRIMARY KEY,
       applied_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP::text)

@@ -97,6 +97,8 @@ export class MuralBoardComponent implements OnInit, OnDestroy {
   groupColor = '#64748b';
 
   readonly boardModalOpen = signal(false);
+  readonly boardToDelete = signal<MuralBoardSummary | null>(null);
+  readonly loadingExcluirMuralModal = signal(false);
   boardName = '';
   boardDescription = '';
   boardColor = '#f59e0b';
@@ -636,7 +638,10 @@ export class MuralBoardComponent implements OnInit, OnDestroy {
           if (remaining.length) {
             this.selecionarMural(remaining[0].id);
           } else {
-            this.muralService.loadBoards();
+            this.activeBoard.set(null);
+            this.muralService.activeBoard.set(null);
+            this.boards.set([]);
+            this.muralService.boards.set([]);
           }
         },
         error: (err) => console.error('Erro ao excluir mural:', err)
@@ -645,22 +650,38 @@ export class MuralBoardComponent implements OnInit, OnDestroy {
 
   excluirMuralPorId(board: MuralBoardSummary, event?: Event): void {
     event?.stopPropagation();
-    if (!confirm(`Deseja excluir o mural "${board.name}" e todas as suas notas? Esta ação não pode ser desfeita.`)) return;
+    this.boardToDelete.set(board);
+  }
 
-    this.apiService.excluirMural(board.id, this.currentUserId).subscribe({
-      next: () => {
-        const remaining = this.boards().filter(b => b.id !== board.id);
-        this.boards.set(remaining);
-        if (this.activeBoard()?.id === board.id) {
-          if (remaining.length) {
-            this.selecionarMural(remaining[0].id);
-          } else {
-            this.muralService.loadBoards();
+  cancelarExclusaoMuralModal(): void {
+    this.boardToDelete.set(null);
+  }
+
+  confirmarExclusaoMuralModal(): void {
+    const board = this.boardToDelete();
+    if (!board || this.loadingExcluirMuralModal()) return;
+
+    this.loadingExcluirMuralModal.set(true);
+    this.apiService.excluirMural(board.id, this.currentUserId)
+      .pipe(finalize(() => { this.loadingExcluirMuralModal.set(false); }))
+      .subscribe({
+        next: () => {
+          const remaining = this.boards().filter(b => b.id !== board.id);
+          this.boards.set(remaining);
+          this.boardToDelete.set(null);
+          if (this.activeBoard()?.id === board.id) {
+            if (remaining.length) {
+              this.selecionarMural(remaining[0].id);
+            } else {
+              this.activeBoard.set(null);
+              this.muralService.activeBoard.set(null);
+              this.boards.set([]);
+              this.muralService.boards.set([]);
+            }
           }
-        }
-      },
-      error: (err) => console.error('Erro ao excluir mural:', err)
-    });
+        },
+        error: (err) => console.error('Erro ao excluir mural:', err)
+      });
   }
 
   // ══ Drag & Drop dos Cartões (CDK Drag & Drop com reordenação fluida) ══
