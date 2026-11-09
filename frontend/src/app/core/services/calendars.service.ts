@@ -248,9 +248,17 @@ export class CalendarsService {
       });
   }
 
-  /** Toggle visibilidade de uma agenda */
+  /** Toggle visibilidade de uma agenda (suporte a seleção múltipla / overlay) */
   toggleVisibility(calendarId: string): void {
-    this.visibleCalendarIds.set(new Set([calendarId]));
+    const current = new Set(this.visibleCalendarIds());
+    if (current.has(calendarId)) {
+      if (current.size > 1) {
+        current.delete(calendarId);
+      }
+    } else {
+      current.add(calendarId);
+    }
+    this.visibleCalendarIds.set(current);
   }
 
   /** Seleciona exclusivamente apenas esta agenda */
@@ -258,15 +266,19 @@ export class CalendarsService {
     this.visibleCalendarIds.set(new Set([calendarId]));
   }
 
-  /** Seleciona todas as agendas */
+  /** Seleciona todas as agendas não ocultas */
   selectAll(): void {
-    const firstId = this.calendars()[0]?.id;
-    this.visibleCalendarIds.set(new Set(firstId ? [firstId] : []));
+    const activeIds = this.calendars()
+      .filter(c => !c.isHidden)
+      .map(c => c.id);
+    this.visibleCalendarIds.set(new Set(activeIds));
   }
 
-  /** Desmarca todas as agendas */
+  /** Desmarca todas as agendas mantendo ao menos a primeira */
   deselectAll(): void {
-    this.selectAll();
+    const active = this.calendars().filter(c => !c.isHidden);
+    const firstId = active[0]?.id || this.calendars()[0]?.id;
+    this.visibleCalendarIds.set(new Set(firstId ? [firstId] : []));
   }
 
   /** Verifica se todas estão selecionadas */

@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, ViewChild, inject, computed, signal, effect, untracked } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, HostListener, inject, computed, signal, effect, untracked } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -35,6 +35,11 @@ import { AppLoadingService } from '../../../core/services/app-loading.service';
 import { AiService } from '../../../core/services/ai.service';
 import { AiAssistantComponent } from '../../../shared/components/ai-assistant/ai-assistant.component';
 import { LivroAbrindoComponent } from '../../../shared/components/livro-abrindo/livro-abrindo.component';
+import { CommandPaletteComponent } from '../../../shared/components/command-palette/command-palette.component';
+import { NotificationPopoverComponent } from '../../../shared/components/notification-popover/notification-popover.component';
+import { NotificationsService } from '../../../core/services/notifications.service';
+import { KanbanTask } from '../../../core/models/kanban.model';
+import { MuralItem } from '../../../core/models/mural.model';
 
 export type CalendarView = 'month' | 'week' | 'day';
 
@@ -44,7 +49,7 @@ export type CalendarView = 'month' | 'week' | 'day';
   imports: [
     CommonModule, MatDialogModule, MatIconModule, MatTooltipModule,
     MonthViewComponent, WeekViewComponent, DayViewComponent,
-    MiniCalendarComponent, ThemeToggleComponent, CalendarManagerComponent, KanbanBoardComponent, MuralBoardComponent, NotificationSettingsComponent, AiAssistantComponent, LivroAbrindoComponent,
+    MiniCalendarComponent, ThemeToggleComponent, CalendarManagerComponent, KanbanBoardComponent, MuralBoardComponent, NotificationSettingsComponent, AiAssistantComponent, LivroAbrindoComponent, CommandPaletteComponent, NotificationPopoverComponent,
   ],
   templateUrl: './calendar-page.component.html',
   styleUrl: './calendar-page.component.scss',
@@ -131,6 +136,72 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
   readonly sidebarCollapsed = signal<boolean>(this.userPreferences.sidebarCollapsed());
   readonly agendaPillsExpanded = signal(this.userPreferences.agendaPillsExpanded());
   readonly notificationSettingsOpen = signal(false);
+  readonly notificationPopoverOpen = signal(false);
+  readonly notificationsService = inject(NotificationsService);
+  readonly commandPaletteOpen = signal(false);
+
+  toggleNotificationPopover(event: MouseEvent): void {
+    event.stopPropagation();
+    this.notificationPopoverOpen.update(v => !v);
+  }
+
+  openCommandPalette(): void {
+    this.commandPaletteOpen.set(true);
+  }
+
+  closeCommandPalette(): void {
+    this.commandPaletteOpen.set(false);
+  }
+
+  allMuralItems(): MuralItem[] {
+    const active = this.muralService.activeBoard();
+    if (!active?.items) return [];
+    return active.items;
+  }
+
+  allKanbanTasks(): KanbanTask[] {
+    const board = this.kanbanService.activeBoard();
+    return board?.tasks || [];
+  }
+
+  onCommandPaletteSelectEvent(event: CalendarEvent): void {
+    this.openViewModal(event);
+  }
+
+  onCommandPaletteSelectTask(task: KanbanTask): void {
+    this.setSection('tasks');
+    setTimeout(() => {
+      this.kanbanBoard?.openView(task);
+    }, 100);
+  }
+
+  onCommandPaletteSelectMuralItem(item: MuralItem): void {
+    this.setSection('mural');
+    setTimeout(() => {
+      this.muralBoard?.abrirVisualizarItem(item);
+    }, 100);
+  }
+
+  onCommandPaletteTriggerAction(actionId: string): void {
+    switch (actionId) {
+      case 'act-new-event':
+        this.setSection('calendar');
+        this.openCreateModal();
+        break;
+      case 'act-new-task':
+        this.setSection('tasks');
+        this.openTaskCreate();
+        break;
+      case 'act-new-mural':
+        this.setSection('mural');
+        this.openMuralCreate();
+        break;
+      case 'act-go-today':
+        this.setSection('calendar');
+        this.goToday();
+        break;
+    }
+  }
 
   readonly events = this.eventsService.events;
   /** Eventos exibidos, incluindo os pagamentos padrão da Minha Agenda. */
@@ -190,6 +261,14 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
     return `há ${Math.round(diff / 60)}min`;
   }
 
+  @HostListener('window:keydown', ['$event'])
+  handleWindowKeydown(event: KeyboardEvent): void {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+      event.preventDefault();
+      this.commandPaletteOpen.update(v => !v);
+    }
+  }
+
   ngOnInit(): void {
     this.route.paramMap.subscribe(() => {
       this.applyRouteState();
@@ -226,7 +305,24 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
   }
 
   toggleCalendarVisibility(calendarId: string): void {
-    this.selectOnlyCalendar(calendarId);
+    const wasVisible = this.calendarsService.visibleCalendarIds().has(calendarId);
+    this.calendarsService.toggleVisibility(calendarId);
+    const isNowVisible = this.calendarsService.visibleCalendarIds().has(calendarId);
+
+    if (isNowVisible && !wasVisible) {
+      this.eventsService.loadFromCalendar(calendarId);
+    } else if (!isNowVisible && wasVisible) {
+      this.eventsService.unloadCalendar(calendarId);
+    }
+
+    if (this.activeSection === 'calendar') {
+      const visibleIds = [...this.calendarsService.visibleCalendarIds()];
+      void this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { agenda: visibleIds.length === 1 ? visibleIds[0] : null },
+        queryParamsHandling: 'merge',
+      });
+    }
   }
 
   selectOnlyCalendar(calendarId: string, ev?: Event): void {
@@ -246,12 +342,23 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
 
   selectAllCalendars(): void {
     this.calendarsService.selectAll();
-    const id = [...this.calendarsService.visibleCalendarIds()][0];
-    if (id) this.selectOnlyCalendar(id);
+    const visibleIds = [...this.calendarsService.visibleCalendarIds()];
+    this.eventsService.loadFromCalendars(visibleIds);
+    if (this.activeSection === 'calendar') {
+      void this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { agenda: null },
+        queryParamsHandling: 'merge',
+      });
+    }
   }
 
   deselectAllCalendars(): void {
-    this.selectAllCalendars();
+    this.calendarsService.deselectAll();
+    const visibleIds = [...this.calendarsService.visibleCalendarIds()];
+    if (visibleIds[0]) {
+      this.selectOnlyCalendar(visibleIds[0]);
+    }
   }
 
   removeCalendar(cal: Calendar): void {
@@ -400,7 +507,7 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
     const event = this.eventDeleteTarget();
     if (!event || !this.canManageEvent(event)) return;
     this.eventDeleteLoading.set(true);
-    this.eventsService.remove(event.id, success => {
+    this.eventsService.remove(event.id, 'this', (success: boolean) => {
       this.eventDeleteLoading.set(false);
       if (success) this.eventDeleteTarget.set(null);
     });
@@ -530,7 +637,7 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
   onMiniCalMonthChanged(date: Date): void { this.loadHolidays(date.getFullYear()); }
 
   // ── Modal de eventos ──
-  openCreateModal(defaultDate?: string): void {
+  openCreateModal(defaultDate?: string, startTime?: string, endTime?: string): void {
     if (this.isTaskCalendarSelected()) return;
     const targetCalendarIds = this.calendarsService.calendars()
       .filter(cal => this.calendarsService.visibleCalendarIds().has(cal.id) && this.calendarsService.canEdit(cal.id))
@@ -542,11 +649,15 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
     });
     const dialogRef = this.dialog.open(EventModalComponent, {
       width: '600px', maxWidth: '98vw',
-      data: { defaultDate, targetCalendarIds } satisfies EventModalData,
+      data: { defaultDate, startTime, endTime, targetCalendarIds } satisfies EventModalData,
       panelClass: 'agenda-dialog',
       disableClose: true,
     });
     dialogRef.afterClosed().subscribe(() => this.clearUrlAction());
+  }
+
+  onTimeRangeSelected(range: { date: string; startTime: string; endTime: string }): void {
+    this.openCreateModal(range.date, range.startTime, range.endTime);
   }
 
   openViewModal(event: CalendarEvent): void {

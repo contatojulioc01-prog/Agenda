@@ -7,6 +7,7 @@
 
   <!-- ══════════════ SIDEBAR ══════════════ -->
   <aside class="sidebar" [class.collapsed]="sidebarCollapsed()">
+    <div class="sidebar-backdrop" *ngIf="!sidebarCollapsed()" (click)="toggleSidebar()"></div>
     <div class="sidebar-top">
       <!-- Header com Marca e Botão de Expandir/Recolher -->
       <div class="sidebar-header-row">
@@ -105,6 +106,17 @@
           [matTooltip]="cal.taskTeamName || 'Tarefas'"
           matTooltipPosition="right">
           <span class="collapsed-cal-indicator" [style.background]="cal.color"></span>
+        </button>
+      </div>
+
+      <!-- Tarefas: quadros ativos -->
+      <div class="collapsed-cals-list" *ngIf="activeSection === 'tasks'">
+        <button *ngFor="let b of kanbanService.boards()" type="button" class="collapsed-cal-btn"
+          [class.is-active]="kanbanService.activeBoard()?.id === b.id"
+          (click)="kanbanService.loadBoard(b.id)"
+          [matTooltip]="b.name"
+          matTooltipPosition="right">
+          <span class="collapsed-cal-indicator" [style.background]="b.color"></span>
         </button>
       </div>
 
@@ -275,10 +287,36 @@
     <div class="sidebar-content tasks-sidebar" [hidden]="sidebarCollapsed() || activeSection !== 'tasks'">
       <div class="tasks-sidebar-hero">
         <span class="tasks-sidebar-icon"><mat-icon>task_alt</mat-icon></span>
-        <h2>Central de tarefas</h2>
-        <p>Planeje, priorize e mova seus cartões por cada etapa do trabalho.</p>
+        <h2>Central de Tarefas</h2>
+        <p>Planeje, priorize e acompanhe suas atividades em tempo real.</p>
       </div>
+
       <div class="sidebar-divider"></div>
+
+      <!-- Seção: Seus Quadros de Tarefas -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-header">
+          <button type="button" class="sidebar-section-toggle" (click)="toggleSidebarSection('kanban-boards')"
+            [attr.aria-expanded]="!isSidebarSectionCollapsed('kanban-boards')" aria-controls="kanban-boards-list">
+            <mat-icon>{{ isSidebarSectionCollapsed('kanban-boards') ? 'chevron_right' : 'expand_more' }}</mat-icon>
+            <span class="sidebar-section-title">Seus Quadros</span>
+          </button>
+        </div>
+        <div id="kanban-boards-list" class="calendar-list" *ngIf="!isSidebarSectionCollapsed('kanban-boards')">
+          <div *ngFor="let b of kanbanService.boards()" class="calendar-item"
+            [class.is-active]="kanbanService.activeBoard()?.id === b.id" [style.--cal-color]="b.color"
+            (click)="kanbanService.loadBoard(b.id)">
+            <div class="calendar-info">
+              <span class="calendar-dot" [style.background]="b.color"></span>
+              <span class="calendar-name">{{ b.name }}</span>
+              <span class="mural-count-badge" *ngIf="b.taskCount">{{ b.taskCount }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-divider"></div>
+
       <div class="sidebar-section task-tips">
         <div class="sidebar-section-header">
           <button type="button" class="sidebar-section-toggle" (click)="toggleSidebarSection('task-tips')"
@@ -363,15 +401,26 @@
           <span class="user-dept">{{ user.departamentName || 'Corporativo' }}</span>
         </div>
         <div class="user-card-actions" [class.collapsed-actions]="sidebarCollapsed()">
-          <button class="btn-logout btn-notifications" (click)="notificationSettingsOpen.set(true)"
-            matTooltip="Notificações do Windows" matTooltipPosition="right" aria-label="Configurar notificações">
+          <button class="btn-logout btn-notifications" (click)="toggleNotificationPopover($event)"
+            matTooltip="Notificações e Avisos" matTooltipPosition="right" aria-label="Notificações">
             <mat-icon>notifications</mat-icon>
+            <span class="sidebar-unread-dot" *ngIf="notificationsService.unreadCount() > 0"></span>
+          </button>
+          <button class="btn-logout" (click)="notificationSettingsOpen.set(true)"
+            matTooltip="Configurar Notificações do Windows" matTooltipPosition="right" aria-label="Configurar notificações">
+            <mat-icon>settings</mat-icon>
           </button>
           <button class="btn-logout" (click)="logout()" matTooltip="Encerrar sessão" matTooltipPosition="right" aria-label="Sair">
             <mat-icon>logout</mat-icon>
           </button>
         </div>
       </div>
+
+      <!-- Popover de Notificações Integrado na Sidebar -->
+      <app-notification-popover
+        *ngIf="notificationPopoverOpen()"
+        (close)="notificationPopoverOpen.set(false)"
+      ></app-notification-popover>
 
       <!-- Toggle tema fixo -->
       <div class="sidebar-bottom">
@@ -388,6 +437,9 @@
     <div class="group-panel header-panel">
       <div class="header-main-row">
         <div class="header-left">
+          <button type="button" class="mobile-menu-toggle" (click)="toggleSidebar()" aria-label="Abrir menu">
+            <mat-icon>menu</mat-icon>
+          </button>
           <button class="btn-today" (click)="goToday()" id="btn-hoje">Hoje</button>
           <button class="nav-arrow" (click)="navigate(-1)" id="btn-prev" aria-label="Período anterior">
             <mat-icon>chevron_left</mat-icon>
@@ -429,10 +481,17 @@
         </button>
 
         <div class="pills-scroll" id="agenda-pills-list" *ngIf="agendaPillsExpanded()">
+          <button type="button" class="agenda-pill pill-all"
+            [class.active]="calendarsService.isAllSelected()"
+            (click)="selectAllCalendars()"
+            matTooltip="Exibir todas as agendas simultaneamente">
+            <mat-icon class="pill-all-icon">done_all</mat-icon>
+            <span class="pill-name">Todas</span>
+          </button>
           <button *ngFor="let cal of activePillCalendars()" class="agenda-pill"
             [class.active]="calendarsService.visibleCalendarIds().has(cal.id)"
             (click)="toggleCalendarVisibility(cal.id)"
-            [matTooltip]="calendarDisplayName(cal) + ' · Clique para exibir esta agenda'">
+            [matTooltip]="calendarDisplayName(cal) + (calendarsService.visibleCalendarIds().has(cal.id) ? ' (Visível · clique para ocultar)' : ' (Oculta · clique para exibir)')">
             <span class="pill-dot" [style.background]="cal.color"></span>
             <span class="pill-name">{{ calendarDisplayName(cal) }}</span>
           </button>
@@ -451,11 +510,11 @@
       <app-week-view *ngIf="currentView === 'week'" [selectedDate]="selectedDate" [events]="displayedEvents()"
         [holidays]="holidays" (dayClick)="openCreateModal($event)" (dayContextMenu)="openDayContextMenu($event)"
         (eventClick)="openViewModal($event)" (eventContextMenu)="openEventContextMenu($event)"
-        (eventDrop)="onEventDrop($event)"></app-week-view>
+        (eventDrop)="onEventDrop($event)" (timeRangeSelected)="onTimeRangeSelected($event)"></app-week-view>
 
       <app-day-view *ngIf="currentView === 'day'" [selectedDate]="selectedDate" [events]="displayedEvents()"
         [holidays]="holidays" (dayContextMenu)="openDayContextMenu($event)" (eventClick)="openViewModal($event)"
-        (eventContextMenu)="openEventContextMenu($event)" (eventDrop)="onEventDrop($event)"></app-day-view>
+        (eventContextMenu)="openEventContextMenu($event)" (eventDrop)="onEventDrop($event)" (timeRangeSelected)="onTimeRangeSelected($event)"></app-day-view>
 
     </div>
   </div>
@@ -543,6 +602,19 @@
 
 <app-notification-settings *ngIf="notificationSettingsOpen()"
   (closed)="notificationSettingsOpen.set(false)"></app-notification-settings>
+
+<!-- ── Command Palette Global (Ctrl + K) ── -->
+<app-command-palette
+  *ngIf="commandPaletteOpen()"
+  [events]="displayedEvents()"
+  [tasks]="allKanbanTasks()"
+  [muralItems]="allMuralItems()"
+  (close)="closeCommandPalette()"
+  (selectEvent)="onCommandPaletteSelectEvent($event)"
+  (selectTask)="onCommandPaletteSelectTask($event)"
+  (selectMuralItem)="onCommandPaletteSelectMuralItem($event)"
+  (triggerAction)="onCommandPaletteTriggerAction($event)">
+</app-command-palette>
 
 <div class="invitation-overlay" *ngIf="calendarDeleteTarget as calendar">
   <section class="invitation-modal delete-calendar-modal" role="dialog" aria-modal="true"

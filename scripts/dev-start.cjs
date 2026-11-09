@@ -8,7 +8,8 @@ const frontendDir = path.join(rootDir, 'frontend');
 const isWindows = process.platform === 'win32';
 const token = 'agenda-dev-local';
 const appHost = process.env.DEV_HOST || '0.0.0.0';
-const appUrl = `http://0.0.0.0:9990/?token=${encodeURIComponent(token)}`;
+const devPort = process.env.DEV_PORT || '5200';
+const appUrl = `http://0.0.0.0:${devPort}/?token=${encodeURIComponent(token)}`;
 const children = [];
 let stopping = false;
 
@@ -79,7 +80,7 @@ start('frontend', ['run', 'dev:serve'], frontendDir, {});
 
 Promise.all([
   waitUntilReady('http://0.0.0.0:9900/health'),
-  waitUntilReady('http://0.0.0.0:9990/'),
+  waitUntilReady(`http://0.0.0.0:${devPort}/`),
 ]).then(([backendReady, frontendReady]) => {
   if (!backendReady || !frontendReady) {
     console.error('[DEV] Os servidores não ficaram prontos dentro do tempo esperado.');

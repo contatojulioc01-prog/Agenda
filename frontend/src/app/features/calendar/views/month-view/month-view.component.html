@@ -39,27 +39,70 @@
 
       <!-- Camada de Barras de Eventos (Grid contínuo de 7 colunas sobreposto) -->
       <div class="week-events-layer">
+        <ng-container *ngFor="let seg of week.segments">
+          <div
+            *ngIf="seg.rowSlot < MAX_VISIBLE_SLOTS"
+            class="month-event-bar"
+            [class.bar-start]="seg.isStart"
+            [class.bar-end]="seg.isEnd"
+            [class.bar-single]="seg.isStart && seg.isEnd && seg.span === 1"
+            [class.system-event]="seg.event.isSystem"
+            [class.task-deadline]="seg.event.isTaskDeadline"
+            [style.grid-column]="(seg.startCol + 1) + ' / span ' + seg.span"
+            [style.top.px]="32 + seg.rowSlot * 24"
+            [style.background]="colorMap[seg.event.color]"
+            [attr.draggable]="seg.event.isSystem || (seg.event.endDate && seg.event.endDate !== seg.event.date) ? null : true"
+            (dragstart)="onDragStart($event, seg.event)"
+            (dragend)="onDragEnd($event)"
+            (click)="$event.stopPropagation(); eventClick.emit(seg.event)"
+            (contextmenu)="$event.preventDefault(); $event.stopPropagation(); eventContextMenu.emit({ event: seg.event, mouseEvent: $event })"
+            [matTooltip]="seg.event.title + (seg.event.allDay ? '' : ' · ' + seg.event.startTime + ' - ' + seg.event.endTime) + (seg.event.endDate && seg.event.endDate !== seg.event.date ? ' (' + seg.event.date + ' até ' + seg.event.endDate + ')' : '') + (seg.event.isTaskDeadline ? ' · Clique para abrir o card em Tarefas' : '')"
+          >
+            <span *ngIf="!seg.event.allDay && seg.isStart" class="bar-time">{{ seg.event.startTime }}</span>
+            <span class="bar-title">{{ seg.event.title }}</span>
+          </div>
+        </ng-container>
+
+        <!-- Indicador de +N mais para dias com eventos excedentes -->
+        <ng-container *ngFor="let day of week.days; let dayCol = index">
+          <button
+            *ngIf="getHiddenCountForDay(week, dayCol, day.dateStr) > 0"
+            type="button"
+            class="month-more-btn"
+            [style.grid-column]="dayCol + 1"
+            [style.top.px]="32 + MAX_VISIBLE_SLOTS * 24"
+            (click)="openDayMore(day, $event)"
+            matTooltip="Ver todos os eventos deste dia">
+            +{{ getHiddenCountForDay(week, dayCol, day.dateStr) }} mais
+          </button>
+        </ng-container>
+      </div>
+    </div>
+  </div>
+
+  <!-- Popover "+N mais" do dia -->
+  <div class="day-popover-backdrop" *ngIf="dayPopover as pop" (click)="closeDayPopover()">
+    <div class="day-popover-card" [style.left.px]="pop.x" [style.top.px]="pop.y" (click)="$event.stopPropagation()">
+      <div class="popover-header">
+        <span class="popover-title">Dia {{ pop.dayNum }} · {{ pop.events.length }} evento(s)</span>
+        <button type="button" class="popover-close" (click)="closeDayPopover()"><mat-icon>close</mat-icon></button>
+      </div>
+      <div class="popover-list">
         <div
-          *ngFor="let seg of week.segments"
-          class="month-event-bar"
-          [class.bar-start]="seg.isStart"
-          [class.bar-end]="seg.isEnd"
-          [class.bar-single]="seg.isStart && seg.isEnd && seg.span === 1"
-          [class.system-event]="seg.event.isSystem"
-          [class.task-deadline]="seg.event.isTaskDeadline"
-          [style.grid-column]="(seg.startCol + 1) + ' / span ' + seg.span"
-          [style.top.px]="32 + seg.rowSlot * 24"
-          [style.background]="colorMap[seg.event.color]"
-          [attr.draggable]="seg.event.isSystem || (seg.event.endDate && seg.event.endDate !== seg.event.date) ? null : true"
-          (dragstart)="onDragStart($event, seg.event)"
-          (dragend)="onDragEnd($event)"
-          (click)="$event.stopPropagation(); eventClick.emit(seg.event)"
-          (contextmenu)="$event.preventDefault(); $event.stopPropagation(); eventContextMenu.emit({ event: seg.event, mouseEvent: $event })"
-          [matTooltip]="seg.event.title + (seg.event.allDay ? '' : ' · ' + seg.event.startTime + ' - ' + seg.event.endTime) + (seg.event.endDate && seg.event.endDate !== seg.event.date ? ' (' + seg.event.date + ' até ' + seg.event.endDate + ')' : '') + (seg.event.isTaskDeadline ? ' · Clique para abrir o card em Tarefas' : '')"
+          *ngFor="let ev of pop.events"
+          class="popover-event-item"
+          [style.--ev-color]="colorMap[ev.color]"
+          (click)="eventClick.emit(ev); closeDayPopover()"
         >
-          <span *ngIf="!seg.event.allDay && seg.isStart" class="bar-time">{{ seg.event.startTime }}</span>
-          <span class="bar-title">{{ seg.event.title }}</span>
+          <span class="ev-color-dot" [style.background]="colorMap[ev.color]"></span>
+          <span class="ev-time" *ngIf="!ev.allDay">{{ ev.startTime }}</span>
+          <span class="ev-title">{{ ev.title }}</span>
         </div>
+      </div>
+      <div class="popover-footer">
+        <button type="button" class="popover-add-btn" (click)="dayClick.emit(pop.dateStr); closeDayPopover()">
+          <mat-icon>add</mat-icon> Criar evento neste dia
+        </button>
       </div>
     </div>
   </div>

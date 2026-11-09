@@ -14,9 +14,14 @@
           <p>{{ isReadOnly ? 'Visualização dos dados, avisos e anexos deste cartão.' : (isEdit ? 'Atualize as informações, anexos ou estilo do aviso.' : 'Adicione uma nota, documento ou comunicado ao mural.') }}</p>
         </div>
       </div>
-      <button type="button" class="close-btn" (click)="fechar()" title="Fechar">
-        <mat-icon class="material-icon">close</mat-icon>
-      </button>
+      <div class="header-actions-right">
+        <button *ngIf="isReadOnly" type="button" class="header-action-btn" (click)="enableEditMode()" matTooltip="Editar nota">
+          <mat-icon>edit</mat-icon>
+        </button>
+        <button type="button" class="close-btn" (click)="fechar()" title="Fechar">
+          <mat-icon class="material-icon">close</mat-icon>
+        </button>
+      </div>
     </div>
 
     <!-- Scrollable Body -->
@@ -31,7 +36,7 @@
       </div>
 
       <!-- Modo Visualização Limpo & Elegante -->
-      <div class="read-only-view-container" *ngIf="isReadOnly">
+      <div class="read-only-view-container" *ngIf="isReadOnly" (dblclick)="enableEditMode()">
         <div class="view-content-card" [style.border-left-color]="selectedColor">
           <div class="view-header-row">
             <h1 class="view-title">{{ title || 'Sem título' }}</h1>
@@ -170,7 +175,8 @@
             <h3>Documentos, Códigos & Anexos</h3>
           </div>
 
-          <div class="attachments-section">
+          <div class="attachments-section" [class.drag-over-zone]="isDragOver"
+            (dragover)="onDragOver($event)" (dragleave)="onDragLeave($event)" (drop)="onDrop($event)">
             <div class="upload-dropzone">
               <input
                 type="file"
@@ -192,9 +198,9 @@
                   class="button-spinner"
                 ></mat-progress-spinner>
                 <mat-icon *ngIf="!loadingUpload">cloud_upload</mat-icon>
-                <span>{{ loadingUpload ? 'Enviando anexos...' : 'Anexar Arquivos (Qualquer formato)' }}</span>
+                <span>{{ loadingUpload ? 'Enviando anexos...' : 'Anexar Arquivos (ou arraste / cole aqui)' }}</span>
               </button>
-              <span class="upload-hint">Aceita códigos de programação, PDFs, imagens, documentos e planilhas</span>
+              <span class="upload-hint">Arraste arquivos aqui, cole imagens da área de transferência (Ctrl+V) ou clique para selecionar</span>
             </div>
 
             <!-- Arquivos Pendentes (Mini-Cards sem botões visíveis, opções no botão direito) -->
@@ -245,6 +251,13 @@
             </div>
           </div>
         </div>
+
+        <!-- Linha do Tempo e Comentários da Nota -->
+        <app-activity-timeline
+          *ngIf="item && item.id"
+          [entityType]="'mural_item'"
+          [entityId]="item.id"
+        ></app-activity-timeline>
 
       </form>
 

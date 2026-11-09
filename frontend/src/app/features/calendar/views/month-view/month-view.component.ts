@@ -53,9 +53,40 @@ export class MonthViewComponent implements OnInit, OnChanges {
 
   readonly DOW = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
   readonly colorMap = EVENT_COLOR_MAP;
+  readonly MAX_VISIBLE_SLOTS = 3;
 
   monthWeeks: MonthWeek[] = [];
   dragEventId: string | null = null;
+  dayPopover: { dateStr: string; dayNum: number; events: CalendarEvent[]; x: number; y: number } | null = null;
+
+  openDayMore(day: MonthDay, ev: MouseEvent): void {
+    ev.stopPropagation();
+    ev.preventDefault();
+    const dayEvs = (this.events || []).filter(e => {
+      const end = e.endDate || e.date;
+      return e.date <= day.dateStr && end >= day.dateStr;
+    });
+    const x = Math.min(window.innerWidth - 300, Math.max(10, ev.clientX - 100));
+    const y = Math.min(window.innerHeight - 350, Math.max(10, ev.clientY - 40));
+    this.dayPopover = {
+      dateStr: day.dateStr,
+      dayNum: day.dayNum,
+      events: dayEvs,
+      x,
+      y,
+    };
+  }
+
+  closeDayPopover(): void {
+    this.dayPopover = null;
+  }
+
+  getHiddenCountForDay(week: MonthWeek, dayCol: number, dayDateStr: string): number {
+    return (this.events || []).filter(e => {
+      const end = e.endDate || e.date;
+      return e.date <= dayDateStr && end >= dayDateStr;
+    }).length - week.segments.filter(s => s.startCol <= dayCol && (s.startCol + s.span - 1) >= dayCol && s.rowSlot < this.MAX_VISIBLE_SLOTS).length;
+  }
 
   ngOnInit(): void {
     this.build();

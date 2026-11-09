@@ -165,6 +165,23 @@
           Nenhum membro adicionado ainda. Pesquise pelo nome no campo acima para vincular colaboradores.
         </p>
       </div>
+
+      <!-- Importação e Exportação iCal (.ics) -->
+      <div class="field-group" *ngIf="isEditing && calendar">
+        <label class="field-label">Sincronização & Arquivo iCal (.ics)</label>
+        <div class="sync-actions-row">
+          <button type="button" class="btn-sync-action" (click)="exportIcs()">
+            <mat-icon>file_download</mat-icon>
+            <span>Exportar .ics</span>
+          </button>
+          <label class="btn-sync-action file-btn">
+            <mat-icon>file_upload</mat-icon>
+            <span>{{ isImporting ? 'Importando...' : 'Importar .ics' }}</span>
+            <input type="file" accept=".ics,text/calendar" (change)="onFileIcsSelected($event)" style="display: none;" [disabled]="isImporting" />
+          </label>
+        </div>
+        <small class="sync-hint">Compatível com Google Calendar, Outlook e Apple Calendar.</small>
+      </div>
     </div>
 
     <!-- Footer -->

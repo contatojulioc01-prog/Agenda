@@ -929,6 +929,26 @@ export class MuralBoardComponent implements OnInit, OnDestroy {
     });
   }
 
+  converterItemEmTarefa(item: MuralItem): void {
+    this.closeMuralItemContextMenu();
+    const boards = this.kanbanService.boards();
+    const targetBoard = boards[0];
+    if (!targetBoard) {
+      alert('Nenhum quadro Kanban encontrado para converter.');
+      return;
+    }
+
+    this.muralService.convertToTask(item.id, {
+      boardId: targetBoard.id,
+      priority: 'medium'
+    }).subscribe({
+      next: (res) => {
+        this.router.navigate(['/tarefas', res.boardId], { queryParams: { tarefa: res.taskId } });
+      },
+      error: (err) => console.error('Erro ao converter nota em tarefa:', err)
+    });
+  }
+
   formatarData(isoString: string): string {
     if (!isoString) return '';
     try {

@@ -127,6 +127,44 @@ router.delete('/devices/:deviceId', asyncRoute(async (req, res) => {
   res.json({ success: true });
 }));
 
+// In-App Notifications Center
+router.get('/inbox', asyncRoute(async (req, res) => {
+  const userId = req.headers['x-user-id'];
+  if (!userId) return res.status(401).json({ error: 'Usuário não autenticado' });
+
+  const notifications = await db.all(`SELECT id, user_id AS "userId", title, message, type,
+    reference_type AS "referenceType", reference_id AS "referenceId",
+    CASE WHEN read = 1 THEN true ELSE false END AS read,
+    created_at AS "createdAt"
+    FROM inapp_notifications
+    WHERE user_id = $1
+    ORDER BY created_at DESC
+    LIMIT 100`, [userId]);
+
+  const unreadCount = await db.get(`SELECT COUNT(*) AS total FROM inapp_notifications WHERE user_id = $1 AND read = 0`, [userId]);
+
+  res.json({
+    notifications,
+    unreadCount: Number(unreadCount ? unreadCount.total : 0)
+  });
+}));
+
+router.patch('/:id/read', asyncRoute(async (req, res) => {
+  const userId = req.headers['x-user-id'];
+  if (!userId) return res.status(401).json({ error: 'Usuário não autenticado' });
+
+  await db.run('UPDATE inapp_notifications SET read = 1 WHERE id = $1 AND user_id = $2', [req.params.id, userId]);
+  res.json({ success: true });
+}));
+
+router.post('/read-all', asyncRoute(async (req, res) => {
+  const userId = req.headers['x-user-id'];
+  if (!userId) return res.status(401).json({ error: 'Usuário não autenticado' });
+
+  await db.run('UPDATE inapp_notifications SET read = 1 WHERE user_id = $1', [userId]);
+  res.json({ success: true });
+}));
+
 deviceRouter.use(asyncRoute(authenticateDevice));
 
 function shiftDate(date, days) {

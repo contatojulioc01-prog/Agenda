@@ -7,6 +7,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Calendar, CalendarMember, CalendarPermission, CALENDAR_COLORS } from '../../../core/models/calendar.model';
 import { CalendarsService } from '../../../core/services/calendars.service';
+import { EventsService } from '../../../core/services/events.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { UserResponse, DEFAULT_AVATAR } from '../../../core/models/user.model';
 
@@ -19,6 +20,7 @@ import { UserResponse, DEFAULT_AVATAR } from '../../../core/models/user.model';
 })
 export class CalendarManagerComponent implements OnInit {
   public calendarsService = inject(CalendarsService);
+  public eventsService = inject(EventsService);
   public authService = inject(AuthService);
 
   readonly defaultAvatar = DEFAULT_AVATAR;
@@ -36,6 +38,7 @@ export class CalendarManagerComponent implements OnInit {
   name = signal('');
   selectedColor = '#4f46e5';
   isPrivate = true;
+  isImporting = false;
 
   // Dropdowns
   showMemberDropdown = false;
@@ -213,5 +216,35 @@ export class CalendarManagerComponent implements OnInit {
     if (!success) return;
     this.saved.emit();
     this.closed.emit();
+  }
+
+  exportIcs(): void {
+    if (!this.calendar) return;
+    const url = this.eventsService.getExportIcsUrl(this.calendar.id);
+    window.open(url, '_blank');
+  }
+
+  onFileIcsSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (!input.files || !input.files[0] || !this.calendar) return;
+    const file = input.files[0];
+    this.isImporting = true;
+    file.text().then(content => {
+      this.eventsService.importIcs(this.calendar!.id, content).subscribe({
+        next: (res) => {
+          this.isImporting = false;
+          input.value = '';
+          this.eventsService.loadFromCalendar(this.calendar!.id);
+          this.saved.emit();
+        },
+        error: (err) => {
+          this.isImporting = false;
+          input.value = '';
+          console.error('Erro ao importar .ics:', err);
+        }
+      });
+    }).catch(() => {
+      this.isImporting = false;
+    });
   }
 }

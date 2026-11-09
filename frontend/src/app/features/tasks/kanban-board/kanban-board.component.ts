@@ -17,6 +17,7 @@ import { AiTextButtonComponent } from '../../../shared/components/ai-text-button
 import { MarkdownTextComponent } from '../../../shared/components/markdown-text/markdown-text.component';
 import { MarkdownEditorComponent } from '../../../shared/components/markdown-editor/markdown-editor.component';
 import { AttachmentPreviewModalComponent } from '../../../shared/components/attachment-preview-modal/attachment-preview-modal.component';
+import { ActivityTimelineComponent } from '../../../shared/components/activity-timeline/activity-timeline.component';
 import { detectFileType } from '../../../core/utils/code-highlight.util';
 
 export type ColumnFieldType = 'text' | 'date' | 'number' | 'select' | 'checkbox' | 'person' | 'system';
@@ -54,6 +55,7 @@ export const DEFAULT_TABLE_COLUMNS: TableColumnDef[] = [
     MarkdownTextComponent,
     MarkdownEditorComponent,
     AttachmentPreviewModalComponent,
+    ActivityTimelineComponent,
   ],
   templateUrl: './kanban-board.component.html',
   styleUrl: './kanban-board.component.scss',
@@ -115,6 +117,13 @@ export class KanbanBoardComponent implements OnDestroy {
   readonly modalOpen = signal(false);
   readonly isTaskReadOnly = signal(false);
   readonly editingId = signal<string | null>(null);
+
+  exportBoardCsv(): void {
+    const b = this.board();
+    if (!b) return;
+    const url = this.service.getExportCsvUrl(b.id);
+    window.open(url, '_blank');
+  }
 
   // Column Resizing & Persistence in LocalStorage
   readonly resizingColumnId = signal<string | null>(null);

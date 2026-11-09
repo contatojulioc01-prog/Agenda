@@ -1,4 +1,29 @@
+import { Attachment } from './attachment.model';
+
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
+
+export interface ActivityComment {
+  id: string;
+  entityType: 'task' | 'mural_item' | 'event';
+  entityId: string;
+  userId: string;
+  userName: string;
+  userAvatar?: string;
+  content: string;
+  mentions?: string[];
+  createdAt: string;
+}
+
+export interface ActivityLog {
+  id: string;
+  entityType: 'task' | 'mural_item' | 'event';
+  entityId: string;
+  userId: string;
+  userName: string;
+  action: string;
+  changes?: Record<string, any>;
+  createdAt: string;
+}
 
 export interface KanbanBoardSummary {
   id: string;
@@ -87,4 +112,3 @@ export interface KanbanTeamInvitation {
   team_name: string;
   team_color: string;
 }
-import { Attachment } from './attachment.model';

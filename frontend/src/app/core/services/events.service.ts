@@ -200,6 +200,11 @@ export class EventsService {
     if (changes.color !== undefined) body['color'] = changes.color;
     if (changes.category !== undefined) body['category'] = changes.category;
     if (changes.allDay !== undefined) body['allDay'] = changes.allDay;
+    if (changes.location !== undefined) body['location'] = changes.location;
+    if (changes.meetingUrl !== undefined) body['meetingUrl'] = changes.meetingUrl;
+    if (changes.recurrenceRule !== undefined) body['recurrenceRule'] = changes.recurrenceRule;
+    if (changes.attendees !== undefined) body['attendees'] = changes.attendees;
+    if ((changes as any).scope !== undefined) body['scope'] = (changes as any).scope;
 
     this.http.put<CalendarEvent>(
       `${getBackendUrl()}/api/events/${id}`,
@@ -219,19 +224,59 @@ export class EventsService {
   }
 
   /** Remove evento no backend */
-  remove(id: string, onComplete?: (success: boolean) => void): void {
+  remove(id: string, scope: 'this' | 'future' | 'all' = 'this', onComplete?: (success: boolean) => void): void {
     if (this.events().find(event => event.id === id)?.isSystem) { onComplete?.(false); return; }
     const userId = this.currentUserId();
     if (!userId) { this.error.set('Usuário não identificado para excluir no PostgreSQL.'); onComplete?.(false); return; }
     this.error.set('');
-    this.http.delete(`${getBackendUrl()}/api/events/${id}`, { headers: { 'x-user-id': userId } })
+    this.http.delete(`${getBackendUrl()}/api/events/${id}?scope=${scope}`, { headers: { 'x-user-id': userId } })
       .pipe(catchError(err => {
         this.error.set(err.error?.error || 'Não foi possível excluir o evento no PostgreSQL.');
         return of(null);
       })).subscribe(result => {
-        if (result) this.events.update(list => list.filter(event => event.id !== id));
+        if (result) {
+          const target = this.events().find(e => e.id === id);
+          if (scope === 'all' && target?.copyGroupId) {
+            this.events.update(list => list.filter(e => e.copyGroupId !== target.copyGroupId));
+          } else if (scope === 'future' && target?.copyGroupId) {
+            this.events.update(list => list.filter(e => !(e.copyGroupId === target.copyGroupId && e.date >= target.date)));
+          } else {
+            this.events.update(list => list.filter(event => event.id !== id));
+          }
+        }
         onComplete?.(!!result);
       });
+  }
+
+  /** Atualiza RSVP de presença de participante */
+  updateRsvp(eventId: string, status: 'accepted' | 'tentative' | 'declined', email?: string) {
+    const userId = this.currentUserId();
+    return this.http.put<{ success: boolean; status: string }>(
+      `${getBackendUrl()}/api/events/${eventId}/rsvp`,
+      { status, email },
+      { headers: { 'x-user-id': userId } }
+    );
+  }
+
+  /** Importa arquivo .ics para uma agenda */
+  importIcs(calendarId: string, icsContent: string) {
+    const userId = this.currentUserId();
+    return this.http.post<{ success: boolean; count: number }>(
+      `${getBackendUrl()}/api/calendars/${calendarId}/import.ics`,
+      icsContent,
+      {
+        headers: {
+          'x-user-id': userId,
+          'Content-Type': 'text/calendar'
+        }
+      }
+    );
+  }
+
+  /** Exporta agenda como .ics */
+  getExportIcsUrl(calendarId: string): string {
+    const userId = this.currentUserId();
+    return `${getBackendUrl()}/api/calendars/${calendarId}/export.ics?uid=${encodeURIComponent(userId)}`;
   }
 
   /** Move evento para outra data (drag & drop) */

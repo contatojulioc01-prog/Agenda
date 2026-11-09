@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges, ViewChild, inject, signal } from '@angular/core';
+import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges, ViewChild, HostListener, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
@@ -18,6 +18,7 @@ import { AiTextButtonComponent } from '../../../shared/components/ai-text-button
 import { MarkdownEditorComponent } from '../../../shared/components/markdown-editor/markdown-editor.component';
 import { MarkdownTextComponent } from '../../../shared/components/markdown-text/markdown-text.component';
 import { AttachmentPreviewModalComponent } from '../../../shared/components/attachment-preview-modal/attachment-preview-modal.component';
+import { ActivityTimelineComponent } from '../../../shared/components/activity-timeline/activity-timeline.component';
 import { detectFileType } from '../../../core/utils/code-highlight.util';
 
 export interface MuralColorOption {
@@ -41,6 +42,7 @@ export interface MuralColorOption {
     MarkdownEditorComponent,
     MarkdownTextComponent,
     AttachmentPreviewModalComponent,
+    ActivityTimelineComponent,
   ],
   templateUrl: './mural-item-modal.component.html',
   styleUrl: './mural-item-modal.component.scss',
@@ -275,15 +277,57 @@ export class MuralItemModalComponent implements OnInit, OnChanges {
     this.confirmDelete.set(false);
   }
 
-  onFilesSelected(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    const files = Array.from(input.files || []);
-    if (!files.length) return;
+  isDragOver = false;
 
+  @HostListener('window:paste', ['$event'])
+  handlePaste(event: ClipboardEvent): void {
+    if (this.isReadOnly) return;
+    const items = event.clipboardData?.items;
+    if (!items) return;
+
+    const files: File[] = [];
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].kind === 'file') {
+        const file = items[i].getAsFile();
+        if (file) files.push(file);
+      }
+    }
+
+    if (files.length > 0) {
+      event.preventDefault();
+      this.processFiles(files);
+    }
+  }
+
+  onDragOver(event: DragEvent): void {
+    if (this.isReadOnly) return;
+    event.preventDefault();
+    event.stopPropagation();
+    this.isDragOver = true;
+  }
+
+  onDragLeave(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.isDragOver = false;
+  }
+
+  onDrop(event: DragEvent): void {
+    if (this.isReadOnly) return;
+    event.preventDefault();
+    event.stopPropagation();
+    this.isDragOver = false;
+    const files = event.dataTransfer?.files;
+    if (files && files.length > 0) {
+      this.processFiles(Array.from(files));
+    }
+  }
+
+  private processFiles(files: File[]): void {
+    if (!files.length) return;
     this.errorMessage.set('');
 
     if (this.isEdit && this.item) {
-      // Faz upload imediato dos múltiplos arquivos
       this.loadingUpload = true;
       const uploads$ = files.map(file =>
         this.attachmentsService.upload('mural_item', this.item!.id, file, this.currentUserId)
@@ -292,7 +336,6 @@ export class MuralItemModalComponent implements OnInit, OnChanges {
       forkJoin(uploads$).pipe(
         finalize(() => {
           this.loadingUpload = false;
-          input.value = '';
         })
       ).subscribe({
         next: (uploadedList) => {
@@ -301,14 +344,20 @@ export class MuralItemModalComponent implements OnInit, OnChanges {
         },
         error: (err) => {
           console.error('Erro ao enviar anexos:', err);
-          this.errorMessage.set(err.error?.error || 'Não foi possível enviar um ou mais anexos. Verifique o limite de 10 MB por arquivo.');
+          this.errorMessage.set(err.error?.error || 'Não foi possível enviar um ou mais anexos.');
         }
       });
     } else {
-      // Adiciona na fila pendente para quando o item for criado
       this.pendingFiles.push(...files);
-      input.value = '';
     }
+  }
+
+  onFilesSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const files = Array.from(input.files || []);
+    if (!files.length) return;
+    this.processFiles(files);
+    input.value = '';
   }
 
   removerPendingFile(index: number): void {

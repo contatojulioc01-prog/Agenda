@@ -36,12 +36,20 @@
     <div
       #colRef
       class="day-events-col"
+      (mousedown)="onColMouseDown($event, colRef)"
       (dragenter)="onDragEnter($event, colRef)"
       (dragover)="onDragOver($event, colRef)"
       (dragleave)="onDragLeave($event, colRef)"
       (drop)="onDrop($event, colRef)"
       (contextmenu)="openDayContextMenu($event)"
     >
+      <!-- Bloco fantasma de seleção por arraste -->
+      <div
+        *ngIf="dragSelecting"
+        class="ghost-drag-selection"
+        [style.top.px]="dragSelectTop"
+        [style.height.px]="dragSelectHeight"
+      ></div>
       <div *ngFor="let h of HOURS" class="day-hour-row">
         <div class="half-hour-line"></div>
       </div>

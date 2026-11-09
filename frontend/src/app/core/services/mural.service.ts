@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { catchError, finalize, of } from 'rxjs';
 import { AuthService } from './auth.service';
 import { MuralBoard, MuralBoardSummary, MuralGroup, MuralItem, MuralItemInput } from '../models/mural.model';
+import { ActivityComment, ActivityLog } from '../models/kanban.model';
 
 @Injectable({ providedIn: 'root' })
 export class MuralService {
@@ -239,5 +240,31 @@ export class MuralService {
         }
         onComplete?.(!!res);
       });
+  }
+
+  /** Timeline e comentários de uma nota do Mural */
+  loadTimeline(itemId: string) {
+    return this.http.get<{ comments: ActivityComment[]; logs: ActivityLog[] }>(
+      `/api/mural/items/${itemId}/timeline`,
+      { headers: this.headers }
+    );
+  }
+
+  /** Adicionar comentário a uma nota do Mural */
+  addComment(itemId: string, content: string, userName?: string, userAvatar?: string) {
+    return this.http.post<ActivityComment>(
+      `/api/mural/items/${itemId}/comments`,
+      { content, userName, userAvatar },
+      { headers: this.headers }
+    );
+  }
+
+  /** Conversão cruzada: converter item do mural em tarefa do Kanban */
+  convertToTask(itemId: string, data: { boardId: string; columnId?: string; priority?: string; dueDate?: string | null }) {
+    return this.http.post<{ success: boolean; taskId: string; boardId: string; columnId: string }>(
+      `/api/mural/items/${itemId}/convert-to-task`,
+      data,
+      { headers: this.headers }
+    );
   }
 }

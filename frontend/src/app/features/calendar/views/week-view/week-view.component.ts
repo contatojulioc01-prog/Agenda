@@ -59,6 +59,7 @@ export class WeekViewComponent implements OnInit, OnChanges, OnDestroy {
   @Output() eventClick = new EventEmitter<CalendarEvent>();
   @Output() eventContextMenu = new EventEmitter<{ event: CalendarEvent; mouseEvent: MouseEvent }>();
   @Output() eventDrop = new EventEmitter<EventDropPayload>();
+  @Output() timeRangeSelected = new EventEmitter<{ date: string; startTime: string; endTime: string }>();
 
   readonly colorMap = EVENT_COLOR_MAP;
   readonly DAYS_LABEL = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -80,11 +81,87 @@ export class WeekViewComponent implements OnInit, OnChanges, OnDestroy {
   isResizing = false;
   resizingEventId: string | null = null;
 
+  // Estado de criação por arraste
+  dragSelecting = false;
+  dragSelectDate: string | null = null;
+  dragSelectStartMin = 0;
+  dragSelectEndMin = 0;
+  dragSelectTop = 0;
+  dragSelectHeight = 0;
+  private dragSelectColRef: HTMLElement | null = null;
+
+  onColMouseDown(event: MouseEvent, day: WeekDay, colRef: HTMLElement): void {
+    if (event.button !== 0) return;
+    const target = event.target as HTMLElement;
+    if (target.closest('.week-event') || target.closest('.event-resize-handle') || target.closest('.event-resize-handle-x')) return;
+
+    const rect = colRef.getBoundingClientRect();
+    const relY = event.clientY - rect.top;
+    const rawMin = Math.max(0, Math.min(24 * 60, relY));
+    const snappedStart = Math.floor(rawMin / 15) * 15;
+
+    this.dragSelecting = true;
+    this.dragSelectDate = day.dateStr;
+    this.dragSelectStartMin = snappedStart;
+    this.dragSelectEndMin = snappedStart + 30; // default 30 min
+    this.dragSelectTop = snappedStart;
+    this.dragSelectHeight = 30;
+    this.dragSelectColRef = colRef;
+
+    const onMouseMove = (moveEv: MouseEvent) => {
+      if (!this.dragSelecting) return;
+      const moveRelY = moveEv.clientY - rect.top;
+      const currentMin = Math.max(0, Math.min(24 * 60, moveRelY));
+      const snappedCur = Math.round(currentMin / 15) * 15;
+
+      const minVal = Math.min(this.dragSelectStartMin, snappedCur);
+      const maxVal = Math.max(this.dragSelectStartMin + 15, Math.max(this.dragSelectStartMin, snappedCur));
+
+      this.dragSelectTop = minVal;
+      this.dragSelectHeight = Math.max(15, maxVal - minVal);
+      this.dragSelectEndMin = minVal + this.dragSelectHeight;
+      this.cdr.detectChanges();
+    };
+
+    const onMouseUp = () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+
+      if (this.dragSelecting && this.dragSelectDate) {
+        const start = minutesToTime(this.dragSelectTop);
+        const end = minutesToTime(Math.min(24 * 60, this.dragSelectTop + this.dragSelectHeight));
+        const selectedDate = this.dragSelectDate;
+
+        this.dragSelecting = false;
+        this.dragSelectDate = null;
+        this.cdr.detectChanges();
+
+        this.timeRangeSelected.emit({
+          date: selectedDate,
+          startTime: start,
+          endTime: end,
+        });
+      }
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  }
+
   ngOnInit(): void {
     this.build();
     this.updateCurrentTime();
     this.timeInterval = setInterval(() => this.updateCurrentTime(), 60000);
     this.injectScrollbarWidth();
+    setTimeout(() => this.scrollToCurrentTime(), 150);
+  }
+
+  scrollToCurrentTime(): void {
+    const container = document.querySelector('.week-body') as HTMLElement;
+    if (container) {
+      const targetScroll = Math.max(0, this.currentTimeTop - 200);
+      container.scrollTop = targetScroll;
+    }
   }
 
   ngOnChanges(changes: SimpleChanges): void {

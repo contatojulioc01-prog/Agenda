@@ -1,4 +1,4 @@
-import { Component, Inject, OnDestroy, OnInit, inject, computed, signal } from '@angular/core';
+import { Component, Inject, OnDestroy, OnInit, inject, computed, signal, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatDialogRef, MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
@@ -24,6 +24,8 @@ import { detectFileType } from '../../../core/utils/code-highlight.util';
 export interface EventModalData {
   event?: CalendarEvent;
   defaultDate?: string;
+  startTime?: string;
+  endTime?: string;
   targetCalendarIds?: string[];
   readOnly?: boolean;
 }
@@ -197,6 +199,12 @@ export class EventModalComponent implements OnInit, OnDestroy {
         this.formData.date = this.data.defaultDate;
         this.formData.endDate = this.data.defaultDate;
       }
+      if (this.data?.startTime) {
+        this.formData.startTime = this.data.startTime;
+      }
+      if (this.data?.endTime) {
+        this.formData.endTime = this.data.endTime;
+      }
       if (this.data?.targetCalendarIds?.[0]) this.formData.calendarId = this.data.targetCalendarIds[0];
     }
     this.loadHolidays();
@@ -206,14 +214,66 @@ export class EventModalComponent implements OnInit, OnDestroy {
 
   get attachments(): Attachment[] { return this.formData.attachments || []; }
 
-  selectFiles(event: Event): void {
-    const input = event.target as HTMLInputElement;
+  isDragOver = false;
+
+  @HostListener('window:paste', ['$event'])
+  handlePaste(event: ClipboardEvent): void {
+    if (this.isReadOnly) return;
+    const items = event.clipboardData?.items;
+    if (!items) return;
+
+    const files: File[] = [];
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].kind === 'file') {
+        const file = items[i].getAsFile();
+        if (file) files.push(file);
+      }
+    }
+
+    if (files.length > 0) {
+      event.preventDefault();
+      this.addFiles(files);
+    }
+  }
+
+  onDragOver(event: DragEvent): void {
+    if (this.isReadOnly) return;
+    event.preventDefault();
+    event.stopPropagation();
+    this.isDragOver = true;
+  }
+
+  onDragLeave(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.isDragOver = false;
+  }
+
+  onDrop(event: DragEvent): void {
+    if (this.isReadOnly) return;
+    event.preventDefault();
+    event.stopPropagation();
+    this.isDragOver = false;
+    const files = event.dataTransfer?.files;
+    if (files && files.length > 0) {
+      this.addFiles(Array.from(files));
+    }
+  }
+
+  private addFiles(files: File[]): void {
     const available = Math.max(0, 10 - this.attachments.length - this.pendingFiles.length);
-    const selected = [...(input.files || [])].slice(0, available);
+    const selected = files.slice(0, available);
     const tooLarge = selected.find(file => file.size > 10 * 1024 * 1024);
     this.attachmentError = tooLarge ? `${tooLarge.name} excede o limite de 10 MB.` : '';
     this.pendingFiles.push(...selected.filter(file => file.size <= 10 * 1024 * 1024));
-    input.value = '';
+  }
+
+  selectFiles(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (input.files) {
+      this.addFiles(Array.from(input.files));
+      input.value = '';
+    }
   }
 
   removePending(index: number): void { this.pendingFiles.splice(index, 1); }
@@ -483,10 +543,10 @@ export class EventModalComponent implements OnInit, OnDestroy {
     if (!this.isReadOnly && this.isEdit && this.data.event) this.showDeleteConfirmation = true;
   }
 
-  confirmDelete(): void {
+  confirmDelete(scope: 'this' | 'future' | 'all' = 'this'): void {
     if (!this.data.event) return;
     this.loadingSalvar = true;
-    this.eventsService.remove(this.data.event.id, success => {
+    this.eventsService.remove(this.data.event.id, scope, (success: boolean) => {
       this.loadingSalvar = false;
       if (success) this.dialogRef.close(true);
     });

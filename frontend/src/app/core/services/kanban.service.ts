@@ -2,7 +2,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { catchError, finalize, of, tap } from 'rxjs';
 import { AuthService } from './auth.service';
-import { KanbanBoard, KanbanBoardSummary, KanbanColumn, KanbanTask, KanbanTaskInput, KanbanTeam, KanbanTeamInvitation, KanbanTeamMember } from '../models/kanban.model';
+import { ActivityComment, ActivityLog, KanbanBoard, KanbanBoardSummary, KanbanColumn, KanbanTask, KanbanTaskInput, KanbanTeam, KanbanTeamInvitation, KanbanTeamMember } from '../models/kanban.model';
 import { Attachment } from '../models/attachment.model';
 
 @Injectable({ providedIn: 'root' })
@@ -307,6 +307,29 @@ export class KanbanService {
     this.http.post(`/api/kanban/boards/${boardId}/reorder`, { columns, tasks }, { headers: this.headers })
       .pipe(catchError(err => { this.error.set(err.error?.error || 'Erro ao reordenar.'); this.loadBoard(boardId); return of(null); }))
       .subscribe();
+  }
+
+  /** Carrega linha do tempo e comentários da tarefa */
+  loadTimeline(taskId: string) {
+    return this.http.get<{ comments: ActivityComment[]; logs: ActivityLog[] }>(
+      `/api/kanban/tasks/${taskId}/timeline`,
+      { headers: this.headers }
+    );
+  }
+
+  /** Adiciona comentário a uma tarefa */
+  addComment(taskId: string, content: string, userName?: string, userAvatar?: string) {
+    return this.http.post<ActivityComment>(
+      `/api/kanban/tasks/${taskId}/comments`,
+      { content, userName, userAvatar },
+      { headers: this.headers }
+    );
+  }
+
+  /** Retorna URL de download do CSV exportado */
+  getExportCsvUrl(boardId: string): string {
+    const uid = this.auth.currentUser()?.id || 'anonymous';
+    return `/api/kanban/boards/${boardId}/export-csv?uid=${encodeURIComponent(uid)}`;
   }
 
   private upsertTask(task: KanbanTask): void {

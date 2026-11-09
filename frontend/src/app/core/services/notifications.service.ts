@@ -1,7 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { catchError, finalize, of } from 'rxjs';
-import { NotificationDevice, NotificationPreferences, NotificationSettings } from '../models/notification.model';
+import { InAppNotification, NotificationDevice, NotificationPreferences, NotificationSettings } from '../models/notification.model';
 
 @Injectable({ providedIn: 'root' })
 export class NotificationsService {
@@ -15,9 +15,39 @@ export class NotificationsService {
     eventMinutesBefore: 15,
   });
   readonly devices = signal<NotificationDevice[]>([]);
+  readonly inAppNotifications = signal<InAppNotification[]>([]);
+  readonly unreadCount = signal(0);
   readonly loading = signal(false);
   readonly saving = signal(false);
   readonly error = signal('');
+
+  loadInApp(): void {
+    this.http.get<{ notifications: InAppNotification[]; unreadCount: number }>('/api/notifications/inbox')
+      .pipe(catchError(() => of(null)))
+      .subscribe(res => {
+        if (!res) return;
+        this.inAppNotifications.set(res.notifications || []);
+        this.unreadCount.set(res.unreadCount || 0);
+      });
+  }
+
+  markAsRead(id: string): void {
+    this.http.patch(`/api/notifications/${id}/read`, {})
+      .pipe(catchError(() => of(null)))
+      .subscribe(() => {
+        this.inAppNotifications.update(list => list.map(n => n.id === id ? { ...n, read: true } : n));
+        this.unreadCount.update(c => Math.max(0, c - 1));
+      });
+  }
+
+  markAllAsRead(): void {
+    this.http.post('/api/notifications/read-all', {})
+      .pipe(catchError(() => of(null)))
+      .subscribe(() => {
+        this.inAppNotifications.update(list => list.map(n => ({ ...n, read: true })));
+        this.unreadCount.set(0);
+      });
+  }
 
   load(): void {
     this.loading.set(true);

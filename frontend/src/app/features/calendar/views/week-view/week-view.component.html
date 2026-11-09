@@ -31,13 +31,20 @@
       #colRef
       class="week-day-col"
       [attr.data-date]="day.dateStr"
+      (mousedown)="onColMouseDown($event, day, colRef)"
       (dragenter)="onDragEnter($event, colRef)"
       (dragover)="onDragOver($event, colRef)"
       (dragleave)="onDragLeave($event, colRef)"
       (drop)="onDrop($event, day, colRef)"
-      (click)="dayClick.emit(day.dateStr)"
       (contextmenu)="$event.preventDefault(); dayContextMenu.emit({ date: day.dateStr, mouseEvent: $event })"
     >
+      <!-- Bloco fantasma de seleção por arraste (Drag to Create) -->
+      <div
+        *ngIf="dragSelecting && dragSelectDate === day.dateStr"
+        class="ghost-drag-selection"
+        [style.top.px]="dragSelectTop"
+        [style.height.px]="dragSelectHeight"
+      ></div>
       <!-- Linhas de hora -->
       <div *ngFor="let h of HOURS" class="hour-row">
         <div class="half-hour-line"></div>

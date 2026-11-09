@@ -1851,7 +1851,23 @@ input,select,textarea { border:1px solid var(--border); border-radius:8px; backg
 .task-modal > footer { display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 18px;border-top:1px solid var(--border-light) }.task-modal > footer>div{display:flex;gap:7px}.archive-btn{color:var(--text-secondary);background:var(--bg-hover)}.delete-btn{color:#ef4444;background:rgba(239,68,68,.1)}
 @media(max-width:900px){.filter-stat{margin-left:0}.kanban-toolbar{align-items:flex-start}.toolbar-actions .secondary-btn{font-size:0}.toolbar-actions .secondary-btn mat-icon{font-size:18px}.kanban-column{width:270px;flex-basis:270px}}
 @media(max-width:680px){.kanban-filters{height:auto !important;max-height:none !important;flex-wrap:wrap !important;gap:8px !important;padding:8px 10px !important}.search-box{flex:1 1 100% !important;margin:0 !important;order:3}}
-@media(max-width:600px){.kanban-toolbar{flex-wrap:wrap}.toolbar-actions{width:100%}.primary-btn{flex:1}.modal-body{grid-template-columns:1fr}.full{grid-column:auto}.task-modal>footer{align-items:stretch;flex-direction:column}.task-modal>footer>div{justify-content:flex-end}}
+@media(max-width:600px){
+  .kanban-toolbar{flex-wrap:wrap;min-height:auto;padding:10px 12px;gap:10px}
+  .toolbar-actions{width:100%;flex-wrap:wrap}
+  .primary-btn{flex:1;min-height:42px}
+  .modal-body{grid-template-columns:1fr}
+  .full{grid-column:auto}
+  .task-modal{max-height:95vh;border-radius:12px}
+  .task-modal>footer{align-items:stretch;flex-direction:column;gap:8px;padding:10px 14px}
+  .task-modal>footer>div{justify-content:space-between;flex-wrap:wrap;gap:6px}
+  .notion-table-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    height: auto !important;
+    padding: 10px !important;
+    border-bottom: 1px solid var(--border) !important;
+  }
+}
 
 /* ══════════════════════════════════════════════════
    🖨️ ESTILOS DE IMPRESSÃO KANBAN (PRINT ONLY / SCREEN HIDDEN)

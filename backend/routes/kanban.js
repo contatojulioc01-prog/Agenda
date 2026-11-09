@@ -832,6 +832,113 @@ router.delete('/tasks/:taskId', asyncRoute(async (req, res) => {
   res.json({ success: true, trashedDescendants: descendants.length, expiresAt });
 }));
 
+// Timeline e Comentários para Tarefas Kanban
+router.get('/tasks/:taskId/timeline', asyncRoute(async (req, res) => {
+  const task = await db.get('SELECT * FROM kanban_tasks WHERE id = $1', [req.params.taskId]);
+  const access = task && await boardAccess(task.board_id, userId(req));
+  if (!task || !access) return res.status(404).json({ error: 'Tarefa não encontrada' });
+
+  const comments = await db.all(`SELECT id, entity_type AS "entityType", entity_id AS "entityId",
+    user_id AS "userId", user_name AS "userName", user_avatar AS "userAvatar",
+    content, mentions, created_at AS "createdAt"
+    FROM activity_comments WHERE entity_type = 'task' AND entity_id = $1
+    ORDER BY created_at ASC`, [task.id]);
+
+  const logs = await db.all(`SELECT id, entity_type AS "entityType", entity_id AS "entityId",
+    user_id AS "userId", user_name AS "userName", action, changes, created_at AS "createdAt"
+    FROM activity_logs WHERE entity_type = 'task' AND entity_id = $1
+    ORDER BY created_at ASC`, [task.id]);
+
+  const formattedComments = comments.map(c => ({
+    ...c,
+    mentions: parseJson(c.mentions, [])
+  }));
+
+  const formattedLogs = logs.map(l => ({
+    ...l,
+    changes: parseJson(l.changes, {})
+  }));
+
+  res.json({ comments: formattedComments, logs: formattedLogs });
+}));
+
+router.post('/tasks/:taskId/comments', asyncRoute(async (req, res) => {
+  const task = await db.get('SELECT * FROM kanban_tasks WHERE id = $1', [req.params.taskId]);
+  const access = task && await boardAccess(task.board_id, userId(req), true);
+  if (!task || !access) return res.status(404).json({ error: 'Tarefa não encontrada' });
+
+  const { content, userName = 'Usuário', userAvatar = '' } = req.body;
+  if (!content || !content.trim()) return res.status(400).json({ error: 'Conteúdo do comentário é obrigatório' });
+
+  // Detectar @menções simples (@nome ou @userId)
+  const mentionMatches = content.match(/@(\w+)/g) || [];
+  const mentions = mentionMatches.map(m => m.slice(1));
+
+  const commentId = id('comm');
+  const now = new Date().toISOString();
+
+  await db.run(`INSERT INTO activity_comments (id, entity_type, entity_id, user_id, user_name, user_avatar, content, mentions, created_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    [commentId, 'task', task.id, userId(req), userName, userAvatar, content.trim(), JSON.stringify(mentions), now]);
+
+  // Se houver menções ou responsáveis, gerar notificações in-app
+  for (const m of mentions) {
+    await db.run(`INSERT INTO inapp_notifications (id, user_id, title, message, type, reference_type, reference_id, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [id('notif'), m, 'Você foi mencionado', `${userName} mencionou você na tarefa: ${task.title}`, 'mention', 'task', task.id, now]);
+  }
+
+  req.broadcast({ type: 'kanban_updated', boardId: task.board_id, taskId: task.id });
+  res.status(201).json({
+    id: commentId,
+    entityType: 'task',
+    entityId: task.id,
+    userId: userId(req),
+    userName,
+    userAvatar,
+    content: content.trim(),
+    mentions,
+    createdAt: now
+  });
+}));
+
+// Exportação CSV do Quadro Kanban (UTF-8 com BOM para Excel)
+router.get('/boards/:boardId/export-csv', asyncRoute(async (req, res) => {
+  const access = await boardAccess(req.params.boardId, userId(req));
+  if (!access) return res.status(404).json({ error: 'Quadro não encontrado' });
+
+  const columns = await db.all('SELECT * FROM kanban_columns WHERE board_id = $1 ORDER BY position ASC', [req.params.boardId]);
+  const tasks = await db.all('SELECT * FROM kanban_tasks WHERE board_id = $1 AND deleted_at IS NULL ORDER BY position ASC', [req.params.boardId]);
+
+  const colMap = new Map(columns.map(c => [c.id, c.title]));
+
+  const rows = [
+    ['ID', 'Título', 'Coluna', 'Prioridade', 'Prazo', 'Etiquetas', 'Responsável', 'Subtarefa de', 'Criado em', 'Descrição']
+  ];
+
+  for (const t of tasks) {
+    rows.push([
+      t.id,
+      t.title || '',
+      colMap.get(t.column_id) || 'Sem Coluna',
+      t.priority || 'medium',
+      t.due_date || '',
+      (parseJson(t.labels, [])).join('; '),
+      t.assignee_id || '',
+      t.parent_task_id || '',
+      t.created_at || '',
+      (t.description || '').replace(/\r?\n/g, ' ')
+    ]);
+  }
+
+  const csvContent = rows.map(r => r.map(field => `"${String(field).replace(/"/g, '""')}"`).join(';')).join('\r\n');
+  const bom = '\uFEFF';
+
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="quadro-${access.board.name || 'kanban'}.csv"`);
+  res.send(bom + csvContent);
+}));
+
 module.exports = router;
 module.exports.purgeExpiredTrash = purgeExpiredTrash;
 module.exports.autoArchiveColumnTasks = autoArchiveColumnTasks;

@@ -1,0 +1,79 @@
+<div class="palette-backdrop" (click)="close.emit()">
+  <div class="palette-modal" (click)="$event.stopPropagation()">
+    <!-- Cabeçalho com campo de busca -->
+    <div class="palette-header">
+      <mat-icon class="search-icon">search</mat-icon>
+      <input
+        #searchInput
+        type="text"
+        class="palette-input"
+        placeholder="O que você está procurando? Digite um evento, tarefa, nota ou comando..."
+        [ngModel]="query()"
+        (ngModelChange)="query.set($event); selectedIndex.set(0)"
+        autofocus
+      />
+      <span class="esc-badge" (click)="close.emit()" matTooltip="Fechar">ESC</span>
+    </div>
+
+    <!-- Categorias / Filtros -->
+    <div class="palette-tabs">
+      <button type="button" class="tab-chip" [class.active]="selectedCategory() === 'all'" (click)="setCategory('all')">
+        Todos
+      </button>
+      <button type="button" class="tab-chip" [class.active]="selectedCategory() === 'event'" (click)="setCategory('event')">
+        <mat-icon>calendar_month</mat-icon> Agendas & Eventos
+      </button>
+      <button type="button" class="tab-chip" [class.active]="selectedCategory() === 'task'" (click)="setCategory('task')">
+        <mat-icon>check_circle_outline</mat-icon> Tarefas
+      </button>
+      <button type="button" class="tab-chip" [class.active]="selectedCategory() === 'mural'" (click)="setCategory('mural')">
+        <mat-icon>space_dashboard</mat-icon> Mural
+      </button>
+      <button type="button" class="tab-chip" [class.active]="selectedCategory() === 'action'" (click)="setCategory('action')">
+        <mat-icon>bolt</mat-icon> Comandos Rápidos
+      </button>
+    </div>
+
+    <!-- Lista de Resultados -->
+    <div class="palette-body">
+      <div class="empty-state" *ngIf="filteredItems().length === 0">
+        <mat-icon class="empty-icon">search_off</mat-icon>
+        <p>Nenhum resultado encontrado para "<strong>{{ query() }}</strong>"</p>
+      </div>
+
+      <div class="palette-list" *ngIf="filteredItems().length > 0">
+        <div
+          *ngFor="let item of filteredItems(); let idx = index"
+          class="palette-item"
+          [class.selected]="idx === selectedIndex()"
+          (mouseenter)="selectedIndex.set(idx)"
+          (click)="executeItem(item)"
+        >
+          <div class="item-icon-wrap" [style.color]="item.color || 'var(--brand-500)'">
+            <mat-icon>{{ item.icon }}</mat-icon>
+          </div>
+          <div class="item-text">
+            <div class="item-title-row">
+              <span class="item-title">{{ item.title }}</span>
+              <span class="item-badge" [attr.data-type]="item.type">{{ item.badge }}</span>
+            </div>
+            <div class="item-subtitle" *ngIf="item.subtitle">{{ item.subtitle }}</div>
+          </div>
+          <div class="item-enter-hint" *ngIf="idx === selectedIndex()">
+            <span>↵</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rodapé com atalhos de navegação -->
+    <div class="palette-footer">
+      <div class="shortcuts-row">
+        <span><kbd>↑</kbd> <kbd>↓</kbd> Navegar</span>
+        <span><kbd>↵</kbd> Selecionar</span>
+        <span><kbd>ESC</kbd> Fechar</span>
+      </div>
+    </div>
+  </div>
+</div>
+

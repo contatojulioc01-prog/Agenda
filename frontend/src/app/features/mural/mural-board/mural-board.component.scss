@@ -1254,3 +1254,51 @@
   to { opacity: 1; transform: scale(1); }
 }
 
+/* ══════════════════════════════════════════════════
+   📱 RESPONSIVIDADE E ADAPTAÇÃO MOBILE DO MURAL
+   ══════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .mural-toolbar {
+    flex-wrap: wrap;
+    min-height: auto;
+    padding: 10px 12px;
+    gap: 10px;
+  }
+
+  .toolbar-left {
+    width: 100%;
+    overflow-x: auto;
+    justify-content: space-between;
+  }
+
+  .toolbar-right {
+    width: 100%;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .mural-canvas {
+    padding: 12px 10px;
+  }
+
+  .mural-groups-row {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .mural-group-column {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .sticky-card {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .mural-ungrouped-grid {
+    grid-template-columns: 1fr;
+  }
+}
+

@@ -578,6 +578,108 @@ router.delete('/teams/:teamId/members/:memberId', asyncRoute(async (req, res) =>
   res.json({ success: true });
 }));
 
+// Timeline e Comentários para Itens do Mural
+router.get('/items/:itemId/timeline', asyncRoute(async (req, res) => {
+  const item = await db.get('SELECT * FROM mural_items WHERE id = $1', [req.params.itemId]);
+  if (!item) return res.status(404).json({ error: 'Nota não encontrada' });
+  const access = await muralAccess(item.mural_id, userId(req));
+  if (!access) return res.status(403).json({ error: 'Sem acesso ao mural' });
+
+  const comments = await db.all(`SELECT id, entity_type AS "entityType", entity_id AS "entityId",
+    user_id AS "userId", user_name AS "userName", user_avatar AS "userAvatar",
+    content, mentions, created_at AS "createdAt"
+    FROM activity_comments WHERE entity_type = 'mural_item' AND entity_id = $1
+    ORDER BY created_at ASC`, [item.id]);
+
+  const logs = await db.all(`SELECT id, entity_type AS "entityType", entity_id AS "entityId",
+    user_id AS "userId", user_name AS "userName", action, changes, created_at AS "createdAt"
+    FROM activity_logs WHERE entity_type = 'mural_item' AND entity_id = $1
+    ORDER BY created_at ASC`, [item.id]);
+
+  res.json({
+    comments: comments.map(c => ({ ...c, mentions: (() => { try { return JSON.parse(c.mentions); } catch { return []; } })() })),
+    logs: logs.map(l => ({ ...l, changes: (() => { try { return JSON.parse(l.changes); } catch { return {}; } })() }))
+  });
+}));
+
+router.post('/items/:itemId/comments', asyncRoute(async (req, res) => {
+  const item = await db.get('SELECT * FROM mural_items WHERE id = $1', [req.params.itemId]);
+  if (!item) return res.status(404).json({ error: 'Nota não encontrada' });
+  const access = await muralAccess(item.mural_id, userId(req), true);
+  if (!access) return res.status(403).json({ error: 'Sem permissão' });
+
+  const { content, userName = 'Usuário', userAvatar = '' } = req.body;
+  if (!content || !content.trim()) return res.status(400).json({ error: 'Conteúdo do comentário é obrigatório' });
+
+  const mentionMatches = content.match(/@(\w+)/g) || [];
+  const mentions = mentionMatches.map(m => m.slice(1));
+  const commentId = id('comm');
+  const now = new Date().toISOString();
+
+  await db.run(`INSERT INTO activity_comments (id, entity_type, entity_id, user_id, user_name, user_avatar, content, mentions, created_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    [commentId, 'mural_item', item.id, userId(req), userName, userAvatar, content.trim(), JSON.stringify(mentions), now]);
+
+  for (const m of mentions) {
+    await db.run(`INSERT INTO inapp_notifications (id, user_id, title, message, type, reference_type, reference_id, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [id('notif'), m, 'Você foi mencionado', `${userName} mencionou você na nota: ${item.title}`, 'mention', 'mural_item', item.id, now]);
+  }
+
+  req.broadcast?.({ type: 'mural_updated' });
+  res.status(201).json({
+    id: commentId,
+    entityType: 'mural_item',
+    entityId: item.id,
+    userId: userId(req),
+    userName,
+    userAvatar,
+    content: content.trim(),
+    mentions,
+    createdAt: now
+  });
+}));
+
+// Conversão Cruzada: Converter Item do Mural em Tarefa do Kanban
+router.post('/items/:itemId/convert-to-task', asyncRoute(async (req, res) => {
+  const uid = userId(req);
+  const item = await db.get('SELECT * FROM mural_items WHERE id = $1', [req.params.itemId]);
+  if (!item) return res.status(404).json({ error: 'Nota não encontrada' });
+  const access = await muralAccess(item.mural_id, uid);
+  if (!access) return res.status(403).json({ error: 'Sem acesso ao mural' });
+
+  const { boardId, columnId, priority = 'medium', dueDate = null } = req.body;
+  if (!boardId) return res.status(400).json({ error: 'boardId é obrigatório' });
+
+  let targetColumnId = columnId;
+  if (!targetColumnId) {
+    const firstCol = await db.get('SELECT id FROM kanban_columns WHERE board_id = $1 ORDER BY position ASC LIMIT 1', [boardId]);
+    if (!firstCol) return res.status(400).json({ error: 'O quadro não possui colunas disponíveis' });
+    targetColumnId = firstCol.id;
+  }
+
+  const taskId = id('tsk');
+  const now = new Date().toISOString();
+
+  await db.transaction(async tx => {
+    await tx.run(`INSERT INTO kanban_tasks (id, board_id, column_id, title, description, position, priority, due_date, labels, assignee_ids, checklist, created_by, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+      [taskId, boardId, targetColumnId, item.title, item.content || '', 0, priority, dueDate, '[]', '[]', '[]', uid, now, now]);
+
+    // Copiar anexos da nota para a tarefa
+    const attachments = await tx.all(`SELECT * FROM attachments WHERE owner_type = 'mural_item' AND owner_id = $1`, [item.id]);
+    for (const att of attachments) {
+      const newAttId = id('att');
+      await tx.run(`INSERT INTO attachments (id, owner_type, owner_id, file_name, file_size, mime_type, storage_path, created_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [newAttId, 'task', taskId, att.file_name, att.file_size, att.mime_type, att.storage_path, now]);
+    }
+  });
+
+  req.broadcast?.({ type: 'kanban_updated', boardId, taskId });
+  res.status(201).json({ success: true, taskId, boardId, columnId: targetColumnId });
+}));
+
 router.ensurePersonalMural = ensurePersonalMural;
 router.ensureTeamMural = ensureTeamMural;
 router.muralAccess = muralAccess;

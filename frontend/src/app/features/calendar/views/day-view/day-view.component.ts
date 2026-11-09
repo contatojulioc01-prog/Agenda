@@ -29,6 +29,7 @@ export class DayViewComponent implements OnInit, OnChanges {
   @Output() dayContextMenu = new EventEmitter<{ date: string; mouseEvent: MouseEvent }>();
   @Output() eventContextMenu = new EventEmitter<{ event: CalendarEvent; mouseEvent: MouseEvent }>();
   @Output() eventDrop = new EventEmitter<EventDropPayload>();
+  @Output() timeRangeSelected = new EventEmitter<{ date: string; startTime: string; endTime: string }>();
 
   readonly colorMap = EVENT_COLOR_MAP;
   readonly HOURS = Array.from({ length: 24 }, (_, i) => i);
@@ -47,8 +48,79 @@ export class DayViewComponent implements OnInit, OnChanges {
   isResizing = false;
   resizingEventId: string | null = null;
 
+  // Estado de criação por arraste
+  dragSelecting = false;
+  dragSelectStartMin = 0;
+  dragSelectEndMin = 0;
+  dragSelectTop = 0;
+  dragSelectHeight = 0;
+
+  onColMouseDown(event: MouseEvent, colRef: HTMLElement): void {
+    if (event.button !== 0) return;
+    const target = event.target as HTMLElement;
+    if (target.closest('.day-event') || target.closest('.event-resize-handle') || target.closest('.event-resize-handle-x')) return;
+
+    const rect = colRef.getBoundingClientRect();
+    const relY = event.clientY - rect.top;
+    const rawMin = Math.max(0, Math.min(24 * 60, relY));
+    const snappedStart = Math.floor(rawMin / 15) * 15;
+
+    this.dragSelecting = true;
+    this.dragSelectStartMin = snappedStart;
+    this.dragSelectEndMin = snappedStart + 30;
+    this.dragSelectTop = snappedStart;
+    this.dragSelectHeight = 30;
+
+    const onMouseMove = (moveEv: MouseEvent) => {
+      if (!this.dragSelecting) return;
+      const moveRelY = moveEv.clientY - rect.top;
+      const currentMin = Math.max(0, Math.min(24 * 60, moveRelY));
+      const snappedCur = Math.round(currentMin / 15) * 15;
+
+      const minVal = Math.min(this.dragSelectStartMin, snappedCur);
+      const maxVal = Math.max(this.dragSelectStartMin + 15, Math.max(this.dragSelectStartMin, snappedCur));
+
+      this.dragSelectTop = minVal;
+      this.dragSelectHeight = Math.max(15, maxVal - minVal);
+      this.dragSelectEndMin = minVal + this.dragSelectHeight;
+      this.cdr.detectChanges();
+    };
+
+    const onMouseUp = () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+
+      if (this.dragSelecting) {
+        const start = minutesToTime(this.dragSelectTop);
+        const end = minutesToTime(Math.min(24 * 60, this.dragSelectTop + this.dragSelectHeight));
+        const selectedDate = this.toStr(this.selectedDate);
+
+        this.dragSelecting = false;
+        this.cdr.detectChanges();
+
+        this.timeRangeSelected.emit({
+          date: selectedDate,
+          startTime: start,
+          endTime: end,
+        });
+      }
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  }
+
   ngOnInit(): void {
     this.build();
+    setTimeout(() => this.scrollToCurrentTime(), 150);
+  }
+
+  scrollToCurrentTime(): void {
+    const container = document.querySelector('.day-body') as HTMLElement;
+    if (container) {
+      const targetScroll = Math.max(0, this.currentTimeTop - 200);
+      container.scrollTop = targetScroll;
+    }
   }
 
   ngOnChanges(changes: SimpleChanges): void {

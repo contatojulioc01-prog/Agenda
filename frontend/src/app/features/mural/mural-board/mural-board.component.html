@@ -356,6 +356,9 @@
   <button type="button" (click)="alternarFixacao($event, menu.item)">
     <mat-icon>push_pin</mat-icon><span>{{ menu.item.isPinned ? 'Desafixar' : 'Fixar' }}</span>
   </button>
+  <button type="button" (click)="converterItemEmTarefa(menu.item)">
+    <mat-icon>assignment_turned_in</mat-icon><span>Transformar em Tarefa Kanban</span>
+  </button>
   <button type="button" class="danger" (click)="excluirItemFromContext(menu.item)">
     <mat-icon>delete_outline</mat-icon><span>Excluir</span>
   </button>

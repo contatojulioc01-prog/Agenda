@@ -1,5 +1,24 @@
 import { Attachment } from './attachment.model';
 
+export interface EventAttendee {
+  id: string;
+  eventId: string;
+  userId?: string | null;
+  name: string;
+  email: string;
+  status: 'pending' | 'accepted' | 'declined' | 'tentative';
+  role: 'organizer' | 'required' | 'optional';
+}
+
+export interface RecurrenceRule {
+  frequency: 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'yearly';
+  interval?: number;
+  daysOfWeek?: number[]; // 0 = Dom, 1 = Seg, ..., 6 = Sab
+  endType?: 'never' | 'after_occurrences' | 'on_date';
+  occurrences?: number;
+  untilDate?: string; // 'YYYY-MM-DD'
+}
+
 export interface CalendarEvent {
   id: string;
   calendarId: string;   // ID da agenda à qual o evento pertence
@@ -13,6 +32,10 @@ export interface CalendarEvent {
   color: EventColor;
   category: string;
   allDay: boolean;
+  location?: string;
+  meetingUrl?: string;
+  recurrenceRule?: RecurrenceRule | null;
+  recurrenceParentId?: string | null;
   copyGroupId?: string;
   /** Evento calculado pelo sistema, sem edição manual. */
   isSystem?: boolean;
@@ -23,6 +46,7 @@ export interface CalendarEvent {
   taskBoardId?: string;
   taskParentId?: string;
   attachments: Attachment[];
+  attendees?: EventAttendee[];
 }
 
 export type EventColor =

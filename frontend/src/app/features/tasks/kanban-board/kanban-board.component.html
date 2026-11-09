@@ -313,6 +313,11 @@
             <span>Lixeira de tarefas</span>
             <span *ngIf="board()?.trashCount" class="menu-badge">{{ board()?.trashCount }}</span>
           </button>
+
+          <button type="button" class="more-menu-item" (click)="exportBoardCsv(); showMoreMenu.set(false)">
+            <mat-icon>download</mat-icon>
+            <span>Exportar CSV (Planilha)</span>
+          </button>
         </div>
       </div>
     </div>
@@ -1774,6 +1779,13 @@
             </div>
           </div>
         </div>
+
+        <!-- Linha do Tempo e Comentários da Tarefa -->
+        <app-activity-timeline
+          *ngIf="editingId()"
+          [entityType]="'task'"
+          [entityId]="editingId()!"
+        ></app-activity-timeline>
       </ng-container>
     </div>
     <app-attachment-preview-modal
