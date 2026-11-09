@@ -33,8 +33,8 @@
 
   --border: #e2e8f0;
   --border-light: #f1f5f9;
-  --border-grid: #94a3b8;
-  --border-grid-half: rgba(148, 163, 184, 0.75);
+  --border-grid: #e2e8f0;
+  --border-grid-half: #f1f5f9;
   --border-focus: #4f46e5;
 
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, .04);
@@ -83,10 +83,10 @@
   --text-weekend: #fca5a5;
   --text-holiday: #f87171;
 
-  --border: #414b57;
-  --border-light: #2d3540;
-  --border-grid: #607086;
-  --border-grid-half: rgba(96, 112, 134, 0.72);
+  --border: #334155;
+  --border-light: #1e293b;
+  --border-grid: #334155;
+  --border-grid-half: #1e293b;
   --border-focus: #818cf8;
 
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, .30);
@@ -1431,7 +1431,8 @@ app-calendar-page {
   inset: -12%;
   z-index: 0;
   pointer-events: none;
-  opacity: var(--particle-opacity);
+  opacity: 0;
+  display: none;
   will-change: transform, opacity;
 }
 
@@ -1465,16 +1466,12 @@ app-calendar-page {
 .sidebar-user-card,
 .agenda-pill,
 .view-switcher {
-  box-shadow:
-    inset 0 1px 0 var(--panel-highlight),
-    0 4px 18px var(--panel-aura);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border);
 }
 
 .group-panel {
-  background-image:
-    linear-gradient(115deg, var(--panel-highlight), transparent 22%),
-    radial-gradient(ellipse at 100% 0, var(--particle-glow), transparent 32%);
-  background-blend-mode: soft-light, normal;
+  background: var(--bg-surface);
 }
 
 [data-theme$="angel"] .page-layout::after {
@@ -2970,8 +2967,8 @@ app-calendar-page {
 .month-dow-header {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  border: 2px solid var(--border-grid);
-  border-bottom: 2px solid var(--border-grid);
+  border: 1px solid var(--border-grid);
+  border-bottom: 1px solid var(--border-grid);
   background: var(--bg-surface);
   flex-shrink: 0;
   border-radius: var(--radius-md) var(--radius-md) 0 0;
@@ -2986,7 +2983,7 @@ app-calendar-page {
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  border-right: 1.5px solid var(--border-grid);
+  border-right: 1px solid var(--border-grid);
 
   &:last-child {
     border-right: none;
@@ -3004,7 +3001,7 @@ app-calendar-page {
   min-height: 0;
   overflow-y: auto;
   background: var(--bg-surface);
-  border: 2px solid var(--border-grid);
+  border: 1px solid var(--border-grid);
   border-top: none;
   border-radius: 0 0 var(--radius-md) var(--radius-md);
 }
@@ -3015,7 +3012,7 @@ app-calendar-page {
   position: relative;
   flex: 1;
   min-height: 105px;
-  border-bottom: 2px solid var(--border-grid);
+  border-bottom: 1px solid var(--border-grid);
 
   &:last-child {
     border-bottom: none;
@@ -3042,6 +3039,11 @@ app-calendar-page {
   cursor: pointer;
   position: relative;
   transition: background var(--transition);
+  border-right: 1px solid var(--border-grid);
+
+  &:last-child {
+    border-right: none;
+  }
 
   &:hover {
     background: var(--bg-hover);
@@ -3250,7 +3252,7 @@ app-calendar-page {
 .week-header {
   display: grid;
   grid-template-columns: 56px repeat(7, 1fr);
-  border-bottom: 2px solid var(--border-grid);
+  border-bottom: 1px solid var(--border-grid);
   background: var(--bg-surface);
   flex-shrink: 0;
   /* Compensa a scrollbar fixa do week-body para manter alinhamento perfeito */
@@ -3258,7 +3260,7 @@ app-calendar-page {
 }
 
 .week-time-gutter-header {
-  border-right: 2px solid var(--border-grid);
+  border-right: 1px solid var(--border-grid);
 }
 
 .week-day-header {
@@ -3266,7 +3268,7 @@ app-calendar-page {
   flex-direction: column;
   align-items: center;
   padding: 10px 6px 8px;
-  border-right: 2px solid var(--border-grid);
+  border-right: 1px solid var(--border-grid);
   cursor: pointer;
   transition: background var(--transition);
 
@@ -3333,7 +3335,7 @@ app-calendar-page {
 .week-time-col {
   display: flex;
   flex-direction: column;
-  border-right: 2px solid var(--border-grid);
+  border-right: 1px solid var(--border-grid);
   flex-shrink: 0;
   background: var(--bg-app);
 }
@@ -3349,13 +3351,13 @@ app-calendar-page {
   font-weight: 600;
   color: var(--text-muted);
   flex-shrink: 0;
-  border-bottom: 1.5px solid var(--border-grid);
+  border-bottom: 1px solid var(--border-grid);
   box-sizing: border-box;
 }
 
 .week-day-col {
   position: relative;
-  border-right: 2px solid var(--border-grid);
+  border-right: 1px solid var(--border-grid);
   display: flex;
   flex-direction: column;
   transition: background 0.15s ease;
@@ -3390,7 +3392,7 @@ app-calendar-page {
 
 .hour-row {
   height: 60px;
-  border-bottom: 1.5px solid var(--border-grid);
+  border-bottom: 1px solid var(--border-grid);
   flex-shrink: 0;
   position: relative;
   transition: background var(--transition);
@@ -3592,7 +3594,7 @@ body.resizing-x-active * {
   align-items: center;
   justify-content: center;
   padding: 16px 24px 12px;
-  border-bottom: 1.5px solid var(--border-grid);
+  border-bottom: 1px solid var(--border-grid);
   background: var(--bg-surface);
   flex-shrink: 0;
   gap: 12px;
