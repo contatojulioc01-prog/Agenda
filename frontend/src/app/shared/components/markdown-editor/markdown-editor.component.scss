@@ -566,11 +566,11 @@ app-markdown-editor { display: block; min-width: 0; }
   width: 320px !important;
   min-width: 320px !important;
   max-width: 340px !important;
-  border-radius: 14px !important;
+  border-radius: 12px !important;
   overflow: hidden !important;
-  background: var(--bg-card, #ffffff) !important;
-  border: 1px solid var(--border-light, #e2e8f0) !important;
-  box-shadow: 0 16px 36px -6px rgba(15, 23, 42, 0.16), 0 8px 16px -4px rgba(15, 23, 42, 0.08) !important;
+  background: var(--bg-surface, #ffffff) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.08) !important;
   backdrop-filter: blur(16px);
 
   .mat-mdc-menu-content {

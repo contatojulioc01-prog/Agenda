@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatMenuModule } from '@angular/material/menu';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { KanbanService } from '../../../core/services/kanban.service';
@@ -38,8 +39,8 @@ export const DEFAULT_TABLE_COLUMNS: TableColumnDef[] = [
   { id: 'priority', label: 'Prioridade', icon: 'flag', visible: true, type: 'system' },
   { id: 'assignee', label: 'Responsável', icon: 'person', visible: true, type: 'system' },
   { id: 'date', label: 'Prazo', icon: 'event', visible: true, type: 'system' },
-  { id: 'demand', label: 'Demanda', icon: 'notes', visible: true, type: 'system' },
-  { id: 'labels', label: 'Etiquetas', icon: 'sell', visible: true, type: 'system' },
+  { id: 'demand', label: 'Demanda', icon: 'notes', visible: false, type: 'system' },
+  { id: 'labels', label: 'Etiquetas', icon: 'sell', visible: false, type: 'system' },
 ];
 
 @Component({
@@ -51,6 +52,7 @@ export const DEFAULT_TABLE_COLUMNS: TableColumnDef[] = [
     DragDropModule,
     MatIconModule,
     MatTooltipModule,
+    MatMenuModule,
     AiTextButtonComponent,
     MarkdownTextComponent,
     MarkdownEditorComponent,
@@ -1375,6 +1377,10 @@ export class KanbanBoardComponent implements OnDestroy {
   checklistProgress(task: KanbanTask): number {
     if (!task.checklist.length) return 0;
     return Math.round(task.checklist.filter(item => item.done).length / task.checklist.length * 100);
+  }
+
+  checklistDoneCount(task: KanbanTask): number {
+    return task.checklist.filter(item => item.done).length;
   }
 
   isChecklistExpanded(taskId: string): boolean {

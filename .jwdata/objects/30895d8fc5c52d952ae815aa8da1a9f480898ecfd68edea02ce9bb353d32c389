@@ -1,0 +1,36 @@
+{
+  "name": "agenda-backend",
+  "version": "1.0.0",
+  "description": "Backend para Agenda Corporativa Compartilhada",
+  "main": "index.js",
+  "scripts": {
+    "build": "npm --prefix ../frontend run build",
+    "start": "node index.js",
+    "startdev": "node -e \"process.env.PGDATABASE='agenda_dev'; process.env.NODE_ENV='development'; process.env.HOST='0.0.0.0'; require('./index.js');\"",
+    "dev": "node ../scripts/dev-start.cjs",
+    "dev:server": "npx nodemon --watch . --ext js,json --exec node -e \"process.env.PGDATABASE='agenda_dev'; process.env.NODE_ENV='development'; process.env.HOST='0.0.0.0'; require('./index.js');\"",
+    "test": "node --test test/*.test.js",
+    "db:setup": "node scripts/setup-postgres.js",
+    "db:setup:dev": "node -e \"process.env.PGDATABASE='agenda_dev'; require('./scripts/setup-postgres.js');\"",
+    "seed:dev": "node scripts/seed-dev.js",
+    "db:migrate:sqlite": "node scripts/migrate-sqlite-to-postgres.js",
+    "seed:linkedin": "node scripts/seed-linkedin.js"
+  },
+  "dependencies": {
+    "@azure/msal-node": "^7.2.1",
+    "@modelcontextprotocol/node": "^2.1.2",
+    "@modelcontextprotocol/server": "^2.4.0",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.9",
+    "express": "^5.3.0",
+    "express-rate-limit": "^8.7.1",
+    "helmet": "^8.3.0",
+    "pg": "^8.23.1",
+    "sql.js": "^1.15.2",
+    "ws": "^8.22.0",
+    "zod": "^4.6.7"
+  },
+  "engines": {
+    "node": ">=26.0.0"
+  }
+}

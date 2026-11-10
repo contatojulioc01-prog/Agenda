@@ -13,7 +13,7 @@
           aria-label="Selecionar Mural"
         >
           <div class="board-mark" [style.background]="activeBoard()?.color || '#f59e0b'">
-            <mat-icon>{{ activeBoard()?.scopeType === 'team' ? 'groups' : 'space_dashboard' }}</mat-icon>
+            <mat-icon>{{ activeBoard()?.scopeType === 'team' ? 'group' : 'space_dashboard' }}</mat-icon>
           </div>
           <div class="board-heading">
             <div class="board-title-row">
@@ -79,7 +79,7 @@
 
             <!-- Murais de Time -->
             <div class="mat-menu-group-label" *ngIf="hasTeamBoards()">
-              <mat-icon>groups</mat-icon>
+              <mat-icon>group</mat-icon>
               <span>Times & Equipes</span>
             </div>
             <ng-container *ngFor="let b of boards()">
@@ -122,31 +122,63 @@
         <button *ngIf="search()" class="icon-btn" (click)="search.set('')"><mat-icon>close</mat-icon></button>
       </div>
 
-      <!-- Filtros -->
-      <button class="archive-toggle expand-pill-btn size-34" [class.active]="filterPinnedOnly()" (click)="filterPinnedOnly.set(!filterPinnedOnly())" matTooltip="Fixados">
-        <mat-icon>push_pin</mat-icon><span class="pill-label">Fixados</span>
-      </button>
-      <button class="archive-toggle expand-pill-btn size-34" [class.active]="filterWithAttachments()" (click)="filterWithAttachments.set(!filterWithAttachments())" matTooltip="Com Anexos">
-        <mat-icon>attach_file</mat-icon><span class="pill-label">Com Anexos</span>
-      </button>
+      <!-- Filtros com Menu Dropdown Compacto -->
+      <div class="filters-dropdown-wrapper">
+        <button type="button" class="action-ghost-btn filter-pill-btn" [class.active]="hasActiveFilters()"
+          [matMenuTriggerFor]="filterMenu" matTooltip="Filtrar notas do mural">
+          <mat-icon>tune</mat-icon>
+          <span>Filtros</span>
+          <span class="filter-count-badge" *ngIf="activeFiltersCount()">{{ activeFiltersCount() }}</span>
+        </button>
+        <mat-menu #filterMenu="matMenu" class="board-switcher-menu" panelClass="board-switcher-menu">
+          <div class="menu-filter-content" (click)="$event.stopPropagation()">
+            <div class="menu-filter-header">
+              <span>Filtrar Notas</span>
+              <button *ngIf="hasActiveFilters()" type="button" class="clear-filters-link" (click)="clearFilters()">Limpar</button>
+            </div>
+            <button type="button" class="filter-menu-option" [class.is-active]="filterPinnedOnly()" (click)="filterPinnedOnly.set(!filterPinnedOnly())">
+              <mat-icon class="option-icon">push_pin</mat-icon>
+              <span>Somente Fixadas</span>
+              <mat-icon class="check-icon" *ngIf="filterPinnedOnly()">check</mat-icon>
+            </button>
+            <button type="button" class="filter-menu-option" [class.is-active]="filterWithAttachments()" (click)="filterWithAttachments.set(!filterWithAttachments())">
+              <mat-icon class="option-icon">attach_file</mat-icon>
+              <span>Com Anexos</span>
+              <mat-icon class="check-icon" *ngIf="filterWithAttachments()">check</mat-icon>
+            </button>
+          </div>
+        </mat-menu>
+      </div>
     </div>
 
     <div class="toolbar-actions">
-      <button class="secondary-btn expand-pill-btn size-36" (click)="abrirNovoMural('personal')" matTooltip="Criar novo mural pessoal">
-        <mat-icon>dashboard_customize</mat-icon><span class="pill-label">Novo Mural</span>
+      <button class="primary-btn primary-pill size-36" (click)="abrirNovoItem()" matTooltip="Adicionar novo cartão ao mural">
+        <mat-icon>add</mat-icon>
+        <span>Novo Cartão</span>
       </button>
-      <button class="secondary-btn expand-pill-btn size-36" (click)="abrirNovoGrupo()" matTooltip="Criar novo quadro de cartões">
-        <mat-icon>create_new_folder</mat-icon><span class="pill-label">Novo Quadro</span>
+
+      <button class="action-ghost-btn toolbar-pill-btn" (click)="abrirNovoGrupo()" matTooltip="Criar novo quadro de cartões">
+        <mat-icon>create_new_folder</mat-icon>
+        <span>Novo Quadro</span>
       </button>
-      <button class="primary-btn expand-pill-btn size-36 primary-pill" (click)="abrirNovoItem()" matTooltip="Novo Cartão no Mural">
-        <mat-icon>add</mat-icon><span class="pill-label">Novo Cartão</span>
+
+      <button class="action-ghost-btn icon-compact-btn" [matMenuTriggerFor]="moreActionsMenu" matTooltip="Mais opções do mural">
+        <mat-icon>more_horiz</mat-icon>
       </button>
-      <button *ngIf="activeBoard()?.myRole === 'admin'" class="secondary-btn expand-pill-btn size-36" (click)="abrirEditarMural()" matTooltip="Configurar / Excluir Mural">
-        <mat-icon>settings</mat-icon><span class="pill-label">Configurações</span>
-      </button>
-      <button *ngIf="activeBoard()?.scopeType === 'team' || teams().length > 0" class="secondary-btn expand-pill-btn size-36" (click)="abrirGerenciarTime()" matTooltip="Gerenciar Time & Membros SSO">
-        <mat-icon>group</mat-icon><span class="pill-label">Membros</span>
-      </button>
+      <mat-menu #moreActionsMenu="matMenu" class="board-switcher-menu" panelClass="board-switcher-menu">
+        <button mat-menu-item (click)="abrirNovoMural('personal')">
+          <mat-icon>dashboard_customize</mat-icon>
+          <span>Novo mural</span>
+        </button>
+        <button mat-menu-item *ngIf="activeBoard()?.scopeType === 'team' || teams().length > 0" (click)="abrirGerenciarTime()">
+          <mat-icon>group</mat-icon>
+          <span>Gerenciar time & membros</span>
+        </button>
+        <button mat-menu-item *ngIf="activeBoard()?.myRole === 'admin'" (click)="abrirEditarMural()">
+          <mat-icon>settings</mat-icon>
+          <span>Configurações do mural</span>
+        </button>
+      </mat-menu>
     </div>
   </div>
 
@@ -177,11 +209,22 @@
             <span class="column-count">{{ itemsForGroup(group.id).length }}</span>
           </div>
           <div class="group-actions">
-            <button class="icon-btn" (click)="moverGrupo(group, -1, $event)" [disabled]="isFirstGroup(group)" matTooltip="Mover para esquerda"><mat-icon>chevron_left</mat-icon></button>
-            <button class="icon-btn" (click)="moverGrupo(group, 1, $event)" [disabled]="isLastGroup(group)" matTooltip="Mover para direita"><mat-icon>chevron_right</mat-icon></button>
-            <button class="icon-btn" (click)="abrirNovoItem(group.id)" matTooltip="Adicionar cartão"><mat-icon>add</mat-icon></button>
-            <button *ngIf="activeBoard()?.myRole === 'admin'" class="icon-btn" (click)="abrirEditarGrupo(group, $event)" matTooltip="Editar quadro"><mat-icon>edit</mat-icon></button>
-            <button *ngIf="activeBoard()?.myRole === 'admin'" class="icon-btn danger-hover" (click)="solicitarExclusaoGrupoDireto(group, $event)" matTooltip="Excluir quadro"><mat-icon>delete_outline</mat-icon></button>
+            <button class="icon-btn" (click)="abrirNovoItem(group.id)" matTooltip="Adicionar cartão neste quadro">
+              <mat-icon>add</mat-icon>
+            </button>
+            <button *ngIf="activeBoard()?.myRole === 'admin'" class="icon-btn" [matMenuTriggerFor]="groupActionMenu" matTooltip="Opções do quadro">
+              <mat-icon>more_vert</mat-icon>
+            </button>
+            <mat-menu #groupActionMenu="matMenu" class="board-switcher-menu" panelClass="board-switcher-menu">
+              <button mat-menu-item (click)="abrirEditarGrupo(group, $event)">
+                <mat-icon>edit</mat-icon>
+                <span>Editar quadro</span>
+              </button>
+              <button mat-menu-item class="danger-menu-item" (click)="solicitarExclusaoGrupoDireto(group, $event)">
+                <mat-icon>delete_outline</mat-icon>
+                <span>Excluir quadro</span>
+              </button>
+            </mat-menu>
           </div>
         </div>
 
@@ -267,7 +310,6 @@
           cdkDrag
           [cdkDragData]="item"
           [style.background]="item.color"
-          [style.--card-rot]="item.rotation + 'deg'"
           [class.pinned]="item.isPinned"
           (click)="abrirVisualizarItem(item)"
           (contextmenu)="openMuralItemContextMenu($event, item)"

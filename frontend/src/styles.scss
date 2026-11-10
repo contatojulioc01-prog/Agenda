@@ -3011,7 +3011,7 @@ app-calendar-page {
   flex-direction: column;
   position: relative;
   flex: 1;
-  min-height: 105px;
+  min-height: 112px;
   border-bottom: 1px solid var(--border-grid);
 
   &:last-child {
@@ -3063,7 +3063,8 @@ app-calendar-page {
   }
 
   &.today-cell {
-    background: var(--bg-cell-today);
+    /* Fundo neutro e limpo, sem pintar a célula inteira com cor forte */
+    background: var(--bg-surface);
   }
 
   &.holiday-cell {
@@ -3097,6 +3098,7 @@ app-calendar-page {
   background: var(--bg-today);
   color: var(--text-today);
   font-weight: 700;
+  box-shadow: 0 0 0 2px var(--bg-surface), 0 2px 6px color-mix(in srgb, var(--brand-500) 40%, transparent);
 }
 
 .weekend-cell .day-number {
@@ -3117,11 +3119,30 @@ app-calendar-page {
   color: var(--text-holiday);
   background: rgba(239, 68, 68, .1);
   border-radius: 5px;
-  padding: 1px 5px;
+  padding: 1px 6px;
   margin-bottom: 2px;
   white-space: nowrap;
+  max-width: calc(100% - 32px);
   overflow: hidden;
   text-overflow: ellipsis;
+  cursor: help;
+  transition: background var(--transition), color var(--transition);
+
+  .holiday-icon {
+    flex-shrink: 0;
+    font-size: 10px;
+    line-height: 1;
+  }
+
+  .holiday-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &:hover {
+    background: rgba(239, 68, 68, .18);
+  }
 }
 
 /* Camada de Barras de Eventos em Grid Contínuo de 7 Colunas */
@@ -3141,7 +3162,7 @@ app-calendar-page {
   pointer-events: auto;
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   height: 22px;
   padding: 0 8px;
   font-size: 11.5px;
@@ -3159,6 +3180,15 @@ app-calendar-page {
   text-overflow: ellipsis;
   transition: filter var(--transition), transform var(--transition);
   z-index: 5;
+
+  .bar-source-icon {
+    font-size: 13px;
+    width: 13px;
+    height: 13px;
+    line-height: 13px;
+    opacity: 0.92;
+    flex-shrink: 0;
+  }
 
   /* Eventos multi-dia não são arrastáveis */
   &[draggable="false"],
@@ -3816,12 +3846,12 @@ body.dragging-active * {
 
 .mini-cal-dow {
   text-align: center;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   padding: 3px 0;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
 }
 
 .mini-cal-day {
@@ -4495,20 +4525,251 @@ body.dragging-active * {
   }
 }
 
+/* ════════════════════════════════════════════════════════════════════════════
+   PADRÃO GLOBAL DE CDK OVERLAY PANES & MENUS (NOTION / TAREFAS "..." STYLE)
+   ════════════════════════════════════════════════════════════════════════════ */
+
+@keyframes filterPopIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.cdk-overlay-pane {
+  animation: filterPopIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cdk-overlay-pane .mat-mdc-menu-panel,
+.mat-mdc-menu-panel {
+  --mat-menu-container-color: var(--bg-surface) !important;
+  background-color: var(--bg-surface) !important;
+  background: var(--bg-surface) !important;
+  min-width: 210px !important;
+  padding: 5px !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+
+  .mat-mdc-menu-content {
+    padding: 0 !important;
+    background: transparent !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 2px !important;
+  }
+
+  button.mat-mdc-menu-item,
+  .mat-mdc-menu-item,
+  .more-menu-item,
+  .switcher-item,
+  .filter-menu-option {
+    width: 100% !important;
+    height: 34px !important;
+    min-height: 34px !important;
+    padding: 0 10px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 9px !important;
+    border: 0 !important;
+    background: transparent !important;
+    color: var(--text-secondary) !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    border-radius: 7px !important;
+    cursor: pointer !important;
+    transition: all 0.12s ease !important;
+    font-family: inherit !important;
+    box-sizing: border-box !important;
+    text-align: left !important;
+
+    mat-icon {
+      font-size: 17px !important;
+      width: 17px !important;
+      height: 17px !important;
+      line-height: 17px !important;
+      color: var(--text-muted) !important;
+      margin-right: 0 !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      flex-shrink: 0 !important;
+      transition: color 0.12s ease !important;
+    }
+
+    span {
+      font-size: 12px !important;
+      line-height: 1.2 !important;
+    }
+
+    .menu-badge,
+    .team-menu-count {
+      margin-left: auto !important;
+      font-size: 10.5px !important;
+      font-weight: 700 !important;
+      padding: 1px 6px !important;
+      border-radius: 9px !important;
+      background: rgba(239, 68, 68, 0.15) !important;
+      color: #ef4444 !important;
+    }
+
+    &:hover {
+      background: var(--bg-hover) !important;
+      color: var(--text-primary) !important;
+
+      mat-icon {
+        color: var(--brand-500) !important;
+      }
+    }
+
+    &.active,
+    &.is-selected,
+    &.active-item,
+    &[aria-selected="true"] {
+      background: var(--bg-active) !important;
+      color: var(--brand-600) !important;
+      font-weight: 650 !important;
+
+      mat-icon {
+        color: var(--brand-600) !important;
+      }
+    }
+
+    &.danger,
+    &.danger-hover,
+    &.danger-menu-item,
+    &.menu-item-danger {
+      color: #ef4444 !important;
+
+      mat-icon {
+        color: #ef4444 !important;
+      }
+
+      &:hover {
+        background: rgba(239, 68, 68, 0.1) !important;
+        color: #dc2626 !important;
+        mat-icon {
+          color: #dc2626 !important;
+        }
+      }
+    }
+  }
+}
+
+.cdk-overlay-pane .mat-mdc-select-panel,
+.cdk-overlay-pane .mat-mdc-autocomplete-panel {
+  background-color: var(--bg-surface) !important;
+  background: var(--bg-surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+  padding: 4px !important;
+  overflow: hidden !important;
+}
+
+/* ══════════════ ANGULAR MATERIAL KANBAN BOARD SWITCHER MENU ══════════════ */
+.mat-mdc-menu-panel.board-switcher-menu,
+.board-switcher-menu {
+  min-width: 250px !important;
+  max-width: 320px !important;
+
+  .switcher-dropdown-content {
+    outline: none;
+    padding: 2px 0;
+  }
+
+  .switcher-menu-header {
+    padding: 8px 14px 6px;
+    font-size: 11px;
+    font-weight: 750;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .switcher-divider {
+    height: 1px;
+    background: var(--border-light);
+    margin: 4px 0;
+  }
+
+  .switcher-items-list {
+    display: flex;
+    flex-direction: column;
+    padding: 0 4px;
+    max-height: 280px;
+    overflow-y: auto;
+  }
+
+  .switcher-item {
+    .team-menu-dot {
+      width: 10px !important;
+      height: 10px !important;
+      min-width: 10px !important;
+      min-height: 10px !important;
+      border-radius: 50% !important;
+      flex-shrink: 0 !important;
+      box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12) !important;
+    }
+
+    .item-label {
+      flex: 1 1 auto !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+      white-space: nowrap !important;
+      color: var(--text-primary) !important;
+    }
+
+    .selected-check {
+      font-size: 17px !important;
+      width: 17px !important;
+      height: 17px !important;
+      line-height: 17px !important;
+      color: var(--brand-500) !important;
+      margin-left: 6px !important;
+      flex-shrink: 0 !important;
+    }
+
+    &.is-selected {
+      background: color-mix(in srgb, var(--brand-500) 10%, transparent) !important;
+      color: var(--brand-600, #4f46e5) !important;
+      font-weight: 650 !important;
+
+      .item-label {
+        color: var(--brand-600, #4f46e5) !important;
+        font-weight: 650 !important;
+      }
+
+      .item-icon {
+        color: var(--brand-500) !important;
+      }
+    }
+
+    &.add-team-btn {
+      color: var(--brand-600, #4f46e5) !important;
+      font-weight: 650 !important;
+
+      .item-label {
+        color: var(--brand-600, #4f46e5) !important;
+      }
+
+      .item-icon {
+        color: var(--brand-600, #4f46e5) !important;
+      }
+    }
+  }
+}
+
 /* ══════════════ ANGULAR MATERIAL MURAL MENU ══════════════ */
 .mat-mdc-menu-panel.mural-custom-mat-menu {
   min-width: 250px !important;
   max-width: 320px !important;
-  border-radius: 14px !important;
-  border: 1px solid var(--border) !important;
-  background: var(--bg-surface) !important;
-  box-shadow: var(--shadow-lg, 0 10px 25px -5px rgba(0, 0, 0, 0.2)) !important;
-  padding: 6px 0 !important;
-  overflow: hidden !important;
-
-  .mat-mdc-menu-content {
-    padding: 0 !important;
-  }
 
   .mat-menu-header {
     display: flex;
@@ -4571,27 +4832,6 @@ body.dragging-active * {
   }
 
   button.mat-mdc-menu-item {
-    min-height: 40px !important;
-    height: 40px !important;
-    padding: 0 14px !important;
-    display: flex !important;
-    align-items: center !important;
-    gap: 9px !important;
-    color: var(--text-primary) !important;
-    font-size: 13px !important;
-    font-weight: 550 !important;
-    transition: background 0.15s !important;
-
-    &:hover {
-      background: var(--bg-hover) !important;
-    }
-
-    &.active-item {
-      background: color-mix(in srgb, var(--brand-500) 12%, var(--bg-surface)) !important;
-      color: var(--text-brand, var(--brand-500)) !important;
-      font-weight: 700 !important;
-    }
-
     .menu-board-dot {
       width: 9px;
       height: 9px;
@@ -4629,48 +4869,91 @@ body.dragging-active * {
 .mat-mdc-menu-panel.mural-attachment-context-menu {
   min-width: 190px !important;
   max-width: 260px !important;
-  padding: 5px !important;
-  border: 1px solid var(--border) !important;
-  border-radius: 10px !important;
-  background: var(--bg-surface) !important;
-  box-shadow: var(--shadow-lg, 0 10px 25px -5px rgba(0, 0, 0, 0.25)) !important;
-  overflow: hidden !important;
 
-  .mat-mdc-menu-content {
-    padding: 0 !important;
-    display: flex !important;
-    flex-direction: column !important;
-    gap: 2px !important;
+  .mat-divider {
+    margin: 4px 0 !important;
+    border-top-color: var(--border-light) !important;
   }
+}
 
-  button.mat-mdc-menu-item {
+/* ══════════════ MENUS CONTEXTUAIS E FLUTUANTES GLOBAIS ══════════════ */
+.notion-more-menu,
+.mural-context-menu,
+.team-context-menu,
+.task-context-menu,
+.agenda-context-menu,
+.column-options-menu,
+.notion-columns-menu,
+.notion-sort-menu,
+.notion-filters-menu {
+  background: var(--bg-surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+  padding: 5px !important;
+  animation: filterPopIn 0.15s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  box-sizing: border-box !important;
+
+  button {
     width: 100% !important;
-    min-height: 36px !important;
-    height: 36px !important;
+    height: 34px !important;
+    min-height: 34px !important;
     padding: 0 10px !important;
     display: flex !important;
     align-items: center !important;
     gap: 9px !important;
-    border-radius: 7px !important;
+    border: 0 !important;
+    background: transparent !important;
     color: var(--text-secondary) !important;
-    font-family: inherit !important;
     font-size: 12px !important;
-    font-weight: 600 !important;
+    font-weight: 500 !important;
+    border-radius: 7px !important;
+    cursor: pointer !important;
+    transition: all 0.12s ease !important;
+    font-family: inherit !important;
+    box-sizing: border-box !important;
     text-align: left !important;
-    transition: all 0.15s ease !important;
 
     mat-icon {
+      font-size: 17px !important;
       width: 17px !important;
       height: 17px !important;
-      font-size: 17px !important;
-      margin-right: 0 !important;
+      line-height: 17px !important;
+      color: var(--text-muted) !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      flex-shrink: 0 !important;
+      transition: color 0.12s ease !important;
+    }
+
+    span {
+      font-size: 12px !important;
+      line-height: 1.2 !important;
     }
 
     &:hover {
-      color: var(--text-primary) !important;
       background: var(--bg-hover) !important;
+      color: var(--text-primary) !important;
+
+      mat-icon {
+        color: var(--brand-500) !important;
+      }
     }
 
+    &.active {
+      background: var(--bg-active) !important;
+      color: var(--brand-600) !important;
+      font-weight: 650 !important;
+
+      mat-icon {
+        color: var(--brand-600) !important;
+      }
+    }
+
+    &.danger,
+    &.danger-hover,
+    &.danger-menu-item,
     &.menu-item-danger {
       color: #ef4444 !important;
 
@@ -4679,14 +4962,12 @@ body.dragging-active * {
       }
 
       &:hover {
-        color: #dc2626 !important;
         background: rgba(239, 68, 68, 0.1) !important;
+        color: #dc2626 !important;
+        mat-icon {
+          color: #dc2626 !important;
+        }
       }
     }
-  }
-
-  .mat-divider {
-    margin: 4px 0 !important;
-    border-top-color: var(--border-light) !important;
   }
 }

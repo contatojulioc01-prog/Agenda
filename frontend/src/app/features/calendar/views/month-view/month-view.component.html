@@ -30,8 +30,9 @@
         >
           <div class="day-cell-header">
             <span class="day-number">{{ day.dayNum }}</span>
-            <span *ngIf="day.holiday" class="holiday-tag" [matTooltip]="day.holiday.name">
-              🎌 {{ day.holiday.name | slice:0:16 }}{{ day.holiday.name.length > 16 ? '…' : '' }}
+            <span *ngIf="day.holiday" class="holiday-tag" [matTooltip]="day.holiday.name" [title]="day.holiday.name">
+              <span class="holiday-icon">🎌</span>
+              <span class="holiday-name">{{ day.holiday.name }}</span>
             </span>
           </div>
         </div>
@@ -56,8 +57,10 @@
             (dragend)="onDragEnd($event)"
             (click)="$event.stopPropagation(); eventClick.emit(seg.event)"
             (contextmenu)="$event.preventDefault(); $event.stopPropagation(); eventContextMenu.emit({ event: seg.event, mouseEvent: $event })"
-            [matTooltip]="seg.event.title + (seg.event.allDay ? '' : ' · ' + seg.event.startTime + ' - ' + seg.event.endTime) + (seg.event.endDate && seg.event.endDate !== seg.event.date ? ' (' + seg.event.date + ' até ' + seg.event.endDate + ')' : '') + (seg.event.isTaskDeadline ? ' · Clique para abrir o card em Tarefas' : '')"
+            [matTooltip]="seg.event.title + (seg.event.allDay ? '' : ' · ' + seg.event.startTime + ' - ' + seg.event.endTime) + (seg.event.endDate && seg.event.endDate !== seg.event.date ? ' (' + seg.event.date + ' até ' + seg.event.endDate + ')' : '') + (seg.event.isTaskDeadline ? ' · Prazo de Tarefa' : '')"
           >
+            <mat-icon *ngIf="seg.event.isTaskDeadline && seg.isStart" class="bar-source-icon">checklist</mat-icon>
+            <mat-icon *ngIf="seg.event.isSystem && seg.isStart" class="bar-source-icon">shield</mat-icon>
             <span *ngIf="!seg.event.allDay && seg.isStart" class="bar-time">{{ seg.event.startTime }}</span>
             <span class="bar-title">{{ seg.event.title }}</span>
           </div>

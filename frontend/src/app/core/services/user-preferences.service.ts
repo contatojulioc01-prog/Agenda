@@ -114,7 +114,7 @@ export class UserPreferencesService {
     return {
       theme: prefersDark ? 'dark' : 'light',
       calendarView: 'month',
-      collapsedSidebarSections: [],
+      collapsedSidebarSections: ['my-calendars', 'task-tips', 'mural-tips'],
       agendaPillsExpanded: true,
       sidebarCollapsed: false,
     };

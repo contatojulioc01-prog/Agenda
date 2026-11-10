@@ -2,19 +2,16 @@
   --move-x: 0px;
   --move-y: 0px;
   position: fixed;
-  right: clamp(14px, 2vw, 26px);
-  bottom: clamp(14px, 2vw, 26px);
-  z-index: 1400;
+  right: clamp(16px, 2.5vw, 28px);
+  bottom: clamp(16px, 2.5vw, 28px);
+  z-index: 1000;
   display: block;
   width: max-content;
   height: max-content;
-  transform: translate(0, 0);
-  transition: left 650ms cubic-bezier(0.2, 0.9, 0.25, 1), top 650ms cubic-bezier(0.2, 0.9, 0.25, 1), transform 650ms cubic-bezier(0.2, 0.9, 0.25, 1);
-  will-change: left, top, transform;
   transform: translate(0, 0) scale(1);
   transform-origin: center center;
-  transition: transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
-  will-change: transform;
+  transition: transform 700ms cubic-bezier(0.22, 1, 0.36, 1), left 650ms cubic-bezier(0.2, 0.9, 0.25, 1), top 650ms cubic-bezier(0.2, 0.9, 0.25, 1);
+  will-change: left, top, transform;
 }
 
 :host.positioned {
@@ -23,8 +20,6 @@
 }
 
 :host.opening {
-  z-index: 2100;
-  transform: scale(1.68);
   z-index: 2200;
   transform: translate(var(--move-x), var(--move-y)) scale(1.75);
   pointer-events: none;
@@ -32,15 +27,18 @@
 
 .livro-assistente {
   position: relative;
-  display: grid;
-  width: 170px;
-  min-height: 132px;
-  place-items: center;
-  padding: 0 4px 5px;
-  overflow: visible;
-  border: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 125px;
+  height: 125px;
+  min-height: 125px;
+  padding: 0;
+  border-radius: 50%;
+  border: none;
   color: var(--text-primary);
   background: transparent;
+  box-shadow: none;
   cursor: grab;
   isolation: isolate;
   touch-action: none;
@@ -48,14 +46,12 @@
 
   &:hover,
   &:focus-visible {
-    transform: translateY(-5px) scale(1.04);
-    filter: drop-shadow(0 12px 16px color-mix(in srgb, var(--brand-500) 28%, transparent));
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: none;
   }
 
   &:focus-visible {
-    border-radius: 18px;
-    outline: 3px solid color-mix(in srgb, var(--brand-500) 58%, transparent);
-    outline-offset: 3px;
+    outline: none;
   }
 
   &.opening {
@@ -69,8 +65,8 @@
 
   .livro-assistente {
     cursor: grabbing;
-    transform: scale(1.03);
-    filter: drop-shadow(0 12px 16px color-mix(in srgb, var(--brand-500) 28%, transparent));
+    transform: scale(1.05);
+    box-shadow: none;
   }
 }
 
@@ -78,78 +74,64 @@
   position: relative;
   z-index: 1;
   display: block;
-  width: 154px;
+  width: 172px;
   height: auto;
-  margin: -10px 0 -14px;
   pointer-events: none;
   user-select: none;
-  filter: drop-shadow(0 14px 28px rgba(238, 116, 32, .32));
+  filter: drop-shadow(0 12px 24px rgba(238, 116, 32, .32));
 }
 
 .livro-static {
   position: relative;
   z-index: 1;
   display: block;
-  width: 101px;
-  height: 101px;
-  margin: 0 0 -5px;
+  width: 77px;
+  height: 77px;
   object-fit: contain;
-  filter: drop-shadow(0 10px 16px rgba(47, 155, 216, .2));
+  filter: drop-shadow(0 4px 12px rgba(47, 155, 216, .26));
   pointer-events: none;
   user-select: none;
 }
 
 .livro-label {
-  position: relative;
-  z-index: 2;
-  padding: 5px 11px;
-  border: 1px solid color-mix(in srgb, var(--brand-500) 28%, transparent);
-  border-radius: 999px;
-  color: var(--text-primary);
-  background: color-mix(in srgb, var(--bg-surface) 92%, transparent);
-  box-shadow: 0 6px 18px color-mix(in srgb, #000 16%, transparent);
-  font-size: 11px;
-  font-weight: 750;
-  letter-spacing: .01em;
-  white-space: nowrap;
-  backdrop-filter: blur(10px);
-  transition: opacity 220ms ease, transform 220ms ease;
-}
-
-.livro-assistente.opening .livro-label {
-  opacity: 0;
-  transform: translateY(6px) scale(0.85);
+  display: none;
 }
 
 .livro-glow {
   position: absolute;
-  inset: 10px;
+  inset: -10px;
   z-index: 0;
   border-radius: 50%;
-  background: color-mix(in srgb, var(--brand-500) 25%, transparent);
+  background: radial-gradient(circle at center, color-mix(in srgb, var(--brand-500) 45%, transparent) 0%, color-mix(in srgb, var(--brand-500) 22%, transparent) 45%, transparent 72%);
   filter: blur(18px);
-  opacity: 0;
-  transition: opacity 300ms ease;
+  opacity: 0.85;
+  transition: opacity 300ms ease, transform 300ms ease, filter 300ms ease;
+  pointer-events: none;
+}
+
+.livro-assistente:hover .livro-glow {
+  opacity: 1;
+  transform: scale(1.18);
+  filter: blur(24px);
 }
 
 .livro-assistente.opening .livro-glow {
-  opacity: 0.9;
-  transform: scale(1.35);
+  opacity: 0.95;
+  transform: scale(1.5);
   animation: livro-glow 2.4s ease-in-out infinite;
 }
 
 @keyframes livro-glow {
-  50% { opacity: .55; transform: scale(1.45); }
+  50% { opacity: .6; transform: scale(1.55); }
 }
 
 @media (max-width: 600px) {
-  :host { right: 10px; bottom: 10px; }
+  :host { right: 12px; bottom: 12px; }
   :host.positioned { right: auto; bottom: auto; }
   :host.opening { transform: scale(1.35); }
-  .livro-assistente { width: 142px; min-height: 110px; }
-  .livro-svg { width: 124px; }
-  .livro-static { width: 85px; height: 85px; }
-  .livro-label { padding: 4px 9px; font-size: 10px; }
+  .livro-assistente { width: 96px; height: 96px; min-height: 96px; }
+  .livro-svg { width: 135px; }
+  .livro-static { width: 60px; height: 60px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

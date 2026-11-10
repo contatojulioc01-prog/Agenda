@@ -5,6 +5,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatMenuModule } from '@angular/material/menu';
 
 import { EventsService } from '../../../core/services/events.service';
 import { HolidaysService } from '../../../core/services/holidays.service';
@@ -47,7 +48,7 @@ export type CalendarView = 'month' | 'week' | 'day';
   selector: 'app-calendar-page',
   standalone: true,
   imports: [
-    CommonModule, MatDialogModule, MatIconModule, MatTooltipModule,
+    CommonModule, MatDialogModule, MatIconModule, MatTooltipModule, MatMenuModule,
     MonthViewComponent, WeekViewComponent, DayViewComponent,
     MiniCalendarComponent, ThemeToggleComponent, CalendarManagerComponent, KanbanBoardComponent, MuralBoardComponent, NotificationSettingsComponent, AiAssistantComponent, LivroAbrindoComponent, CommandPaletteComponent, NotificationPopoverComponent,
   ],

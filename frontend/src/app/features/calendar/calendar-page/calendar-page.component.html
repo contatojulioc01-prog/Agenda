@@ -33,6 +33,27 @@
         </button>
       </div>
 
+      <!-- Botão de Ação em Destaque no Topo da Sidebar -->
+      <div class="sidebar-action-wrap">
+        <button *ngIf="activeSection === 'calendar'" class="btn-create btn-create-featured" [disabled]="isTaskCalendarSelected()"
+          (click)="openCreateModal()" id="btn-create-event"
+          [matTooltip]="sidebarCollapsed() ? (isTaskCalendarSelected() ? 'Gerenciada por Tarefas' : '+ Novo Evento') : (isTaskCalendarSelected() ? 'Os eventos desta agenda são gerenciados pelos cards de tarefas' : '+ Novo Evento')"
+          matTooltipPosition="right">
+          <span class="btn-create-icon">＋</span>
+          <span class="btn-create-text" *ngIf="!sidebarCollapsed()">{{ isTaskCalendarSelected() ? 'Gerenciada por Tarefas' : 'Novo Evento' }}</span>
+        </button>
+        <button *ngIf="activeSection === 'tasks'" class="btn-create btn-create-featured" (click)="openTaskCreate()" id="btn-create-task"
+          [matTooltip]="sidebarCollapsed() ? '+ Criar Tarefa' : '+ Criar Nova Tarefa'" matTooltipPosition="right">
+          <span class="btn-create-icon">＋</span>
+          <span class="btn-create-text" *ngIf="!sidebarCollapsed()">Criar Tarefa</span>
+        </button>
+        <button *ngIf="activeSection === 'mural'" class="btn-create btn-create-featured" (click)="openMuralCreate()" id="btn-create-mural"
+          [matTooltip]="sidebarCollapsed() ? '+ Criar Cartão' : '+ Criar Novo Cartão no Mural'" matTooltipPosition="right">
+          <span class="btn-create-icon">＋</span>
+          <span class="btn-create-text" *ngIf="!sidebarCollapsed()">Criar Cartão</span>
+        </button>
+      </div>
+
       <nav class="app-section-tabs" aria-label="Módulos do sistema" [attr.data-active]="activeSection">
         <!-- Linha superior fixa: Agenda -->
         <button type="button" class="tab-top-btn" [class.active]="activeSection === 'calendar'"
@@ -57,25 +78,6 @@
           </button>
         </div>
       </nav>
-
-      <!-- Botão criar evento -->
-      <button *ngIf="activeSection === 'calendar'" class="btn-create" [disabled]="isTaskCalendarSelected()"
-        (click)="openCreateModal()" id="btn-create-event"
-        [matTooltip]="sidebarCollapsed() ? (isTaskCalendarSelected() ? 'Gerenciada por Tarefas' : 'Criar novo evento') : (isTaskCalendarSelected() ? 'Os eventos desta agenda são gerenciados pelos cards de tarefas' : 'Criar novo evento')"
-        matTooltipPosition="right">
-        <span class="btn-create-icon">＋</span>
-        <span *ngIf="!sidebarCollapsed()">{{ isTaskCalendarSelected() ? 'Gerenciada por Tarefas' : 'Criar evento' }}</span>
-      </button>
-      <button *ngIf="activeSection === 'tasks'" class="btn-create" (click)="openTaskCreate()" id="btn-create-task"
-        [matTooltip]="sidebarCollapsed() ? 'Criar tarefa' : 'Criar nova tarefa'" matTooltipPosition="right">
-        <span class="btn-create-icon">＋</span>
-        <span *ngIf="!sidebarCollapsed()">Criar tarefa</span>
-      </button>
-      <button *ngIf="activeSection === 'mural'" class="btn-create" (click)="openMuralCreate()" id="btn-create-mural"
-        [matTooltip]="sidebarCollapsed() ? 'Criar cartão' : 'Criar novo cartão no mural'" matTooltipPosition="right">
-        <span class="btn-create-icon">＋</span>
-        <span *ngIf="!sidebarCollapsed()">Criar cartão</span>
-      </button>
     </div>
 
     <!-- Conteúdo central rolável -->
@@ -148,6 +150,7 @@
             [attr.aria-expanded]="!isSidebarSectionCollapsed('my-calendars')" aria-controls="my-calendars-list">
             <mat-icon>{{ isSidebarSectionCollapsed('my-calendars') ? 'chevron_right' : 'expand_more' }}</mat-icon>
             <span class="sidebar-section-title">Minhas Agendas</span>
+            <span class="sidebar-section-count" *ngIf="myCalendars().length > 0">({{ myCalendars().length }})</span>
           </button>
           <div class="sidebar-section-actions">
             <button class="btn-add-calendar" (click)="openCreateCalendar()" matTooltip="Nova agenda"
@@ -187,9 +190,11 @@
             </div>
           </div>
 
-          <div *ngIf="myCalendars().length === 0" class="no-calendars-hint">
-            <mat-icon>calendar_today</mat-icon>
-            <span>Nenhuma agenda criada</span>
+          <div *ngIf="myCalendars().length === 0" class="no-calendars-hint simplified">
+            <button class="btn-create-first-cal" (click)="openCreateCalendar()">
+              <mat-icon>add</mat-icon>
+              <span>Criar minha primeira agenda</span>
+            </button>
           </div>
         </div>
       </div>
@@ -201,6 +206,7 @@
             [attr.aria-expanded]="!isSidebarSectionCollapsed('shared-calendars')" aria-controls="shared-calendars-list">
             <mat-icon>{{ isSidebarSectionCollapsed('shared-calendars') ? 'chevron_right' : 'expand_more' }}</mat-icon>
             <span class="sidebar-section-title">Compartilhadas</span>
+            <span class="sidebar-section-count">({{ sharedCalendars().length }})</span>
           </button>
         </div>
         <div class="calendar-list" id="shared-calendars-list" *ngIf="!isSidebarSectionCollapsed('shared-calendars')">
@@ -231,6 +237,7 @@
             [attr.aria-expanded]="!isSidebarSectionCollapsed('task-calendars')" aria-controls="task-calendars-list">
             <mat-icon>{{ isSidebarSectionCollapsed('task-calendars') ? 'chevron_right' : 'expand_more' }}</mat-icon>
             <span class="sidebar-section-title">Tarefas</span>
+            <span class="sidebar-section-count">({{ taskCalendars().length }})</span>
           </button>
         </div>
         <div class="calendar-list" id="task-calendars-list" *ngIf="!isSidebarSectionCollapsed('task-calendars')">
@@ -390,7 +397,7 @@
 
     <!-- Rodapé fixo no canto inferior esquerdo -->
     <div class="sidebar-footer">
-      <!-- Perfil do Usuário -->
+      <!-- Perfil do Usuário com Tema Integrado -->
       <div class="sidebar-user-card" *ngIf="currentUser() as user">
         <div class="user-avatar has-img" [matTooltip]="sidebarCollapsed() ? (user.name + ' (' + (user.departamentName || 'Corporativo') + ')') : ''" matTooltipPosition="right">
           <img [src]="user.avatar || defaultAvatar" [alt]="user.name"
@@ -401,6 +408,7 @@
           <span class="user-dept">{{ user.departamentName || 'Corporativo' }}</span>
         </div>
         <div class="user-card-actions" [class.collapsed-actions]="sidebarCollapsed()">
+          <app-theme-toggle></app-theme-toggle>
           <button class="btn-logout btn-notifications" (click)="toggleNotificationPopover($event)"
             matTooltip="Notificações e Avisos" matTooltipPosition="right" aria-label="Notificações">
             <mat-icon>notifications</mat-icon>
@@ -421,12 +429,6 @@
         *ngIf="notificationPopoverOpen()"
         (close)="notificationPopoverOpen.set(false)"
       ></app-notification-popover>
-
-      <!-- Toggle tema fixo -->
-      <div class="sidebar-bottom">
-        <span class="theme-label" *ngIf="!sidebarCollapsed()">Tema</span>
-        <app-theme-toggle></app-theme-toggle>
-      </div>
     </div>
   </aside>
 
@@ -440,17 +442,54 @@
           <button type="button" class="mobile-menu-toggle" (click)="toggleSidebar()" aria-label="Abrir menu">
             <mat-icon>menu</mat-icon>
           </button>
-          <button class="btn-today" (click)="goToday()" id="btn-hoje">Hoje</button>
-          <button class="nav-arrow" (click)="navigate(-1)" id="btn-prev" aria-label="Período anterior">
-            <mat-icon>chevron_left</mat-icon>
-          </button>
-          <button class="nav-arrow" (click)="navigate(1)" id="btn-next" aria-label="Próximo período">
-            <mat-icon>chevron_right</mat-icon>
-          </button>
+          <!-- Segmented Navigation Controls -->
+          <div class="nav-segment-group">
+            <button class="btn-today" (click)="goToday()" id="btn-hoje">Hoje</button>
+            <button class="nav-arrow" (click)="navigate(-1)" id="btn-prev" aria-label="Período anterior" matTooltip="Período anterior">
+              <mat-icon>chevron_left</mat-icon>
+            </button>
+            <button class="nav-arrow" (click)="navigate(1)" id="btn-next" aria-label="Próximo período" matTooltip="Próximo período">
+              <mat-icon>chevron_right</mat-icon>
+            </button>
+          </div>
           <h1 class="period-label">{{ periodLabel }}</h1>
         </div>
 
         <div class="header-right">
+          <!-- Dropdown/Menu Limpo de Filtro de Agendas -->
+          <div class="agenda-filter-dropdown" *ngIf="activePillCalendars().length > 0">
+            <button type="button" class="btn-filter-agendas" [matMenuTriggerFor]="agendasMenu"
+              [matTooltip]="'Filtrar agendas visíveis (' + calendarsService.visibleCalendarIds().size + ' ativas)'">
+              <mat-icon>tune</mat-icon>
+              <span class="filter-label">Agendas</span>
+              <span class="filter-badge" *ngIf="!calendarsService.isAllSelected()">{{ calendarsService.visibleCalendarIds().size }}</span>
+              <mat-icon class="dropdown-chevron">expand_more</mat-icon>
+            </button>
+            <mat-menu #agendasMenu="matMenu" class="agendas-dropdown-panel" xPosition="before">
+              <div class="agendas-dropdown-content" (click)="$event.stopPropagation()">
+                <div class="dropdown-header">
+                  <span class="dropdown-title">Filtrar Agendas</span>
+                  <button type="button" class="btn-select-all" (click)="selectAllCalendars()">
+                    {{ calendarsService.isAllSelected() ? 'Todas visíveis' : 'Selecionar todas' }}
+                  </button>
+                </div>
+                <div class="dropdown-divider"></div>
+                <div class="dropdown-items-list">
+                  <button type="button" *ngFor="let cal of activePillCalendars()"
+                    class="dropdown-agenda-item"
+                    [class.is-active]="calendarsService.visibleCalendarIds().has(cal.id)"
+                    (click)="toggleCalendarVisibility(cal.id)">
+                    <span class="item-checkbox">
+                      <mat-icon>{{ calendarsService.visibleCalendarIds().has(cal.id) ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>
+                    </span>
+                    <span class="item-dot" [style.background]="cal.color"></span>
+                    <span class="item-name">{{ calendarDisplayName(cal) }}</span>
+                  </button>
+                </div>
+              </div>
+            </mat-menu>
+          </div>
+
           <!-- Indicador de Sync WebSocket -->
           <div class="sync-indicator" (click)="syncService.connect()" style="cursor: pointer;"
             [matTooltip]="'Sincronização: ' + syncStatus() + (lastSyncLabel ? ' · ' + lastSyncLabel : '') + ' (Clique para reconectar)'">
@@ -462,39 +501,12 @@
           <!-- View switcher -->
           <div class="view-switcher" role="group" aria-label="Tipo de visualização">
             <button class="view-btn" [class.active]="currentView === 'month'" (click)="setView('month')"
-              id="btn-view-month">Mês</button>
+              id="btn-view-month"><span class="view-btn-label">Mês</span></button>
             <button class="view-btn" [class.active]="currentView === 'week'" (click)="setView('week')"
-              id="btn-view-week">Semana</button>
+              id="btn-view-week"><span class="view-btn-label">Semana</span></button>
             <button class="view-btn" [class.active]="currentView === 'day'" (click)="setView('day')"
-              id="btn-view-day">Dia</button>
+              id="btn-view-day"><span class="view-btn-label">Dia</span></button>
           </div>
-        </div>
-      </div>
-
-      <!-- Barra de Filtros Rápidos de Agendas (Pills) -->
-      <div class="agenda-pills-bar" [class.is-collapsed]="!agendaPillsExpanded()" *ngIf="activePillCalendars().length > 0">
-        <button type="button" class="pills-toggle" (click)="toggleAgendaPills()"
-          [attr.aria-expanded]="agendaPillsExpanded()" aria-controls="agenda-pills-list"
-          [matTooltip]="agendaPillsExpanded() ? 'Ocultar seleção de agendas' : 'Mostrar seleção de agendas'">
-          <mat-icon>{{ agendaPillsExpanded() ? 'chevron_left' : 'chevron_right' }}</mat-icon>
-          <span class="pills-label">Agendas</span>
-        </button>
-
-        <div class="pills-scroll" id="agenda-pills-list" *ngIf="agendaPillsExpanded()">
-          <button type="button" class="agenda-pill pill-all"
-            [class.active]="calendarsService.isAllSelected()"
-            (click)="selectAllCalendars()"
-            matTooltip="Exibir todas as agendas simultaneamente">
-            <mat-icon class="pill-all-icon">done_all</mat-icon>
-            <span class="pill-name">Todas</span>
-          </button>
-          <button *ngFor="let cal of activePillCalendars()" class="agenda-pill"
-            [class.active]="calendarsService.visibleCalendarIds().has(cal.id)"
-            (click)="toggleCalendarVisibility(cal.id)"
-            [matTooltip]="calendarDisplayName(cal) + (calendarsService.visibleCalendarIds().has(cal.id) ? ' (Visível · clique para ocultar)' : ' (Oculta · clique para exibir)')">
-            <span class="pill-dot" [style.background]="cal.color"></span>
-            <span class="pill-name">{{ calendarDisplayName(cal) }}</span>
-          </button>
         </div>
       </div>
     </div>

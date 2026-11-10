@@ -19,9 +19,52 @@
     <div class="board-heading">
       <span class="board-mark"
         [style.background]="board()?.color || 'var(--brand-500)'"><mat-icon>view_kanban</mat-icon></span>
-      <div>
+      <div class="board-meta-col">
         <div class="board-title-row">
-          <h1 class="board-name">{{ board()?.name || 'Kanban' }}</h1>
+          <!-- Dropdown/Seletor Rápido de Quadros e Times -->
+          <div class="board-switcher-wrapper">
+            <button type="button" class="btn-board-switcher" [matMenuTriggerFor]="boardSwitchMenu"
+              matTooltip="Alternar entre quadros e times">
+              <span class="board-name">{{ board()?.name || 'Kanban' }}</span>
+              <mat-icon class="switcher-chevron">expand_more</mat-icon>
+            </button>
+            <mat-menu #boardSwitchMenu="matMenu" class="board-switcher-menu" panelClass="board-switcher-menu" xPosition="after" yPosition="below" [overlapTrigger]="false">
+              <div class="switcher-dropdown-content">
+                <div class="switcher-menu-header" (click)="$event.stopPropagation()">
+                  <span>Quadros & Times</span>
+                </div>
+                <div class="switcher-items-list">
+                  <button type="button" class="switcher-item" *ngIf="personalBoardId() as personalId"
+                    [class.is-selected]="board()?.id === personalId"
+                    (click)="switchBoard(personalId)">
+                    <mat-icon class="item-icon">person</mat-icon>
+                    <span class="item-label">{{ personalBoardName() }}</span>
+                    <mat-icon class="selected-check" *ngIf="board()?.id === personalId">check</mat-icon>
+                  </button>
+
+                  <div class="switcher-divider" *ngIf="personalBoardId() && teams().length"></div>
+
+                  <button type="button" class="switcher-item" *ngFor="let team of teams()"
+                    [class.is-selected]="board()?.teamId === team.id"
+                    (click)="switchBoard(team.boardId)"
+                    (contextmenu)="openTeamContextMenu($event, team)">
+                    <span class="team-menu-dot" [style.background]="team.color"></span>
+                    <span class="item-label">{{ team.name }}</span>
+                    <small class="team-menu-count">{{ team.memberCount }}</small>
+                    <mat-icon class="selected-check" *ngIf="board()?.teamId === team.id">check</mat-icon>
+                  </button>
+
+                  <div class="switcher-divider"></div>
+
+                  <button type="button" class="switcher-item add-team-btn" (click)="creatingTeam.set(true); teamModalOpen.set(true)">
+                    <mat-icon class="item-icon">group_add</mat-icon>
+                    <span class="item-label">Novo time</span>
+                  </button>
+                </div>
+              </div>
+            </mat-menu>
+          </div>
+
           <button class="icon-btn" (click)="renameBoard()"
             matTooltip="Renomear quadro"><mat-icon>edit</mat-icon></button>
           <button class="icon-btn danger-hover" *ngIf="canDeleteCurrentBoard()" (click)="requestDeleteCurrentBoard()"
@@ -33,23 +76,34 @@
       </div>
     </div>
 
+    <!-- Abas de Times e Quadros em Linha Única Integrada -->
+    <nav class="integrated-workspace-tabs" aria-label="Kanbans disponíveis">
+      <button *ngIf="personalBoardId() as personalId" class="tab-item" [class.active]="board()?.id === personalId"
+        (click)="switchBoard(personalId)">
+        <mat-icon>person</mat-icon><span>{{ personalBoardName() }}</span>
+      </button>
+      <button *ngFor="let team of teams()" class="tab-item" [class.active]="board()?.teamId === team.id"
+        (click)="switchBoard(team.boardId)" (contextmenu)="openTeamContextMenu($event, team)">
+        <span class="team-dot" [style.background]="team.color"></span><span>{{ team.name }}</span><small>{{
+          team.memberCount }}</small>
+      </button>
+      <button class="add-team-tab expand-pill-btn size-30" (click)="creatingTeam.set(true); teamModalOpen.set(true)"
+        matTooltip="Adicionar novo time">
+        <mat-icon>group_add</mat-icon>
+        <span class="pill-label">Novo time</span>
+      </button>
+    </nav>
+
     <div class="toolbar-actions">
-      <!-- <button class="secondary-btn expand-pill-btn size-36 fullscreen-btn" [class.active]="isFullscreen()" (click)="toggleFullscreen()" [matTooltip]="isFullscreen() ? 'Restaurar layout (exibir cabeçalho e menu lateral)' : 'Modo expandido (ocultar cabeçalho e menu lateral)'">
-        <mat-icon>{{ isFullscreen() ? 'unfold_less' : 'aspect_ratio' }}</mat-icon>
-        <span class="pill-label">{{ isFullscreen() ? 'Restaurar layout' : 'Tela cheia' }}</span>
-      </button> -->
-      <button class="secondary-btn expand-pill-btn size-36 print-btn-action" (click)="printBoard()"
+      <button class="action-ghost-btn toolbar-pill-btn" (click)="printBoard()"
         matTooltip="Imprimir quadro Kanban">
         <mat-icon>print</mat-icon>
-        <span class="pill-label">Imprimir</span>
+        <span>Imprimir</span>
       </button>
-      <button class="secondary-btn expand-pill-btn size-36" (click)="openTeamManager()" matTooltip="Gerenciar times e membros">
-        <mat-icon>groups</mat-icon>
-        <span class="pill-label">Times</span>
-      </button>
-      <button class="primary-btn expand-pill-btn size-36 primary-pill" (click)="openCreate()" matTooltip="Nova tarefa">
-        <mat-icon>add</mat-icon>
-        <span class="pill-label">Nova tarefa</span>
+      <button class="action-ghost-btn toolbar-pill-btn" (click)="openTeamManager()"
+        matTooltip="Gerenciar times e membros">
+        <mat-icon>group</mat-icon>
+        <span>Times</span>
       </button>
     </div>
 
@@ -59,31 +113,6 @@
       <button type="button" class="icon-btn" (click)="addingBoard.set(false)"><mat-icon>close</mat-icon></button>
     </form>
   </header>
-
-  <nav class="workspace-tabs group-panel" *ngIf="!isFullscreen()" aria-label="Kanbans disponíveis">
-    <div class="tabs-list-wrap">
-      <button *ngIf="personalBoardId() as personalId" [class.active]="board()?.id === personalId"
-        (click)="switchBoard(personalId)">
-        <mat-icon>person</mat-icon><span>{{ personalBoardName() }}</span>
-      </button>
-      <button *ngFor="let team of teams()" [class.active]="board()?.teamId === team.id"
-        (click)="switchBoard(team.boardId)" (contextmenu)="openTeamContextMenu($event, team)">
-        <span class="team-dot" [style.background]="team.color"></span><span>{{ team.name }}</span><small>{{
-          team.memberCount }}</small>
-      </button>
-      <button class="add-team-tab expand-pill-btn size-32" (click)="creatingTeam.set(true); teamModalOpen.set(true)"
-        matTooltip="Adicionar novo time">
-        <mat-icon>group_add</mat-icon>
-        <span class="pill-label">Novo time</span>
-      </button>
-    </div>
-
-    <!-- Botão no canto direito das abas para alternar modo expandido sem F11 -->
-    <!-- <button type="button" class="expand-mode-btn expand-pill-btn size-32" [class.active]="isFullscreen()" (click)="toggleFullscreen()" [matTooltip]="isFullscreen() ? 'Restaurar layout (exibir cabeçalho e menu lateral)' : 'Modo expandido (ocultar cabeçalho e menu lateral)'">
-      <mat-icon>{{ isFullscreen() ? 'unfold_less' : 'aspect_ratio' }}</mat-icon>
-      <span class="pill-label">{{ isFullscreen() ? 'Restaurar layout' : 'Tela cheia' }}</span>
-    </button> -->
-  </nav>
 
   <nav class="tree-breadcrumb" *ngIf="parentStack().length" aria-label="Navegação de subtarefas">
     <button (click)="navigateTree(-1)"><mat-icon>home</mat-icon>{{ board()?.name }}</button>
@@ -121,11 +150,10 @@
 
       <!-- Dropdown de Ordenação (apenas em visualização de tabela) -->
       <div class="notion-sort-wrapper" *ngIf="activeTab() !== 'kanban'">
-        <button type="button" class="action-ghost-btn" (click)="toggleSortMenu($event)"
+        <button type="button" class="action-ghost-btn icon-compact-btn" (click)="toggleSortMenu($event)"
           [class.active]="sortOption() !== 'default'"
-          matTooltip="Ordenar tarefas">
+          [matTooltip]="'Ordenar tarefas: ' + currentSortLabel()">
           <mat-icon>swap_vert</mat-icon>
-          <span>{{ currentSortLabel() }}</span>
         </button>
         <div class="notion-sort-menu" *ngIf="showSortMenu()" (click)="$event.stopPropagation()">
           <button type="button" [class.active]="sortOption() === 'default'" (click)="toggleSort('default')">
@@ -148,11 +176,10 @@
 
       <!-- Dropdown de Colunas (apenas em visualização de tabela) -->
       <div class="notion-columns-wrapper" *ngIf="activeTab() !== 'kanban'">
-        <button type="button" class="action-ghost-btn" (click)="toggleColumnManager($event)"
+        <button type="button" class="action-ghost-btn icon-compact-btn" (click)="toggleColumnManager($event)"
           [class.active]="showColumnManager()"
           matTooltip="Personalizar colunas visíveis">
           <mat-icon>view_column</mat-icon>
-          <span>Colunas</span>
         </button>
         <div class="notion-columns-menu" *ngIf="showColumnManager()" (click)="$event.stopPropagation()">
           <div class="notion-columns-menu-header">
@@ -379,33 +406,19 @@
             <div class="card-labels" *ngIf="getTaskFreeLabels(task).length"><span *ngFor="let label of getTaskFreeLabels(task) | slice:0:4">{{
                 label }}</span></div>
             <div class="card-title-row">
-              <h3>{{ task.title }}</h3><button class="child-board-btn" (click)="openChildBoard(task, $event)"
-                [matTooltip]="branchHasContent(task) ? childCount(task) + ' subtarefas ativas' : 'Criar ramificação de subtarefas'"><mat-icon>account_tree</mat-icon><small
-                  *ngIf="childCount(task)">{{ childCount(task) }}</small></button><mat-icon
-                class="edit-hint">edit</mat-icon>
+              <h3>{{ task.title }}</h3>
+              <button class="child-board-btn" (click)="openChildBoard(task, $event)"
+                [matTooltip]="branchHasContent(task) ? childCount(task) + ' subtarefas ativas' : 'Criar ramificação de subtarefas'">
+                <mat-icon>account_tree</mat-icon>
+                <small *ngIf="childCount(task)">{{ childCount(task) }}</small>
+              </button>
             </div>
-            <app-markdown-text class="card-description" *ngIf="task.description" [text]="task.description" />
-            <div class="check-progress" *ngIf="task.checklist.length"><span
-                [style.width.%]="checklistProgress(task)"></span></div>
-            <button class="card-checklist-toggle" *ngIf="task.checklist.length" type="button"
-              (mousedown)="$event.stopPropagation()" (click)="toggleCardChecklist(task.id, $event)"
-              [attr.aria-expanded]="isChecklistExpanded(task.id)">
-              <mat-icon>{{ isChecklistExpanded(task.id) ? 'keyboard_arrow_up' : 'keyboard_arrow_down' }}</mat-icon>
-              <span>Checklist</span>
-              <strong>{{ task.checklist.filter(item => item.done).length }}/{{ task.checklist.length }}</strong>
-            </button>
-            <div class="card-checklist-items" *ngIf="task.checklist.length && isChecklistExpanded(task.id)"
-              (mousedown)="$event.stopPropagation()" (click)="$event.stopPropagation()">
-              <ng-container *ngFor="let item of task.checklist; let itemIdx = index; trackBy: trackById">
-                <div class="card-checklist-group-label" *ngIf="item.groupTitle && (itemIdx === 0 || task.checklist[itemIdx - 1].groupTitle !== item.groupTitle)">
-                  <mat-icon>folder_open</mat-icon>
-                  <span>{{ item.groupTitle }}</span>
-                </div>
-                <label [class.card-item-grouped]="!!item.groupTitle">
-                  <input type="checkbox" [checked]="item.done" (change)="toggleCardChecklistItem(task, item.id, $event)">
-                  <span [class.done]="item.done">{{ item.text }}</span>
-                </label>
-              </ng-container>
+            <p class="card-description-preview" *ngIf="task.description">{{ task.description | slice:0:120 }}{{ task.description.length > 120 ? '…' : '' }}</p>
+            <div class="card-checklist-summary" *ngIf="task.checklist.length"
+              [matTooltip]="checklistDoneCount(task) + ' de ' + task.checklist.length + ' concluídos'">
+              <mat-icon>checklist</mat-icon>
+              <span>{{ checklistDoneCount(task) }}/{{ task.checklist.length }}</span>
+              <div class="check-progress-mini"><span [style.width.%]="checklistProgress(task)"></span></div>
             </div>
             <footer class="card-footer">
               <div class="card-badges">

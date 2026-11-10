@@ -17,6 +17,7 @@
     "seed:linkedin": "node scripts/seed-linkedin.js"
   },
   "dependencies": {
+    "@azure/msal-node": "^7.2.1",
     "@modelcontextprotocol/node": "^2.1.2",
     "@modelcontextprotocol/server": "^2.4.0",
     "cors": "^2.8.6",

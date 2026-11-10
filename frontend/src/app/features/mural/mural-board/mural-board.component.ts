@@ -72,6 +72,15 @@ export class MuralBoardComponent implements OnInit, OnDestroy {
   readonly filterPinnedOnly = signal(false);
   readonly filterWithAttachments = signal(false);
 
+  readonly hasActiveFilters = computed(() => this.filterPinnedOnly() || this.filterWithAttachments() || this.groupFilter() !== 'all');
+  readonly activeFiltersCount = computed(() => (this.filterPinnedOnly() ? 1 : 0) + (this.filterWithAttachments() ? 1 : 0) + (this.groupFilter() !== 'all' ? 1 : 0));
+
+  clearFilters(): void {
+    this.filterPinnedOnly.set(false);
+    this.filterWithAttachments.set(false);
+    this.groupFilter.set('all');
+  }
+
   readonly colorPresets = [
     { label: 'Âmbar', value: '#f59e0b' },
     { label: 'Azul', value: '#0ea5e9' },
