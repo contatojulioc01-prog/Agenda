@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["src/app/features/calendar/views/day-view/day-view.component.scss"],
-  "sourcesContent": [":host { display: flex; flex-direction: column; height: 100%; overflow: hidden; }\r\n\r\n.all-day-bar {\r\n  display: flex;\r\n  align-items: flex-start;\r\n  gap: 12px;\r\n  padding: 8px 16px;\r\n  border-bottom: 1px solid var(--border);\r\n  background: var(--bg-surface);\r\n  flex-shrink: 0;\r\n}\r\n\r\n.all-day-label {\r\n  font-size: 11px;\r\n  font-weight: 600;\r\n  color: var(--text-muted);\r\n  text-transform: uppercase;\r\n  letter-spacing: 0.06em;\r\n  white-space: nowrap;\r\n  padding-top: 3px;\r\n  min-width: 56px;\r\n  text-align: right;\r\n}\r\n\r\n.all-day-events {\r\n  display: flex;\r\n  flex-wrap: wrap;\r\n  gap: 4px;\r\n}\r\n"],
-  "mappings": ";AAAA;AAAQ,WAAA;AAAe,kBAAA;AAAwB,UAAA;AAAc,YAAA;;AAE7D,CAAA;AACE,WAAA;AACA,eAAA;AACA,OAAA;AACA,WAAA,IAAA;AACA,iBAAA,IAAA,MAAA,IAAA;AACA,cAAA,IAAA;AACA,eAAA;;AAGF,CAAA;AACE,aAAA;AACA,eAAA;AACA,SAAA,IAAA;AACA,kBAAA;AACA,kBAAA;AACA,eAAA;AACA,eAAA;AACA,aAAA;AACA,cAAA;;AAGF,CAAA;AACE,WAAA;AACA,aAAA;AACA,OAAA;;",
-  "names": []
-}

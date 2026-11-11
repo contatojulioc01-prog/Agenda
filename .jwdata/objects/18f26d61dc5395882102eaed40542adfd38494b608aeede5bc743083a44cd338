@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["src/app/features/calendar/views/week-view/week-view.component.scss"],
-  "sourcesContent": [":host { display: flex; flex-direction: column; height: 100%; overflow: hidden; }\r\n\r\n.week-holiday-dot {\r\n  font-size: 12px;\r\n  margin-top: 2px;\r\n}\r\n"],
-  "mappings": ";AAAA;AAAQ,WAAA;AAAe,kBAAA;AAAwB,UAAA;AAAc,YAAA;;AAE7D,CAAA;AACE,aAAA;AACA,cAAA;;",
-  "names": []
-}

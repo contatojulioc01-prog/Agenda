@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["src/app/features/calendar/views/month-view/month-view.component.scss"],
-  "sourcesContent": [":host { display: flex; flex-direction: column; height: 100%; overflow: hidden; }\r\n"],
-  "mappings": ";AAAA;AAAQ,WAAA;AAAe,kBAAA;AAAwB,UAAA;AAAc,YAAA;;",
-  "names": []
-}

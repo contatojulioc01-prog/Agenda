@@ -31,7 +31,7 @@
             <mat-menu #boardSwitchMenu="matMenu" class="board-switcher-menu" panelClass="board-switcher-menu" xPosition="after" yPosition="below" [overlapTrigger]="false">
               <div class="switcher-dropdown-content">
                 <div class="switcher-menu-header" (click)="$event.stopPropagation()">
-                  <span>Quadros & Times</span>
+                  <span>Seus Quadros e Times</span>
                 </div>
                 <div class="switcher-items-list">
                   <button type="button" class="switcher-item" *ngIf="personalBoardId() as personalId"
@@ -48,7 +48,7 @@
                     [class.is-selected]="board()?.teamId === team.id"
                     (click)="switchBoard(team.boardId)"
                     (contextmenu)="openTeamContextMenu($event, team)">
-                    <span class="team-menu-dot" [style.background]="team.color"></span>
+                    <span class="team-menu-dot" [style.background]="team.color || 'var(--brand-500, #4f46e5)'"></span>
                     <span class="item-label">{{ team.name }}</span>
                     <small class="team-menu-count">{{ team.memberCount }}</small>
                     <mat-icon class="selected-check" *ngIf="board()?.teamId === team.id">check</mat-icon>
