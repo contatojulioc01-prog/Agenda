@@ -1,0 +1,1055 @@
+<div class="admin-shell">
+  <!-- ══════════════ GRUPO 1: HEADER EXECUTIVO ══════════════ -->
+  <header class="admin-group admin-header">
+    <div class="header-identity">
+      <div class="header-badge">
+        <mat-icon>admin_panel_settings</mat-icon>
+      </div>
+      <div class="header-copy">
+        <div class="header-title-row">
+          <h1>Console Administrativo</h1>
+          <span class="dev-pill">
+            <span class="pulse-dot"></span>
+            ROLE DEV
+          </span>
+          <span class="env-chip" *ngIf="overview() as ov">{{ ov.environment | uppercase }}</span>
+        </div>
+        <p class="header-subtitle" *ngIf="overview() as ov; else defaultSub">
+          <span>Versão <strong>{{ ov.version }}</strong></span>
+          <span class="dot-sep">•</span>
+          <span>Node {{ ov.nodeVersion }}</span>
+          <span class="dot-sep">•</span>
+          <span>Horário local {{ ov.serverTime }}</span>
+        </p>
+        <ng-template #defaultSub>
+          <p class="header-subtitle">Observabilidade, suporte operacional e governança — SSO 192.168.13.244:7000</p>
+        </ng-template>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <button type="button" class="live-pill" [class.is-live]="isLiveActive()" (click)="toggleLiveUpdates()"
+        [matTooltip]="isLiveActive() ? 'Atualizando em tempo real enquanto a tela está visível (clique para pausar)' : 'Atualização em tempo real pausada (clique para retomar)'">
+        <span class="live-dot"></span>
+        <span>{{ isLiveActive() ? 'Ao vivo' : 'Pausado' }}</span>
+        <small *ngIf="lastUpdatedAt()">{{ lastUpdatedAt() }}</small>
+      </button>
+      <div class="actor-chip" *ngIf="currentUser() as me" [matTooltip]="me.email">
+        <mat-icon>verified</mat-icon>
+        <span>{{ me.name }}</span>
+      </div>
+      <app-theme-toggle></app-theme-toggle>
+      <button type="button" class="btn-secondary" (click)="refreshCurrentTab()" [disabled]="!!busyAction()" matTooltip="Atualizar dados da aba atual">
+        <mat-progress-spinner *ngIf="busyAction()" diameter="15" mode="indeterminate"></mat-progress-spinner>
+        <mat-icon *ngIf="!busyAction()">refresh</mat-icon>
+        <span class="btn-text">Atualizar</span>
+      </button>
+      <button type="button" class="btn-primary" (click)="goBackToAgenda()">
+        <mat-icon>arrow_back</mat-icon>
+        <span class="btn-text">Voltar à Agenda</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ══════════════ GRUPO 2: BARRA DE NAVEGAÇÃO POR ABAS ══════════════ -->
+  <nav class="admin-group admin-tabs" aria-label="Seções do painel administrativo">
+    <button type="button" class="tab-btn" [class.active]="activeTab() === 'health'" (click)="selectTab('health')">
+      <mat-icon>monitor_heart</mat-icon>
+      <span>Saúde & Realtime</span>
+      <span class="tab-badge ok" *ngIf="overview() as ov">{{ ov.realtime.uniqueOnlineUsers }} online</span>
+    </button>
+    <button type="button" class="tab-btn" [class.active]="activeTab() === 'sso'" (click)="selectTab('sso')">
+      <mat-icon>verified_user</mat-icon>
+      <span>SSO & Sessões</span>
+      <span class="tab-badge" *ngIf="authCacheEntries().length > 0">{{ authCacheEntries().length }}</span>
+    </button>
+    <button type="button" class="tab-btn" [class.active]="activeTab() === 'notifier'" (click)="selectTab('notifier')">
+      <mat-icon>notifications_active</mat-icon>
+      <span>Notifier</span>
+      <span class="tab-badge" *ngIf="devices().length > 0">{{ activeDevicesCount() }}/{{ devices().length }}</span>
+    </button>
+    <button type="button" class="tab-btn" [class.active]="activeTab() === 'storage'" (click)="selectTab('storage')">
+      <mat-icon>storage</mat-icon>
+      <span>Dados & Lixeira</span>
+      <span class="tab-badge warn" *ngIf="storageSummary()?.attachments?.orphanCount">{{ storageSummary()!.attachments.orphanCount }}</span>
+    </button>
+    <button type="button" class="tab-btn" [class.active]="activeTab() === 'support'" (click)="selectTab('support')">
+      <mat-icon>support_agent</mat-icon>
+      <span>Suporte</span>
+      <span class="tab-badge" *ngIf="pendingInvitesTotal() > 0">{{ pendingInvitesTotal() }}</span>
+    </button>
+    <button type="button" class="tab-btn" [class.active]="activeTab() === 'audit'" (click)="selectTab('audit')">
+      <mat-icon>receipt_long</mat-icon>
+      <span>Auditoria & Logs</span>
+    </button>
+  </nav>
+
+  <!-- ══════════════ GRUPO 3: ÁREA DE CONTEÚDO ══════════════ -->
+  <main class="admin-group admin-content">
+
+    <!-- ── ABA 1: SAÚDE & REALTIME ── -->
+    <section *ngIf="activeTab() === 'health'" class="tab-panel">
+      <div class="tab-intro">
+        <div>
+          <h2>Saúde da Infraestrutura & Comunicação em Tempo Real</h2>
+          <p>Monitore o servidor, conexões ativas, integrações externas e comunique avisos aos usuários conectados.</p>
+        </div>
+      </div>
+
+      <div class="kpi-grid" *ngIf="overview() as ov">
+        <div class="kpi-card">
+          <div class="kpi-top">
+            <span class="kpi-icon indigo"><mat-icon>schedule</mat-icon></span>
+            <span class="kpi-label">Uptime do Processo</span>
+          </div>
+          <strong class="kpi-value">{{ formatUptime(ov.uptimeSeconds) }}</strong>
+          <small>Cache SSO: {{ ov.authCacheSize }} sessão(ões) ativa(s)</small>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-top">
+            <span class="kpi-icon purple"><mat-icon>memory</mat-icon></span>
+            <span class="kpi-label">Memória Node.js</span>
+          </div>
+          <strong class="kpi-value">{{ ov.memory.rssMb }} MB</strong>
+          <div class="mini-progress">
+            <div class="mini-progress-fill" [style.width.%]="memoryPercent()"></div>
+          </div>
+          <small>Heap: {{ ov.memory.heapUsedMb }} / {{ ov.memory.heapTotalMb }} MB ({{ memoryPercent() }}%)</small>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-top">
+            <span class="kpi-icon emerald"><mat-icon>dns</mat-icon></span>
+            <span class="kpi-label">PostgreSQL ({{ ov.database.database }})</span>
+          </div>
+          <strong class="kpi-value">{{ ov.database.latencyMs }} ms</strong>
+          <small>Pool: {{ ov.database.totalCount }} total • {{ ov.database.idleCount }} livres • {{ ov.database.waitingCount }} fila</small>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-top">
+            <span class="kpi-icon amber"><mat-icon>wifi_tethering</mat-icon></span>
+            <span class="kpi-label">Usuários Online</span>
+          </div>
+          <strong class="kpi-value">{{ ov.realtime.uniqueOnlineUsers }}</strong>
+          <small>WebSocket: {{ ov.realtime.websocketClients }} • SSE: {{ ov.realtime.sseClients }}</small>
+        </div>
+      </div>
+
+      <div class="cards-two-col">
+        <!-- Integrações + Usuários Online -->
+        <div class="stack-col">
+          <div class="form-card">
+            <div class="card-header">
+              <span class="card-icon"><mat-icon>hub</mat-icon></span>
+              <div>
+                <h3>Status das Integrações</h3>
+                <p class="card-desc">Verificação em tempo real de disponibilidade e latência.</p>
+              </div>
+            </div>
+            <div class="integration-list" *ngIf="integrationsHealth() as ih">
+              <div class="integration-item" *ngFor="let item of ih.integrations">
+                <div class="integration-info">
+                  <span class="status-dot" [attr.data-status]="item.status"></span>
+                  <div>
+                    <strong>{{ item.name }}</strong>
+                    <small>{{ item.url || item.details || item.error }}</small>
+                  </div>
+                </div>
+                <div class="integration-meta">
+                  <span class="status-pill" [attr.data-status]="item.status">{{ item.status | uppercase }}</span>
+                  <small>{{ item.latencyMs }} ms</small>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-card" *ngIf="overview() as ov">
+            <div class="card-header-between">
+              <div class="card-header">
+                <span class="card-icon"><mat-icon>people_outline</mat-icon></span>
+                <div>
+                  <h3>Conectados Agora ({{ ov.realtime.onlineUsers.length }})</h3>
+                  <p class="card-desc">Sessões ativas recebendo atualizações instantâneas.</p>
+                </div>
+              </div>
+            </div>
+            <div class="online-chips" *ngIf="ov.realtime.onlineUsers.length > 0; else noOnline">
+              <div class="online-chip" *ngFor="let u of ov.realtime.onlineUsers">
+                <span class="status-dot" data-status="ok"></span>
+                <span class="online-name">{{ resolveUserName(u.userId) }}</span>
+                <span class="transport-tag" *ngIf="u.websocket > 0">WS {{ u.websocket }}</span>
+                <span class="transport-tag" *ngIf="u.sse > 0">SSE {{ u.sse }}</span>
+              </div>
+            </div>
+            <ng-template #noOnline>
+              <div class="empty-state compact">
+                <mat-icon>cloud_off</mat-icon>
+                <span>Nenhum cliente realtime conectado no momento.</span>
+              </div>
+            </ng-template>
+          </div>
+        </div>
+
+        <!-- Banner Global de Manutenção -->
+        <div class="form-card">
+          <div class="card-header-between">
+            <div class="card-header">
+              <span class="card-icon amber"><mat-icon>campaign</mat-icon></span>
+              <div>
+                <h3>Banner Global de Manutenção</h3>
+                <p class="card-desc">Exibe um aviso persistente no topo da Agenda para todos.</p>
+              </div>
+            </div>
+            <label class="switch-control">
+              <input type="checkbox" [(ngModel)]="bannerEnabled" />
+              <span class="switch-slider"></span>
+              <span class="switch-text">{{ bannerEnabled ? 'Ativo' : 'Desativado' }}</span>
+            </label>
+          </div>
+
+          <div class="field-group">
+            <label>Severidade Visual</label>
+            <div class="segmented-pills">
+              <button type="button" class="seg-pill info" [class.active]="bannerLevel === 'info'" (click)="bannerLevel = 'info'">
+                <mat-icon>info</mat-icon> Informativo
+              </button>
+              <button type="button" class="seg-pill warning" [class.active]="bannerLevel === 'warning'" (click)="bannerLevel = 'warning'">
+                <mat-icon>warning_amber</mat-icon> Aviso
+              </button>
+              <button type="button" class="seg-pill danger" [class.active]="bannerLevel === 'danger'" (click)="bannerLevel = 'danger'">
+                <mat-icon>error_outline</mat-icon> Crítico
+              </button>
+            </div>
+          </div>
+
+          <div class="field-group">
+            <label>Mensagem exibida aos usuários</label>
+            <textarea rows="3" [(ngModel)]="bannerMessage" maxlength="400"
+              placeholder="Ex.: Manutenção programada hoje às 18h30. Salve suas alterações com antecedência."></textarea>
+          </div>
+
+          <!-- Preview ao vivo -->
+          <div class="banner-preview" [attr.data-level]="bannerLevel" [class.is-off]="!bannerEnabled">
+            <mat-icon>{{ bannerLevel === 'danger' ? 'error_outline' : (bannerLevel === 'warning' ? 'warning_amber' : 'info') }}</mat-icon>
+            <div class="preview-copy">
+              <span class="preview-tag">PRÉ-VISUALIZAÇÃO {{ bannerEnabled ? '(ATIVO)' : '(DESATIVADO)' }}</span>
+              <p>{{ bannerMessage.trim() || 'Digite uma mensagem acima para visualizar o banner...' }}</p>
+            </div>
+          </div>
+
+          <div class="card-actions end">
+            <button type="button" class="btn-primary" (click)="saveBanner()" [disabled]="isBusy('save-banner')">
+              <mat-progress-spinner *ngIf="isBusy('save-banner')" diameter="15" mode="indeterminate"></mat-progress-spinner>
+              <mat-icon *ngIf="!isBusy('save-banner')">save</mat-icon>
+              <span>Salvar e Propagar Banner</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Broadcast em Tempo Real -->
+      <div class="form-card">
+        <div class="card-header">
+          <span class="card-icon"><mat-icon>sensors</mat-icon></span>
+          <div>
+            <h3>Broadcast Instantâneo (WebSocket / SSE)</h3>
+            <p class="card-desc">Envia um aviso pontual imediato para todas as abas abertas da aplicação.</p>
+          </div>
+        </div>
+        <div class="form-row-3">
+          <div class="field-group">
+            <label>Título do Aviso</label>
+            <input type="text" [(ngModel)]="broadcastTitle" maxlength="120" placeholder="Ex.: Aviso da TI" />
+          </div>
+          <div class="field-group">
+            <label>Nível</label>
+            <div class="segmented-pills">
+              <button type="button" class="seg-pill info" [class.active]="broadcastLevel === 'info'" (click)="broadcastLevel = 'info'">Info</button>
+              <button type="button" class="seg-pill warning" [class.active]="broadcastLevel === 'warning'" (click)="broadcastLevel = 'warning'">Aviso</button>
+              <button type="button" class="seg-pill danger" [class.active]="broadcastLevel === 'danger'" (click)="broadcastLevel = 'danger'">Crítico</button>
+            </div>
+          </div>
+          <div class="field-group">
+            <label>Mensagem</label>
+            <input type="text" [(ngModel)]="broadcastMessage" maxlength="500" placeholder="Digite o comunicado instantâneo..." />
+          </div>
+        </div>
+        <div class="card-actions end">
+          <button type="button" class="btn-primary" (click)="sendBroadcast()" [disabled]="isBusy('send-broadcast') || !broadcastMessage.trim()">
+            <mat-progress-spinner *ngIf="isBusy('send-broadcast')" diameter="15" mode="indeterminate"></mat-progress-spinner>
+            <mat-icon *ngIf="!isBusy('send-broadcast')">send</mat-icon>
+            <span>Transmitir Agora</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── ABA 2: SSO & SESSÕES ── -->
+    <section *ngIf="activeTab() === 'sso'" class="tab-panel">
+      <div class="tab-intro">
+        <div>
+          <h2>SSO Corporativo & Diagnóstico de Permissões</h2>
+          <p>Inspecione sessões em cache do SSO (192.168.13.244:7000) e descubra exatamente o que cada colaborador enxerga no sistema.</p>
+        </div>
+      </div>
+
+      <!-- Diagnóstico em destaque primeiro (maior uso no dia a dia) -->
+      <div class="form-card">
+        <div class="card-header">
+          <span class="card-icon"><mat-icon>manage_search</mat-icon></span>
+          <div>
+            <h3>Diagnóstico de Acesso por Colaborador</h3>
+            <p class="card-desc">Selecione um usuário para listar suas agendas, quadros Kanban, murais e copiar IDs ou transferir propriedade em 1 clique.</p>
+          </div>
+        </div>
+        <div class="inline-search-row">
+          <select [(ngModel)]="diagnosticsUserId">
+            <option value="">Selecione um colaborador...</option>
+            <option *ngFor="let u of allUsers()" [value]="u.id">{{ u.name }} ({{ u.email }})</option>
+          </select>
+          <input type="text" [(ngModel)]="diagnosticsUserId" placeholder="Ou cole o userId diretamente..." (keyup.enter)="runUserDiagnostics()" />
+          <button type="button" class="btn-primary" (click)="runUserDiagnostics()" [disabled]="isBusy('run-diagnostics') || !diagnosticsUserId.trim()">
+            <mat-progress-spinner *ngIf="isBusy('run-diagnostics')" diameter="15" mode="indeterminate"></mat-progress-spinner>
+            <mat-icon *ngIf="!isBusy('run-diagnostics')">search</mat-icon>
+            <span>Diagnosticar</span>
+          </button>
+        </div>
+
+        <div class="diag-grid" *ngIf="diagnosticsResult() as diag">
+          <div class="diag-box">
+            <div class="diag-box-head">
+              <mat-icon>calendar_month</mat-icon>
+              <h4>Agendas Próprias</h4>
+              <span class="count-pill">{{ diag.calendars.owned.length }}</span>
+            </div>
+            <div class="diag-list" *ngIf="diag.calendars.owned.length > 0; else emptyDiag">
+              <div class="diag-item" *ngFor="let c of diag.calendars.owned">
+                <div class="diag-item-main">
+                  <strong>{{ c.name }}</strong>
+                  <code>{{ c.id }}</code>
+                </div>
+                <div class="diag-item-actions">
+                  <button type="button" class="icon-mini-btn" (click)="copyId(c.id)" [matTooltip]="copiedId() === c.id ? 'Copiado!' : 'Copiar ID'">
+                    <mat-icon>{{ copiedId() === c.id ? 'check' : 'content_copy' }}</mat-icon>
+                  </button>
+                  <button type="button" class="icon-mini-btn" (click)="startTransferFromDiagnostics('calendar', c.id)" matTooltip="Transferir propriedade">
+                    <mat-icon>swap_horiz</mat-icon>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="diag-box">
+            <div class="diag-box-head">
+              <mat-icon>share</mat-icon>
+              <h4>Agendas Compartilhadas</h4>
+              <span class="count-pill">{{ diag.calendars.shared.length }}</span>
+            </div>
+            <div class="diag-list" *ngIf="diag.calendars.shared.length > 0; else emptyDiag">
+              <div class="diag-item" *ngFor="let c of diag.calendars.shared">
+                <div class="diag-item-main">
+                  <strong>{{ c.name }}</strong>
+                  <small>Permissão: <code>{{ c.permission }}</code></small>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="diag-box">
+            <div class="diag-box-head">
+              <mat-icon>view_kanban</mat-icon>
+              <h4>Quadros Kanban</h4>
+              <span class="count-pill">{{ diag.kanban.boards.length }}</span>
+            </div>
+            <div class="diag-list" *ngIf="diag.kanban.boards.length > 0; else emptyDiag">
+              <div class="diag-item" *ngFor="let b of diag.kanban.boards">
+                <div class="diag-item-main">
+                  <strong>{{ b.name }} <span class="scope-tag">{{ b.scope_type }}</span></strong>
+                  <code>{{ b.id }}</code>
+                </div>
+                <div class="diag-item-actions">
+                  <button type="button" class="icon-mini-btn" (click)="copyId(b.id)" [matTooltip]="copiedId() === b.id ? 'Copiado!' : 'Copiar ID'">
+                    <mat-icon>{{ copiedId() === b.id ? 'check' : 'content_copy' }}</mat-icon>
+                  </button>
+                  <button type="button" class="icon-mini-btn" (click)="startTransferFromDiagnostics('kanban_board', b.id)" matTooltip="Transferir propriedade">
+                    <mat-icon>swap_horiz</mat-icon>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="diag-box">
+            <div class="diag-box-head">
+              <mat-icon>space_dashboard</mat-icon>
+              <h4>Murais & Notifier</h4>
+              <span class="count-pill">{{ diag.murals.length + diag.devices.length }}</span>
+            </div>
+            <div class="diag-list" *ngIf="diag.murals.length > 0 || diag.devices.length > 0; else emptyDiag">
+              <div class="diag-item" *ngFor="let m of diag.murals">
+                <div class="diag-item-main">
+                  <strong>Mural: {{ m.name }}</strong>
+                  <code>{{ m.id }}</code>
+                </div>
+                <div class="diag-item-actions">
+                  <button type="button" class="icon-mini-btn" (click)="startTransferFromDiagnostics('mural_board', m.id)" matTooltip="Transferir propriedade">
+                    <mat-icon>swap_horiz</mat-icon>
+                  </button>
+                </div>
+              </div>
+              <div class="diag-item" *ngFor="let d of diag.devices">
+                <div class="diag-item-main">
+                  <strong>Notifier: {{ d.name }}</strong>
+                  <small>{{ d.enabled ? 'Ativo' : 'Revogado' }}</small>
+                </div>
+              </div>
+            </div>
+          </div>
+          <ng-template #emptyDiag>
+            <p class="empty-inline">Nenhum item encontrado.</p>
+          </ng-template>
+        </div>
+      </div>
+
+      <!-- Cache SSO -->
+      <div class="form-card">
+        <div class="card-header-between">
+          <div class="card-header">
+            <span class="card-icon purple"><mat-icon>memory</mat-icon></span>
+            <div>
+              <h3>Cache de Sessões SSO ({{ authCacheEntries().length }})</h3>
+              <p class="card-desc">Tokens validados recentemente em memória (TTL de 5 min). Tokens completos nunca são exibidos.</p>
+            </div>
+          </div>
+          <button type="button" class="btn-danger-outline" (click)="confirmClearCache()" [disabled]="isBusy('clear-cache-all') || authCacheEntries().length === 0">
+            <mat-progress-spinner *ngIf="isBusy('clear-cache-all')" diameter="15" mode="indeterminate"></mat-progress-spinner>
+            <mat-icon *ngIf="!isBusy('clear-cache-all')">delete_sweep</mat-icon>
+            <span>Invalidar Todo Cache</span>
+          </button>
+        </div>
+
+        <div class="table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Usuário</th>
+                <th>Roles SSO</th>
+                <th>Fingerprint</th>
+                <th>TTL Restante</th>
+                <th class="col-right">Ação</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let entry of authCacheEntries()">
+                <td>
+                  <strong>{{ entry.name || resolveUserName(entry.userId) }}</strong>
+                  <small class="cell-sub">{{ entry.email || entry.userId }}</small>
+                </td>
+                <td>
+                  <span class="role-chip" *ngFor="let r of entry.roles" [class.is-dev]="r.toUpperCase() === 'DEV'">{{ r }}</span>
+                  <span class="muted" *ngIf="entry.roles.length === 0">Sem roles</span>
+                </td>
+                <td><code>{{ entry.tokenFingerprint }}</code></td>
+                <td>
+                  <span class="status-pill" [attr.data-status]="entry.expired ? 'down' : 'ok'">
+                    {{ entry.expired ? 'Expirado' : (entry.ttlSeconds + 's') }}
+                  </span>
+                </td>
+                <td class="col-right">
+                  <button type="button" class="btn-sm btn-secondary" (click)="confirmClearCache(entry.userId)" [disabled]="isBusy('clear-cache-' + entry.userId)">
+                    Invalidar
+                  </button>
+                </td>
+              </tr>
+              <tr *ngIf="authCacheEntries().length === 0">
+                <td colspan="5">
+                  <div class="empty-state">
+                    <mat-icon>lock_clock</mat-icon>
+                    <span>Nenhuma sessão ativa em cache no momento.</span>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── ABA 3: NOTIFIER ── -->
+    <section *ngIf="activeTab() === 'notifier'" class="tab-panel">
+      <div class="tab-intro">
+        <div>
+          <h2>Agenda.Notifier.exe & Entregas de Notificações</h2>
+          <p>Gerencie máquinas pareadas com o Notifier Windows, audite alertas entregues e dispare testes instantâneos.</p>
+        </div>
+      </div>
+
+      <div class="form-card">
+        <div class="card-header">
+          <span class="card-icon"><mat-icon>send_to_mobile</mat-icon></span>
+          <div>
+            <h3>Disparar Notificação de Teste</h3>
+            <p class="card-desc">Envia um evento realtime de teste para validar a entrega na sessão de um usuário específico.</p>
+          </div>
+        </div>
+        <div class="inline-search-row">
+          <select [(ngModel)]="testNotifyUserId">
+            <option value="">Selecione o destinatário...</option>
+            <option *ngFor="let u of allUsers()" [value]="u.id">{{ u.name }} ({{ u.email }})</option>
+          </select>
+          <input type="text" [(ngModel)]="testNotifyMessage" maxlength="300" placeholder="Mensagem de teste..." />
+          <button type="button" class="btn-primary" (click)="sendTestNotification()" [disabled]="isBusy('test-notify') || !testNotifyUserId.trim()">
+            <mat-progress-spinner *ngIf="isBusy('test-notify')" diameter="15" mode="indeterminate"></mat-progress-spinner>
+            <mat-icon *ngIf="!isBusy('test-notify')">notifications_active</mat-icon>
+            <span>Enviar Teste</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="form-card">
+        <div class="card-header-between">
+          <div class="card-header">
+            <span class="card-icon emerald"><mat-icon>devices</mat-icon></span>
+            <div>
+              <h3>Dispositivos Registrados ({{ devices().length }})</h3>
+              <p class="card-desc">Revogue ou reative chaves de dispositivos do Windows Notifier.</p>
+            </div>
+          </div>
+          <div class="inline-filter">
+            <input type="text" [(ngModel)]="devicesFilterUserId" placeholder="Filtrar por userId..." (keyup.enter)="loadNotifierTab()" />
+            <button type="button" class="btn-secondary btn-sm" (click)="loadNotifierTab()">Filtrar</button>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Dispositivo</th>
+                <th>Usuário</th>
+                <th>Status</th>
+                <th>Último Acesso</th>
+                <th class="col-right">Ação</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let d of devices()">
+                <td><strong>{{ d.name }}</strong><small class="cell-sub">{{ d.id }}</small></td>
+                <td>
+                  <strong>{{ resolveUserName(d.userId) }}</strong>
+                  <small class="cell-sub" *ngIf="resolveUserEmail(d.userId)">{{ resolveUserEmail(d.userId) }}</small>
+                </td>
+                <td>
+                  <span class="status-pill" [attr.data-status]="d.enabled ? 'ok' : 'down'">
+                    {{ d.enabled ? 'ATIVO' : 'REVOGADO' }}
+                  </span>
+                </td>
+                <td>{{ d.lastSeenAt || 'Nunca visto' }}</td>
+                <td class="col-right">
+                  <button type="button" class="btn-sm" [ngClass]="d.enabled ? 'btn-danger-outline' : 'btn-secondary'"
+                    (click)="confirmToggleDevice(d)" [disabled]="isBusy('toggle-device-' + d.id)">
+                    {{ d.enabled ? 'Revogar' : 'Reativar' }}
+                  </button>
+                </td>
+              </tr>
+              <tr *ngIf="devices().length === 0">
+                <td colspan="5">
+                  <div class="empty-state">
+                    <mat-icon>devices_other</mat-icon>
+                    <span>Nenhum dispositivo Notifier encontrado.</span>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="form-card">
+        <div class="card-header">
+          <span class="card-icon"><mat-icon>history</mat-icon></span>
+          <div>
+            <h3>Histórico de Entregas ({{ deliveries().length }})</h3>
+            <p class="card-desc">Últimas notificações processadas para os dispositivos conectados.</p>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Origem</th>
+                <th>Usuário</th>
+                <th>Ocorrência</th>
+                <th>Agendado</th>
+                <th>Entregue em</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let item of deliveries()">
+                <td><code>{{ item.source_type }}</code></td>
+                <td>{{ resolveUserName(item.user_id) }}</td>
+                <td>{{ item.occurrence_date }}</td>
+                <td>{{ item.scheduled_for }}</td>
+                <td>{{ item.delivered_at }}</td>
+              </tr>
+              <tr *ngIf="deliveries().length === 0">
+                <td colspan="5">
+                  <div class="empty-state">
+                    <mat-icon>notifications_none</mat-icon>
+                    <span>Nenhuma entrega registrada ainda.</span>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── ABA 4: DADOS, ANEXOS & LIXEIRA ── -->
+    <section *ngIf="activeTab() === 'storage'" class="tab-panel">
+      <div class="tab-intro">
+        <div>
+          <h2>Armazenamento, Anexos & Lixeira Global</h2>
+          <p>Acompanhe o crescimento do banco de dados, limpe arquivos órfãos com segurança e restaure tarefas excluídas.</p>
+        </div>
+      </div>
+
+      <div class="kpi-grid" *ngIf="storageSummary() as st">
+        <div class="kpi-card">
+          <div class="kpi-top">
+            <span class="kpi-icon indigo"><mat-icon>attach_file</mat-icon></span>
+            <span class="kpi-label">Total de Anexos</span>
+          </div>
+          <strong class="kpi-value">{{ st.attachments.totalCount }}</strong>
+          <small>{{ formatBytes(st.attachments.totalBytes) }} acumulados</small>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-top">
+            <span class="kpi-icon emerald"><mat-icon>sd_storage</mat-icon></span>
+            <span class="kpi-label">Armazenamento</span>
+          </div>
+          <strong class="kpi-value">{{ st.attachments.diskCount }} disco</strong>
+          <small>{{ st.attachments.legacyDbCount }} legado(s) no PostgreSQL</small>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-top">
+            <span class="kpi-icon amber"><mat-icon>cleaning_services</mat-icon></span>
+            <span class="kpi-label">Anexos Órfãos</span>
+          </div>
+          <strong class="kpi-value">{{ st.attachments.orphanCount }}</strong>
+          <small>{{ formatBytes(st.attachments.orphanBytes) }} recuperáveis</small>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-top">
+            <span class="kpi-icon purple"><mat-icon>upgrade</mat-icon></span>
+            <span class="kpi-label">Migrações Aplicadas</span>
+          </div>
+          <strong class="kpi-value">{{ migrations().length }}</strong>
+          <small>Registro em agenda_migrations</small>
+        </div>
+      </div>
+
+      <div class="cards-two-col" *ngIf="storageSummary() as st">
+        <div class="form-card">
+          <div class="card-header">
+            <span class="card-icon"><mat-icon>table_chart</mat-icon></span>
+            <div>
+              <h3>Volume por Tabela</h3>
+              <p class="card-desc">Contagem atual de registros no PostgreSQL.</p>
+            </div>
+          </div>
+          <div class="table-metrics-grid">
+            <div class="table-metric-pill" *ngFor="let t of st.tables">
+              <code>{{ t.table }}</code>
+              <strong>{{ t.count }}</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="stack-col">
+          <div class="form-card">
+            <div class="card-header">
+              <span class="card-icon amber"><mat-icon>cleaning_services</mat-icon></span>
+              <div>
+                <h3>Higienização de Anexos Órfãos</h3>
+                <p class="card-desc">Remove arquivos cujos eventos, tarefas ou cartões do mural não existem mais.</p>
+              </div>
+            </div>
+            <div class="card-actions">
+              <button type="button" class="btn-secondary" (click)="previewOrphanCleanup()" [disabled]="isBusy('preview-orphans')">
+                <mat-progress-spinner *ngIf="isBusy('preview-orphans')" diameter="15" mode="indeterminate"></mat-progress-spinner>
+                <mat-icon *ngIf="!isBusy('preview-orphans')">preview</mat-icon>
+                <span>Simular (Dry-Run)</span>
+              </button>
+              <button type="button" class="btn-danger" (click)="confirmOrphanCleanup()" [disabled]="isBusy('purge-orphans') || st.attachments.orphanCount === 0">
+                <mat-progress-spinner *ngIf="isBusy('purge-orphans')" diameter="15" mode="indeterminate"></mat-progress-spinner>
+                <mat-icon *ngIf="!isBusy('purge-orphans')">delete_forever</mat-icon>
+                <span>Limpar Órfãos</span>
+              </button>
+            </div>
+            <div class="orphan-preview-box" *ngIf="orphanPreview() as op">
+              <mat-icon>info</mat-icon>
+              <span>Simulação: <strong>{{ op.count }}</strong> anexo(s) órfão(s) — <strong>{{ formatBytes(op.totalBytes) }}</strong> seriam liberados.</span>
+            </div>
+          </div>
+
+          <div class="form-card">
+            <div class="card-header">
+              <span class="card-icon purple"><mat-icon>upgrade</mat-icon></span>
+              <div>
+                <h3>Migrações Aplicadas</h3>
+                <p class="card-desc">Histórico de scripts estruturais executados.</p>
+              </div>
+            </div>
+            <div class="migrations-list" *ngIf="migrations().length > 0; else noMigrations">
+              <div class="migration-row" *ngFor="let m of migrations()">
+                <code>{{ m.id }}</code>
+                <small>{{ m.applied_at }}</small>
+              </div>
+            </div>
+            <ng-template #noMigrations>
+              <div class="empty-state compact">
+                <mat-icon>check_circle_outline</mat-icon>
+                <span>Nenhuma migração registrada.</span>
+              </div>
+            </ng-template>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lixeira Global -->
+      <div class="form-card">
+        <div class="card-header-between">
+          <div class="card-header">
+            <span class="card-icon"><mat-icon>delete_outline</mat-icon></span>
+            <div>
+              <h3>Lixeira Global de Tarefas ({{ trashTasks().length }})</h3>
+              <p class="card-desc">Restaure tarefas removidas por engano ou expurgue definitivamente itens antigos.</p>
+            </div>
+          </div>
+          <div class="inline-filter">
+            <input type="text" [(ngModel)]="trashQuery" placeholder="Buscar tarefa por título..." (keyup.enter)="loadTrashTasks()" />
+            <button type="button" class="btn-secondary btn-sm" (click)="loadTrashTasks()">Buscar</button>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Tarefa</th>
+                <th>Quadro</th>
+                <th>Excluída em</th>
+                <th>Excluída por</th>
+                <th class="col-right">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let t of trashTasks()">
+                <td><strong>{{ t.title }}</strong><small class="cell-sub">{{ t.id }}</small></td>
+                <td>{{ t.board_name || t.board_id }}</td>
+                <td>{{ t.deleted_at }}</td>
+                <td>{{ resolveUserName(t.deleted_by) }}</td>
+                <td class="col-right">
+                  <div class="actions-cell end">
+                    <button type="button" class="btn-sm btn-secondary" (click)="restoreTask(t)" [disabled]="isBusy('restore-task-' + t.id)">
+                      Restaurar
+                    </button>
+                    <button type="button" class="btn-sm btn-danger-outline" (click)="confirmPurgeTask(t)" [disabled]="isBusy('purge-task-' + t.id)">
+                      Expurgar
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <tr *ngIf="trashTasks().length === 0">
+                <td colspan="5">
+                  <div class="empty-state">
+                    <mat-icon>auto_delete</mat-icon>
+                    <span>A lixeira global está vazia.</span>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── ABA 5: SUPORTE OPERACIONAL ── -->
+    <section *ngIf="activeTab() === 'support'" class="tab-panel">
+      <div class="tab-intro">
+        <div>
+          <h2>Suporte Operacional</h2>
+          <p>Transfira a propriedade de recursos quando colaboradores mudam de setor e destrave convites pendentes.</p>
+        </div>
+      </div>
+
+      <div class="form-card">
+        <div class="card-header">
+          <span class="card-icon amber"><mat-icon>swap_horiz</mat-icon></span>
+          <div>
+            <h3>Transferência de Propriedade (Ownership)</h3>
+            <p class="card-desc">Dica: use a aba <strong>SSO & Sessões → Diagnóstico</strong> para localizar o recurso e preencher este formulário com 1 clique.</p>
+          </div>
+        </div>
+        <div class="form-row-3">
+          <div class="field-group">
+            <label>1. Tipo de Recurso</label>
+            <select [(ngModel)]="transferResourceType">
+              <option value="calendar">Calendário</option>
+              <option value="kanban_team">Equipe Kanban</option>
+              <option value="kanban_board">Quadro Kanban</option>
+              <option value="mural_board">Mural</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label>2. ID do Recurso</label>
+            <input type="text" [(ngModel)]="transferResourceId" placeholder="Cole o ID (ex.: cal-...)" />
+          </div>
+          <div class="field-group">
+            <label>3. Novo Proprietário</label>
+            <select [(ngModel)]="transferNewOwnerId">
+              <option value="">Selecione o novo dono...</option>
+              <option *ngFor="let u of allUsers()" [value]="u.id">{{ u.name }} ({{ u.email }})</option>
+            </select>
+          </div>
+        </div>
+        <div class="card-actions end">
+          <button type="button" class="btn-danger" (click)="confirmTransferOwnership()"
+            [disabled]="isBusy('transfer-ownership') || !transferResourceId.trim() || !transferNewOwnerId.trim()">
+            <mat-progress-spinner *ngIf="isBusy('transfer-ownership')" diameter="15" mode="indeterminate"></mat-progress-spinner>
+            <mat-icon *ngIf="!isBusy('transfer-ownership')">swap_horiz</mat-icon>
+            <span>Transferir Propriedade</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="cards-two-col">
+        <div class="form-card">
+          <div class="card-header">
+            <span class="card-icon"><mat-icon>mail_outline</mat-icon></span>
+            <div>
+              <h3>Convites de Calendário ({{ pendingInvitations().calendarInvitations.length }})</h3>
+              <p class="card-desc">Convites aguardando aceite do colaborador.</p>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Calendário</th>
+                  <th>Convidado</th>
+                  <th>Permissão</th>
+                  <th class="col-right">Ação</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let inv of pendingInvitations().calendarInvitations">
+                  <td>{{ inv.resource_name || inv.resource_id }}</td>
+                  <td>{{ resolveUserName(inv.user_id) }}</td>
+                  <td><code>{{ inv.role }}</code></td>
+                  <td class="col-right">
+                    <button type="button" class="btn-sm btn-danger-outline"
+                      (click)="confirmCancelInvitation('calendar', inv.id, inv.resource_name || inv.resource_id)"
+                      [disabled]="isBusy('cancel-invite-' + inv.id)">
+                      Cancelar
+                    </button>
+                  </td>
+                </tr>
+                <tr *ngIf="pendingInvitations().calendarInvitations.length === 0">
+                  <td colspan="4">
+                    <div class="empty-state compact">
+                      <mat-icon>mark_email_read</mat-icon>
+                      <span>Nenhum convite de calendário pendente.</span>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="form-card">
+          <div class="card-header">
+            <span class="card-icon purple"><mat-icon>group_add</mat-icon></span>
+            <div>
+              <h3>Convites de Equipe Kanban ({{ pendingInvitations().teamInvitations.length }})</h3>
+              <p class="card-desc">Convites de participação em equipes pendentes.</p>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Equipe</th>
+                  <th>Convidado</th>
+                  <th>Criado em</th>
+                  <th class="col-right">Ação</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let inv of pendingInvitations().teamInvitations">
+                  <td>{{ inv.resource_name || inv.resource_id }}</td>
+                  <td>{{ resolveUserName(inv.user_id) }}</td>
+                  <td>{{ inv.created_at }}</td>
+                  <td class="col-right">
+                    <button type="button" class="btn-sm btn-danger-outline"
+                      (click)="confirmCancelInvitation('team', inv.id, inv.resource_name || inv.resource_id)"
+                      [disabled]="isBusy('cancel-invite-' + inv.id)">
+                      Cancelar
+                    </button>
+                  </td>
+                </tr>
+                <tr *ngIf="pendingInvitations().teamInvitations.length === 0">
+                  <td colspan="4">
+                    <div class="empty-state compact">
+                      <mat-icon>groups</mat-icon>
+                      <span>Nenhum convite de equipe pendente.</span>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── ABA 6: AUDITORIA, LOGS & LGPD ── -->
+    <section *ngIf="activeTab() === 'audit'" class="tab-panel">
+      <div class="tab-intro">
+        <div>
+          <h2>Auditoria Administrativa, Logs & Governança LGPD</h2>
+          <p>Rastreabilidade completa das ações executadas no Console DEV, erros recentes do servidor e exportação LGPD.</p>
+        </div>
+        <button type="button" class="btn-primary" (click)="downloadLgpdReport()" [disabled]="isBusy('download-lgpd')">
+          <mat-progress-spinner *ngIf="isBusy('download-lgpd')" diameter="15" mode="indeterminate"></mat-progress-spinner>
+          <mat-icon *ngIf="!isBusy('download-lgpd')">download</mat-icon>
+          <span>Baixar Relatório LGPD (JSON)</span>
+        </button>
+      </div>
+
+      <div class="form-card">
+        <div class="card-header-between">
+          <div class="card-header">
+            <span class="card-icon"><mat-icon>fact_check</mat-icon></span>
+            <div>
+              <h3>Trilha de Auditoria Admin ({{ auditLogs().length }})</h3>
+              <p class="card-desc">Todas as ações executadas no painel ficam registradas com autor, horário local e IP.</p>
+            </div>
+          </div>
+          <div class="inline-filter">
+            <input type="text" [(ngModel)]="auditActionFilter" placeholder="Filtrar código (ex.: CLEAR_AUTH_CACHE)" (keyup.enter)="loadAuditTab()" />
+            <button type="button" class="btn-secondary btn-sm" (click)="loadAuditTab()">Filtrar</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Data Local</th>
+                <th>Autor</th>
+                <th>Ação</th>
+                <th>Alvo</th>
+                <th>IP</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let log of auditLogs()">
+                <td class="nowrap">{{ log.created_at }}</td>
+                <td><strong>{{ log.actor_name || log.actor_user_id }}</strong></td>
+                <td>
+                  <span class="action-pill" [matTooltip]="log.action">{{ formatAuditAction(log.action) }}</span>
+                </td>
+                <td>{{ log.target_type || '—' }} <small class="cell-sub" *ngIf="log.target_id">{{ log.target_id }}</small></td>
+                <td><code>{{ log.ip_address || '—' }}</code></td>
+              </tr>
+              <tr *ngIf="auditLogs().length === 0">
+                <td colspan="5">
+                  <div class="empty-state">
+                    <mat-icon>history_toggle_off</mat-icon>
+                    <span>Nenhuma ação administrativa registrada ainda.</span>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Console de Logs Estilo Terminal -->
+      <div class="form-card">
+        <div class="card-header-between">
+          <div class="card-header">
+            <span class="card-icon"><mat-icon>terminal</mat-icon></span>
+            <div>
+              <h3>Logs Recentes do Servidor ({{ serverLogs().length }})</h3>
+              <p class="card-desc">Buffer circular em memória com os últimos erros e avisos capturados do backend.</p>
+            </div>
+          </div>
+          <div class="segmented-pills">
+            <button type="button" class="seg-pill neutral" [class.active]="serverLogLevel === 'all'" (click)="serverLogLevel = 'all'; loadServerLogs()">Todos</button>
+            <button type="button" class="seg-pill danger" [class.active]="serverLogLevel === 'error'" (click)="serverLogLevel = 'error'; loadServerLogs()">Erros</button>
+            <button type="button" class="seg-pill warning" [class.active]="serverLogLevel === 'warn'" (click)="serverLogLevel = 'warn'; loadServerLogs()">Avisos</button>
+          </div>
+        </div>
+        <div class="terminal-window">
+          <div class="terminal-bar">
+            <span class="term-dot red"></span>
+            <span class="term-dot yellow"></span>
+            <span class="term-dot green"></span>
+            <span class="terminal-title">agenda-backend — console.warn / console.error</span>
+          </div>
+          <div class="log-console">
+            <div class="log-line" *ngFor="let entry of serverLogs()" [attr.data-level]="entry.level">
+              <span class="log-ts">{{ entry.timestamp }}</span>
+              <span class="log-lvl">[{{ entry.level | uppercase }}]</span>
+              <span class="log-msg">{{ entry.message }}</span>
+            </div>
+            <div class="terminal-empty" *ngIf="serverLogs().length === 0">
+              <mat-icon>check_circle_outline</mat-icon>
+              <span>Nenhum erro ou aviso capturado recentemente.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ══════════════ TOAST FLUTUANTE DE FEEDBACK ══════════════ -->
+  <div class="toast-feedback" *ngIf="feedback() as fb" [class.is-error]="fb.type === 'error'" role="status">
+    <mat-icon>{{ fb.type === 'error' ? 'error_outline' : 'check_circle' }}</mat-icon>
+    <span>{{ fb.text }}</span>
+    <button type="button" class="toast-close" (click)="feedback.set(null)" aria-label="Fechar aviso">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <!-- ══════════════ MODAL GLOBAL DE CONFIRMAÇÃO (SEM FECHAR POR BACKDROP) ══════════════ -->
+  <div class="confirm-overlay" *ngIf="confirmModal() as modal" role="dialog" aria-modal="true">
+    <div class="confirm-card">
+      <div class="confirm-header">
+        <div class="confirm-icon" [class.is-danger]="modal.danger">
+          <mat-icon>{{ modal.danger ? 'warning_amber' : 'help_outline' }}</mat-icon>
+        </div>
+        <h3>{{ modal.title }}</h3>
+        <button type="button" class="confirm-close" (click)="closeConfirm()" aria-label="Fechar">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+      <div class="confirm-body">
+        <p>{{ modal.message }}</p>
+      </div>
+      <div class="confirm-footer">
+        <button type="button" class="btn-secondary" (click)="closeConfirm()">Cancelar</button>
+        <button type="button" [ngClass]="modal.danger ? 'btn-danger' : 'btn-primary'" (click)="executeConfirm()">
+          {{ modal.confirmLabel }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

@@ -113,6 +113,11 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
 
   openAiAssistant(): void { this.aiService.openAssistant(); }
 
+  openAdminPanel(): void {
+    if (!this.authService.isDev()) return;
+    void this.router.navigate(['/admin']);
+  }
+
   // ── Estado ──
   currentView: CalendarView = this.userPreferences.calendarView();
   activeSection: 'calendar' | 'tasks' | 'mural' = 'calendar';

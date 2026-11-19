@@ -397,6 +397,15 @@
 
     <!-- Rodapé fixo no canto inferior esquerdo -->
     <div class="sidebar-footer">
+      <!-- Botão exclusivo de acesso ao Painel Admin (somente role DEV) -->
+      <button *ngIf="authService.isDev()" type="button" class="sidebar-admin-btn"
+        [class.is-collapsed]="sidebarCollapsed()" (click)="openAdminPanel()" id="btn-open-admin"
+        matTooltip="Painel Admin (DEV)" matTooltipPosition="right" aria-label="Painel Administrativo DEV">
+        <mat-icon>admin_panel_settings</mat-icon>
+        <span class="sidebar-admin-label" *ngIf="!sidebarCollapsed()">Painel Admin</span>
+        <span class="sidebar-admin-badge" *ngIf="!sidebarCollapsed()">DEV</span>
+      </button>
+
       <!-- Perfil do Usuário com Tema Integrado -->
       <div class="sidebar-user-card" *ngIf="currentUser() as user">
         <div class="user-avatar has-img" [matTooltip]="sidebarCollapsed() ? (user.name + ' (' + (user.departamentName || 'Corporativo') + ')') : ''" matTooltipPosition="right">

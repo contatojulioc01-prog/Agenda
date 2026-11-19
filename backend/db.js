@@ -273,6 +273,27 @@ async function initDb() {
       applied_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP::text)
     );
 
+    CREATE TABLE IF NOT EXISTS admin_audit_logs (
+      id TEXT PRIMARY KEY,
+      actor_user_id TEXT NOT NULL,
+      actor_name TEXT,
+      action TEXT NOT NULL,
+      target_type TEXT,
+      target_id TEXT,
+      details TEXT NOT NULL DEFAULT '{}',
+      ip_address TEXT,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS system_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_by TEXT,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_created_at ON admin_audit_logs(created_at DESC);
+
     CREATE INDEX IF NOT EXISTS idx_events_calendar ON events(calendar_id, date);
     CREATE INDEX IF NOT EXISTS idx_calendar_members_user ON calendar_members(user_id);
     CREATE INDEX IF NOT EXISTS idx_kanban_tasks_board ON kanban_tasks(board_id, parent_task_id, column_id, position);
@@ -374,10 +395,23 @@ async function transaction(callback) {
   }
 }
 
+function getPoolStats() {
+  if (!pool) {
+    return { connected: false, totalCount: 0, idleCount: 0, waitingCount: 0, database: process.env.PGDATABASE || 'agenda' };
+  }
+  return {
+    connected: true,
+    totalCount: pool.totalCount,
+    idleCount: pool.idleCount,
+    waitingCount: pool.waitingCount,
+    database: process.env.PGDATABASE || 'agenda',
+  };
+}
+
 async function closeDb() {
   if (!pool) return;
   await pool.end();
   pool = null;
 }
 
-module.exports = { initDb, all, get, run, transaction, closeDb, connectionConfig };
+module.exports = { initDb, all, get, run, transaction, closeDb, connectionConfig, getPoolStats };

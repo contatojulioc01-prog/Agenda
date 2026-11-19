@@ -1,4 +1,4 @@
-import { Injectable, signal, inject } from '@angular/core';
+import { Injectable, signal, computed, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Observable, of, forkJoin, throwError } from 'rxjs';
@@ -24,6 +24,65 @@ export class AuthService {
   allUsers = signal<UserResponse[]>([]);
   isLoading = signal<boolean>(false);
   isAuthenticated = signal<boolean>(!!this.initialToken);
+  isDev = computed<boolean>(() => this.hasRole('DEV'));
+
+  /** Normaliza roles vindas do SSO (string[] ou Array<{ id, name }>) */
+  private normalizeRoles(rawRoles: any): string[] {
+    if (!Array.isArray(rawRoles)) return [];
+    const result: string[] = [];
+    for (const item of rawRoles) {
+      if (typeof item === 'string' && item.trim()) {
+        result.push(item.trim());
+      } else if (item && typeof item === 'object') {
+        const candidate = item.name || item.role || item.code || item.label;
+        if (typeof candidate === 'string' && candidate.trim()) {
+          result.push(candidate.trim());
+        }
+      }
+    }
+    return Array.from(new Set(result));
+  }
+
+  hasRole(role: string): boolean {
+    const target = String(role || '').trim().toUpperCase();
+    if (!target) return false;
+    const roles = this.currentUser()?.roles || [];
+    return roles.some(r => String(r || '').trim().toUpperCase() === target);
+  }
+
+  /** Garante que o perfil do usuário (incluindo roles do SSO) esteja carregado para guards de rota */
+  ensureUserLoaded(): Observable<UserProfile | null> {
+    const existing = this.currentUser();
+    if (existing && existing.roles && existing.roles.length > 0) {
+      return of(existing);
+    }
+    if (!this.getToken()) {
+      return of(null);
+    }
+    return this.fetchMe().pipe(
+      map(me => {
+        const meAny = me as any;
+        const meData = me?.data || meAny?.user || meAny;
+        if (!meData || !(meData.id || meData.email)) return this.currentUser();
+        const roles = this.normalizeRoles(meData.roles || meAny.roles || []);
+        const profile: UserProfile = {
+          id: meData.id || meAny.id || existing?.id || '',
+          email: meData.email || meAny.email || existing?.email || '',
+          roles,
+          permissions: meData.permissions || meAny.permissions || existing?.permissions || [],
+          name: meData.name || meAny.name || existing?.name || 'Usuário',
+          avatar: meData.avatar || meAny.avatar || existing?.avatar || DEFAULT_AVATAR,
+          departamentName: meData.departament?.name || meData.departamentName || existing?.departamentName || 'Geral',
+        };
+        if (profile.id) {
+          this.currentUser.set(profile);
+          this.isAuthenticated.set(true);
+        }
+        return this.currentUser();
+      }),
+      catchError(() => of(this.currentUser()))
+    );
+  }
 
   constructor() {
     const currentToken = this.token();
@@ -81,7 +140,7 @@ export class AuthService {
             const profile: UserProfile = {
               id: meData.id || meData.userId || '',
               email: meData.email || '',
-              roles: meData.roles || [],
+              roles: this.normalizeRoles(meData.roles || res.roles || []),
               permissions: meData.permissions || [],
               name: meData.name || meData.email?.split('@')[0] || 'Usuário',
               avatar: meData.avatar || DEFAULT_AVATAR,
@@ -165,7 +224,7 @@ export class AuthService {
           const profile: UserProfile = {
             id: resolvedUserId,
             email: userEmail || matchingUser?.email || '',
-            roles: meData?.roles || meAny.roles || [],
+            roles: this.normalizeRoles(meData?.roles || meAny.roles || matchingUser?.roles || []),
             permissions: meData?.permissions || meAny.permissions || [],
             name: meData?.name || meAny.name || matchingUser?.name || userEmail.split('@')[0] || 'Usuário',
             avatar: avatarUrl,

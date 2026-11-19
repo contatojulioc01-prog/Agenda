@@ -5036,3 +5036,50 @@ body.dragging-active * {
     }
   }
 }
+
+
+/* ══════════════════════════════════════════════════════════════════
+   RESPONSIVIDADE GLOBAL DA APLICAÇÃO (DESKTOP / TABLET / MOBILE)
+   ══════════════════════════════════════════════════════════════════ */
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+@media (max-width: 900px) {
+  .cdk-overlay-pane {
+    max-width: calc(100vw - 16px) !important;
+  }
+
+  .mat-mdc-dialog-container,
+  .mat-mdc-dialog-surface {
+    max-width: calc(100vw - 16px) !important;
+    max-height: 92dvh !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .cdk-overlay-pane {
+    max-width: calc(100vw - 12px) !important;
+  }
+
+  .mat-mdc-dialog-container,
+  .mat-mdc-dialog-surface {
+    max-width: calc(100vw - 12px) !important;
+    max-height: 94dvh !important;
+    border-radius: 14px !important;
+  }
+
+  .mat-mdc-menu-panel {
+    max-width: calc(100vw - 16px) !important;
+  }
+
+  /* Garante scroll horizontal suave em tabelas e grades de calendário no mobile */
+  .month-grid,
+  .week-grid-container,
+  .day-grid-container,
+  .kanban-columns-container {
+    -webkit-overflow-scrolling: touch;
+  }
+}

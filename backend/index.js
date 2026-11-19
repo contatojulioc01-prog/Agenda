@@ -27,6 +27,17 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { initDb, closeDb } = require('./db');
 const { authenticateSocket } = require('./realtime-auth');
+const { LogBuffer } = require('./services/log-buffer');
+const {
+  createAdminRouter,
+  normalizeRoles,
+  hasDevRole,
+  requireDevRole,
+  getMaintenanceBanner,
+} = require('./routes/admin');
+
+const logBuffer = new LogBuffer();
+logBuffer.installConsoleCapture();
 
 const PORT = process.env.PORT || 9900;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -43,7 +54,7 @@ const DEV_USER = {
   departamentId: 'dev-local',
   departamentName: 'Desenvolvimento',
   departament: { id: 'dev-local', name: 'Desenvolvimento' },
-  roles: ['admin'],
+  roles: ['admin', 'DEV'],
   permissions: ['*'],
 };
 
@@ -151,7 +162,7 @@ app.use(cors({
     }
     return callback(null, false);
   },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id', 'x-device-key', 'x-file-name', 'x-file-type', 'MCP-Protocol-Version', 'Mcp-Session-Id', 'Last-Event-ID'],
   exposedHeaders: ['MCP-Protocol-Version', 'Mcp-Session-Id'],
   credentials: true,
@@ -211,9 +222,23 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 2500) {
   }
 }
 
-function extractAuthenticatedUserId(payload) {
+function extractAuthenticatedSession(payload) {
   const value = payload?.data?.user || payload?.data || payload?.user || payload;
-  return value?.id ? String(value.id) : '';
+  const userId = value?.id ? String(value.id) : '';
+  if (!userId) return null;
+  const rawRoles = value?.roles || payload?.roles || payload?.data?.roles || [];
+  const roles = normalizeRoles(rawRoles);
+  return {
+    userId,
+    roles,
+    name: String(value?.name || value?.email || ''),
+    email: String(value?.email || ''),
+    isDev: hasDevRole(roles),
+  };
+}
+
+function extractAuthenticatedUserId(payload) {
+  return extractAuthenticatedSession(payload)?.userId || '';
 }
 
 async function validateSsoTicketWithPortal(ticket) {
@@ -245,41 +270,65 @@ async function validateSsoTicketWithPortal(ticket) {
   return null;
 }
 
-async function validateUserToken(token) {
+async function fetchSsoMeProfile(cleanToken) {
+  const headers = { Authorization: `Bearer ${cleanToken}` };
+  if (SSO_API_KEY) headers['X-Api-Key'] = SSO_API_KEY;
+
+  let response = null;
+  if (SSO_API_KEY) {
+    try {
+      response = await fetchWithTimeout(`${PORTAL_API}/api/apikey/me`, { headers });
+    } catch {}
+  }
+  if (!response || !response.ok) {
+    response = await fetchWithTimeout(`${PORTAL_API}/api/auth/me`, { headers: { Authorization: `Bearer ${cleanToken}` } });
+  }
+  if (response && response.ok) {
+    return extractAuthenticatedSession(await response.json());
+  }
+  return null;
+}
+
+async function validateUserSession(token) {
   if (!token) return null;
   const cleanToken = String(token).replace(/^Bearer\s+/i, '').trim();
   if (!cleanToken) return null;
-  if (isDevToken(cleanToken)) return DEV_USER.id;
+  if (isDevToken(cleanToken)) {
+    const roles = normalizeRoles(DEV_USER.roles);
+    return {
+      userId: DEV_USER.id,
+      roles,
+      name: DEV_USER.name,
+      email: DEV_USER.email,
+      isDev: hasDevRole(roles),
+    };
+  }
 
   let cached = authCache.get(cleanToken);
   if (!cached || cached.expiresAt <= Date.now()) {
     try {
       // 1. Tenta validar via POST /api/apikey/validate-token
       const ssoValidation = await validateSsoTicketWithPortal(cleanToken);
-      let authenticatedUserId = extractAuthenticatedUserId(ssoValidation);
+      let session = extractAuthenticatedSession(ssoValidation);
 
-      // 2. Se não retornou via validate-token, tenta /api/apikey/me ou /api/auth/me
-      if (!authenticatedUserId) {
-        const headers = { Authorization: `Bearer ${cleanToken}` };
-        if (SSO_API_KEY) headers['X-Api-Key'] = SSO_API_KEY;
-
-        let response = null;
-        if (SSO_API_KEY) {
-          try {
-            response = await fetchWithTimeout(`${PORTAL_API}/api/apikey/me`, { headers });
-          } catch {}
-        }
-        if (!response || !response.ok) {
-          response = await fetchWithTimeout(`${PORTAL_API}/api/auth/me`, { headers: { Authorization: `Bearer ${cleanToken}` } });
-        }
-
-        if (response && response.ok) {
-          authenticatedUserId = extractAuthenticatedUserId(await response.json());
+      // 2. Se não retornou via validate-token ou não trouxe roles, consulta /api/apikey/me ou /api/auth/me
+      if (!session || session.roles.length === 0) {
+        const meSession = await fetchSsoMeProfile(cleanToken);
+        if (meSession) {
+          session = session
+            ? {
+                ...session,
+                roles: meSession.roles.length ? meSession.roles : session.roles,
+                name: meSession.name || session.name,
+                email: meSession.email || session.email,
+                isDev: hasDevRole(meSession.roles.length ? meSession.roles : session.roles),
+              }
+            : meSession;
         }
       }
 
-      if (!authenticatedUserId) return null;
-      cached = { userId: authenticatedUserId, expiresAt: Date.now() + 300000 };
+      if (!session?.userId) return null;
+      cached = { ...session, cachedAt: Date.now(), expiresAt: Date.now() + 300000 };
       if (authCache.size >= 500) authCache.delete(authCache.keys().next().value);
       authCache.set(cleanToken, cached);
     } catch (error) {
@@ -287,7 +336,12 @@ async function validateUserToken(token) {
       return null;
     }
   }
-  return cached?.userId || null;
+  return cached?.userId ? cached : null;
+}
+
+async function validateUserToken(token) {
+  const session = await validateUserSession(token);
+  return session?.userId || null;
 }
 
 async function authenticateAgendaRequest(req, res, next) {
@@ -296,17 +350,24 @@ async function authenticateAgendaRequest(req, res, next) {
   if (!token) return res.status(401).json({ error: 'Autenticação obrigatória' });
 
   try {
-    const authenticatedUserId = await validateUserToken(token);
-    if (!authenticatedUserId) return res.status(401).json({ error: 'Sessão inválida ou expirada' });
+    const session = await validateUserSession(token);
+    if (!session?.userId) return res.status(401).json({ error: 'Sessão inválida ou expirada' });
 
     const requestedUserId = String(req.headers['x-user-id'] || '');
-    if (requestedUserId && requestedUserId !== authenticatedUserId) return res.status(403).json({ error: 'Identidade da requisição não corresponde à sessão' });
-    req.headers['x-user-id'] = authenticatedUserId;
+    if (requestedUserId && requestedUserId !== session.userId) return res.status(403).json({ error: 'Identidade da requisição não corresponde à sessão' });
+    req.headers['x-user-id'] = session.userId;
+    req.user = {
+      id: session.userId,
+      roles: session.roles,
+      name: session.name,
+      email: session.email,
+      isDev: session.isDev,
+    };
     req.auth = {
       token: 'validated-by-agenda',
-      clientId: authenticatedUserId,
+      clientId: session.userId,
       scopes: ['agenda:read', 'agenda:write'],
-      extra: { userId: authenticatedUserId },
+      extra: { userId: session.userId, roles: session.roles, isDev: session.isDev },
     };
     next();
   } catch (error) {
@@ -367,9 +428,9 @@ app.post('/api/auth/sso-login', async (req, res) => {
     const ssoResult = await validateSsoTicketWithPortal(ticket);
     if (ssoResult && (ssoResult.success || ssoResult.data)) {
       const userData = ssoResult.data || ssoResult;
-      const userId = extractAuthenticatedUserId(ssoResult);
-      if (userId) {
-        authCache.set(ticket, { userId, expiresAt: Date.now() + 300000 });
+      const session = extractAuthenticatedSession(ssoResult);
+      if (session?.userId && session.roles.length > 0) {
+        authCache.set(ticket, { ...session, cachedAt: Date.now(), expiresAt: Date.now() + 300000 });
       }
       return res.json({
         success: true,
@@ -381,14 +442,14 @@ app.post('/api/auth/sso-login', async (req, res) => {
     }
 
     // Fallback: tenta validar se o ticket fornecido for um token JWT direto
-    const userId = await validateUserToken(ticket);
-    if (userId) {
+    const session = await validateUserSession(ticket);
+    if (session?.userId) {
       return res.json({
         success: true,
         message: 'Token validado com sucesso',
         token: ticket,
-        data: { id: userId },
-        user: { id: userId }
+        data: { id: session.userId, name: session.name, email: session.email, roles: session.roles },
+        user: { id: session.userId, name: session.name, email: session.email, roles: session.roles }
       });
     }
 
@@ -565,6 +626,24 @@ initDb().then(async () => {
   app.use('/api/notifications', authenticateAgendaRequest, notifications.router);
   app.use('/api/privacy', authenticateAgendaRequest, privacyRouter);
   app.use('/api/ai', authenticateAgendaRequest, aiRouter);
+  app.get('/api/system/banner', authenticateAgendaRequest, async (_req, res, next) => {
+    try {
+      res.json(await getMaintenanceBanner());
+    } catch (error) {
+      next(error);
+    }
+  });
+  const adminRouter = createAdminRouter({
+    wss,
+    realtimeClients,
+    authCache,
+    broadcast,
+    appVersion: APP_VERSION,
+    portalApi: PORTAL_API,
+    ssoApiKey: SSO_API_KEY,
+    logBuffer,
+  });
+  app.use('/api/admin', authenticateAgendaRequest, requireDevRole, adminRouter);
   routesReady = true;
   console.log('[ROUTES] Todos os roteadores registrados com sucesso.');
 
