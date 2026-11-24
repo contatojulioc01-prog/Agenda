@@ -5,9 +5,10 @@
 
 <div class="page-layout" (click)="closeCalendarContextMenus()">
 
+  <div class="sidebar-backdrop" *ngIf="!sidebarCollapsed()" (click)="toggleSidebar()"></div>
+
   <!-- ══════════════ SIDEBAR ══════════════ -->
   <aside class="sidebar" [class.collapsed]="sidebarCollapsed()">
-    <div class="sidebar-backdrop" *ngIf="!sidebarCollapsed()" (click)="toggleSidebar()"></div>
     <div class="sidebar-top">
       <!-- Header com Marca e Botão de Expandir/Recolher -->
       <div class="sidebar-header-row">
@@ -540,10 +541,10 @@
     </div>
   </div>
   <div class="main-area tasks-main" [hidden]="activeSection !== 'tasks'">
-    <app-kanban-board></app-kanban-board>
+    <app-kanban-board (menuToggle)="toggleSidebar()"></app-kanban-board>
   </div>
   <div class="main-area mural-main" [hidden]="activeSection !== 'mural'">
-    <app-mural-board></app-mural-board>
+    <app-mural-board (menuToggle)="toggleSidebar()"></app-mural-board>
   </div>
 </div>
 

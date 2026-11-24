@@ -17,6 +17,9 @@
 
   <header class="kanban-toolbar group-panel" *ngIf="!isFullscreen()">
     <div class="board-heading">
+      <button type="button" class="mobile-menu-toggle" (click)="menuToggle.emit()" aria-label="Abrir menu">
+        <mat-icon>menu</mat-icon>
+      </button>
       <span class="board-mark"
         [style.background]="board()?.color || 'var(--brand-500)'"><mat-icon>view_kanban</mat-icon></span>
       <div class="board-meta-col">

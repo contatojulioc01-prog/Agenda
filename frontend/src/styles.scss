@@ -2976,6 +2976,7 @@ app-calendar-page {
 }
 
 .month-dow-cell {
+  min-width: 0;
   padding: 10px 14px 8px;
   text-align: center;
   font-size: 11px;
@@ -3010,13 +3011,25 @@ app-calendar-page {
   display: flex;
   flex-direction: column;
   position: relative;
-  flex: 1;
-  min-height: 112px;
+  flex: 1 1 0%;
+  min-height: 0;
   border-bottom: 1px solid var(--border-grid);
 
   &:last-child {
     border-bottom: none;
   }
+}
+
+.month-grid.compact-bars .month-event-bar {
+  height: 18px;
+  font-size: 11px;
+  padding: 0 6px;
+}
+
+.month-grid.compact-bars .month-more-btn {
+  height: 18px;
+  line-height: 18px;
+  font-size: 10.5px;
 }
 
 .week-cells-layer {
@@ -3035,6 +3048,8 @@ app-calendar-page {
   background: var(--bg-surface);
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
   padding: 6px 8px;
   cursor: pointer;
   position: relative;
@@ -5047,6 +5062,12 @@ body {
   overflow-x: hidden;
 }
 
+@media (max-height: 520px) {
+  .month-week-row {
+    min-height: 68px;
+  }
+}
+
 @media (max-width: 900px) {
   .cdk-overlay-pane {
     max-width: calc(100vw - 16px) !important;
@@ -5056,6 +5077,29 @@ body {
   .mat-mdc-dialog-surface {
     max-width: calc(100vw - 16px) !important;
     max-height: 92dvh !important;
+  }
+
+  .month-dow-cell {
+    padding: 8px 6px 6px;
+  }
+
+  .day-cell {
+    padding: 4px 5px;
+  }
+
+  .view-week {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .week-header,
+  .week-body {
+    min-width: 640px;
+  }
+
+  .week-multiday-layer {
+    min-width: calc(640px - 56px);
   }
 }
 
@@ -5073,6 +5117,85 @@ body {
 
   .mat-mdc-menu-panel {
     max-width: calc(100vw - 16px) !important;
+  }
+
+  .month-week-row {
+    min-height: 68px;
+  }
+
+  .month-dow-cell {
+    padding: 6px 2px;
+    font-size: 10px;
+    letter-spacing: 0.03em;
+  }
+
+  .day-cell {
+    padding: 3px;
+  }
+
+  .day-number {
+    width: 22px;
+    height: 22px;
+    font-size: 11px;
+  }
+
+  .holiday-tag {
+    max-width: calc(100% - 24px);
+    padding: 1px 3px;
+
+    .holiday-name {
+      display: none;
+    }
+  }
+
+  .month-event-bar {
+    height: 18px;
+    padding: 0 4px;
+    font-size: 10px;
+    gap: 2px;
+
+    .bar-time {
+      display: none;
+    }
+  }
+
+  .month-more-btn {
+    height: 18px;
+    line-height: 18px;
+    padding: 0 4px;
+    font-size: 10px;
+  }
+
+  .week-header,
+  .week-body {
+    grid-template-columns: 44px repeat(7, 1fr);
+    min-width: 580px;
+  }
+
+  .week-multiday-layer {
+    left: 44px;
+    min-width: calc(580px - 44px);
+  }
+
+  .day-header-bar {
+    padding: 10px 12px;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .day-num {
+    width: 34px;
+    height: 34px;
+    font-size: 18px;
+  }
+
+  .day-body {
+    grid-template-columns: 44px 1fr;
+  }
+
+  .time-label {
+    padding: 2px 4px 0;
+    font-size: 10px;
   }
 
   /* Garante scroll horizontal suave em tabelas e grades de calendário no mobile */

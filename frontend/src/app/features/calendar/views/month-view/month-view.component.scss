@@ -31,8 +31,8 @@
 
 .day-popover-card {
   position: absolute;
-  width: 280px;
-  max-height: 360px;
+  width: min(280px, calc(100vw - 20px));
+  max-height: min(360px, calc(100dvh - 24px));
   background: var(--bg-surface, #ffffff);
   border: 1px solid var(--border-color, #cbd5e1);
   border-radius: 12px;

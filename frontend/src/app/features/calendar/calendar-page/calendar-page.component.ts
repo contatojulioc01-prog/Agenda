@@ -139,7 +139,11 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
   readonly collapsedSidebarSections = signal<Set<string>>(
     new Set(this.userPreferences.collapsedSidebarSections())
   );
-  readonly sidebarCollapsed = signal<boolean>(this.userPreferences.sidebarCollapsed());
+  readonly sidebarCollapsed = signal<boolean>(
+    typeof window !== 'undefined' && window.innerWidth <= 868
+      ? true
+      : this.userPreferences.sidebarCollapsed()
+  );
   readonly agendaPillsExpanded = signal(this.userPreferences.agendaPillsExpanded());
   readonly notificationSettingsOpen = signal(false);
   readonly notificationPopoverOpen = signal(false);
@@ -609,6 +613,9 @@ export class CalendarPageComponent implements OnInit, OnDestroy {
     this.navigateToCalendar();
   }
   setSection(section: 'calendar' | 'tasks' | 'mural'): void {
+    if (typeof window !== 'undefined' && window.innerWidth <= 868) {
+      this.sidebarCollapsed.set(true);
+    }
     if (section === 'tasks') {
       const boardId = this.kanbanService.activeBoard()?.id;
       void this.router.navigate(boardId ? ['/tarefas', boardId] : ['/tarefas']);

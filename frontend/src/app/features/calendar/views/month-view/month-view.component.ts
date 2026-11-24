@@ -1,5 +1,5 @@
 import {
-  Component, Input, Output, EventEmitter, OnChanges, OnInit, SimpleChanges
+  AfterViewInit, ChangeDetectorRef, Component, ElementRef, EventEmitter, HostListener, Input, NgZone, OnChanges, OnDestroy, OnInit, Output, SimpleChanges, ViewChild, inject
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
@@ -40,7 +40,12 @@ export interface MonthWeek {
   templateUrl: './month-view.component.html',
   styleUrl: './month-view.component.scss',
 })
-export class MonthViewComponent implements OnInit, OnChanges {
+export class MonthViewComponent implements OnInit, OnChanges, AfterViewInit, OnDestroy {
+  private readonly cdr = inject(ChangeDetectorRef);
+  private readonly ngZone = inject(NgZone);
+
+  @ViewChild('monthGrid') monthGridRef?: ElementRef<HTMLElement>;
+
   @Input() year: number = new Date().getFullYear();
   @Input() month: number = new Date().getMonth();
   @Input() events: CalendarEvent[] = [];
@@ -53,7 +58,12 @@ export class MonthViewComponent implements OnInit, OnChanges {
 
   readonly DOW = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
   readonly colorMap = EVENT_COLOR_MAP;
-  readonly MAX_VISIBLE_SLOTS = 3;
+  maxVisibleSlots = 3;
+  headerOffset = 32;
+  slotHeight = 24;
+  compactBars = false;
+
+  private resizeObserver?: ResizeObserver;
 
   monthWeeks: MonthWeek[] = [];
   dragEventId: string | null = null;
@@ -66,7 +76,8 @@ export class MonthViewComponent implements OnInit, OnChanges {
       const end = e.endDate || e.date;
       return e.date <= day.dateStr && end >= day.dateStr;
     });
-    const x = Math.min(window.innerWidth - 300, Math.max(10, ev.clientX - 100));
+    const popoverWidth = Math.min(280, window.innerWidth - 20);
+    const x = Math.min(window.innerWidth - popoverWidth - 10, Math.max(10, ev.clientX - 100));
     const y = Math.min(window.innerHeight - 350, Math.max(10, ev.clientY - 40));
     this.dayPopover = {
       dateStr: day.dateStr,
@@ -85,15 +96,78 @@ export class MonthViewComponent implements OnInit, OnChanges {
     return (this.events || []).filter(e => {
       const end = e.endDate || e.date;
       return e.date <= dayDateStr && end >= dayDateStr;
-    }).length - week.segments.filter(s => s.startCol <= dayCol && (s.startCol + s.span - 1) >= dayCol && s.rowSlot < this.MAX_VISIBLE_SLOTS).length;
+    }).length - week.segments.filter(s => s.startCol <= dayCol && (s.startCol + s.span - 1) >= dayCol && s.rowSlot < this.maxVisibleSlots).length;
   }
 
   ngOnInit(): void {
     this.build();
   }
 
+  ngAfterViewInit(): void {
+    this.updateLayoutMetrics();
+    const gridEl = this.monthGridRef?.nativeElement;
+    if (gridEl && typeof ResizeObserver !== 'undefined') {
+      this.resizeObserver = new ResizeObserver(() => {
+        this.ngZone.run(() => this.updateLayoutMetrics());
+      });
+      this.resizeObserver.observe(gridEl);
+    }
+  }
+
+  ngOnDestroy(): void {
+    this.resizeObserver?.disconnect();
+  }
+
+  @HostListener('window:resize')
+  onWindowResize(): void {
+    this.updateLayoutMetrics();
+  }
+
   ngOnChanges(changes: SimpleChanges): void {
     this.build();
+    this.updateLayoutMetrics();
+  }
+
+  private updateLayoutMetrics(): void {
+    const gridEl = this.monthGridRef?.nativeElement;
+    if (!gridEl) return;
+    const gridHeight = gridEl.clientHeight;
+    const weekCount = Math.max(1, this.monthWeeks.length);
+    if (gridHeight <= 0) return;
+
+    const rowHeight = gridHeight / weekCount;
+    const isNarrow = typeof window !== 'undefined' && window.innerWidth <= 640;
+
+    let nextHeaderOffset = 32;
+    let nextSlotHeight = 24;
+    let nextCompact = false;
+
+    if (isNarrow || rowHeight < 86) {
+      nextHeaderOffset = isNarrow ? 24 : 26;
+      nextSlotHeight = 20;
+      nextCompact = true;
+    } else if (rowHeight < 108) {
+      nextHeaderOffset = 28;
+      nextSlotHeight = 22;
+      nextCompact = true;
+    }
+
+    const moreBtnHeight = 20;
+    const availableForBars = Math.max(0, rowHeight - nextHeaderOffset - moreBtnHeight);
+    const nextMaxSlots = Math.max(1, Math.min(4, Math.floor(availableForBars / nextSlotHeight)));
+
+    if (
+      this.maxVisibleSlots !== nextMaxSlots ||
+      this.headerOffset !== nextHeaderOffset ||
+      this.slotHeight !== nextSlotHeight ||
+      this.compactBars !== nextCompact
+    ) {
+      this.maxVisibleSlots = nextMaxSlots;
+      this.headerOffset = nextHeaderOffset;
+      this.slotHeight = nextSlotHeight;
+      this.compactBars = nextCompact;
+      this.cdr.markForCheck();
+    }
   }
 
   private build(): void {

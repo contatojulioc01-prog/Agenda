@@ -4,6 +4,9 @@
   <div class="mural-toolbar group-panel">
 
     <div class="toolbar-left">
+      <button type="button" class="mobile-menu-toggle" (click)="menuToggle.emit()" aria-label="Abrir menu">
+        <mat-icon>menu</mat-icon>
+      </button>
       <!-- Board Selector com Angular Material Menu -->
       <div class="board-selector-wrapper">
         <button

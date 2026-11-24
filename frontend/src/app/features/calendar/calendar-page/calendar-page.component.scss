@@ -1772,6 +1772,22 @@
   }
 }
 
+@media (max-height: 760px) {
+  .main-area {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  .header-panel {
+    padding: 8px 14px;
+    gap: 6px;
+  }
+
+  .calendar-panel {
+    margin-bottom: 0;
+  }
+}
+
 @media (max-width: 1024px) {
   .main-area {
     padding: 12px;
@@ -1798,6 +1814,10 @@
     padding: 8px;
     gap: 8px;
     width: 100%;
+  }
+
+  .calendar-panel {
+    margin-bottom: 0;
   }
 }
 

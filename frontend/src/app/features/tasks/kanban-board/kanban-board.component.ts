@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnDestroy, computed, effect, inject, signal } from '@angular/core';
+import { Component, EventEmitter, OnDestroy, Output, computed, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
 import { MatIconModule } from '@angular/material/icon';
@@ -63,6 +63,7 @@ export const DEFAULT_TABLE_COLUMNS: TableColumnDef[] = [
   styleUrl: './kanban-board.component.scss',
 })
 export class KanbanBoardComponent implements OnDestroy {
+  @Output() menuToggle = new EventEmitter<void>();
   readonly service = inject(KanbanService);
   readonly auth = inject(AuthService);
   private readonly router = inject(Router);

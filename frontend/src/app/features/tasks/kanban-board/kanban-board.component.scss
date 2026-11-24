@@ -2258,7 +2258,28 @@ input,select,textarea { border:1px solid var(--border); border-radius:8px; backg
 .single-check-group-title { font-size: 11px; font-weight: 750; color: #475569; margin: 8px 0 3px; padding: 3px 6px; border-left: 3px solid #4f46e5; letter-spacing: .03em; text-transform: uppercase; }
 .single-check-item-grouped { padding-left: 14px; }
 .task-modal > footer { display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 18px;border-top:1px solid var(--border-light) }.task-modal > footer>div{display:flex;gap:7px}.archive-btn{color:var(--text-secondary);background:var(--bg-hover)}.delete-btn{color:#ef4444;background:rgba(239,68,68,.1)}
+.mobile-menu-toggle {
+  display: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+
+  mat-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+  }
+}
+
 @media(max-width:900px){.filter-stat{margin-left:0}.kanban-toolbar{align-items:flex-start}.toolbar-actions .secondary-btn{font-size:0}.toolbar-actions .secondary-btn mat-icon{font-size:18px}.kanban-column{width:270px;flex-basis:270px}}
+@media(max-width:868px){.mobile-menu-toggle{display:inline-flex}.integrated-workspace-tabs{display:none}.kanban-toolbar{flex-wrap:wrap;gap:10px}}
 @media(max-width:680px){.kanban-filters{height:auto !important;max-height:none !important;flex-wrap:wrap !important;gap:8px !important;padding:8px 10px !important}.search-box{flex:1 1 100% !important;margin:0 !important;order:3}}
 @media(max-width:600px){
   .kanban-toolbar{flex-wrap:wrap;min-height:auto;padding:10px 12px;gap:10px}
@@ -2269,6 +2290,9 @@ input,select,textarea { border:1px solid var(--border); border-radius:8px; backg
   .task-modal{max-height:95vh;border-radius:12px}
   .task-modal>footer{align-items:stretch;flex-direction:column;gap:8px;padding:10px 14px}
   .task-modal>footer>div{justify-content:space-between;flex-wrap:wrap;gap:6px}
+  .notion-table-header {
+    display: none !important;
+  }
   .notion-table-row {
     flex-direction: column !important;
     align-items: stretch !important;

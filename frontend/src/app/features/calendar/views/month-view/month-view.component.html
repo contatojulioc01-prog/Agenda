@@ -9,7 +9,7 @@
   </div>
 
   <!-- Grade do mês dividida em linhas de semanas -->
-  <div class="month-grid">
+  <div class="month-grid" #monthGrid [class.compact-bars]="compactBars">
     <div *ngFor="let week of monthWeeks" class="month-week-row">
       <!-- Camada de Células de Fundo (7 colunas) -->
       <div class="week-cells-layer">
@@ -42,7 +42,7 @@
       <div class="week-events-layer">
         <ng-container *ngFor="let seg of week.segments">
           <div
-            *ngIf="seg.rowSlot < MAX_VISIBLE_SLOTS"
+            *ngIf="seg.rowSlot < maxVisibleSlots"
             class="month-event-bar"
             [class.bar-start]="seg.isStart"
             [class.bar-end]="seg.isEnd"
@@ -50,7 +50,7 @@
             [class.system-event]="seg.event.isSystem"
             [class.task-deadline]="seg.event.isTaskDeadline"
             [style.grid-column]="(seg.startCol + 1) + ' / span ' + seg.span"
-            [style.top.px]="32 + seg.rowSlot * 24"
+            [style.top.px]="headerOffset + seg.rowSlot * slotHeight"
             [style.background]="colorMap[seg.event.color]"
             [attr.draggable]="seg.event.isSystem || (seg.event.endDate && seg.event.endDate !== seg.event.date) ? null : true"
             (dragstart)="onDragStart($event, seg.event)"
@@ -73,7 +73,7 @@
             type="button"
             class="month-more-btn"
             [style.grid-column]="dayCol + 1"
-            [style.top.px]="32 + MAX_VISIBLE_SLOTS * 24"
+            [style.top.px]="headerOffset + maxVisibleSlots * slotHeight"
             (click)="openDayMore(day, $event)"
             matTooltip="Ver todos os eventos deste dia">
             +{{ getHiddenCountForDay(week, dayCol, day.dateStr) }} mais

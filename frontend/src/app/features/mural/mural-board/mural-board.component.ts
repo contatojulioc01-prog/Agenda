@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject, signal, computed, effect } from '@angular/core';
+import { Component, EventEmitter, OnInit, OnDestroy, Output, inject, signal, computed, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -48,6 +48,7 @@ import { detectFileType } from '../../../core/utils/code-highlight.util';
   styleUrl: './mural-board.component.scss',
 })
 export class MuralBoardComponent implements OnInit, OnDestroy {
+  @Output() menuToggle = new EventEmitter<void>();
   readonly muralService = inject(MuralService);
   readonly kanbanService = inject(KanbanService);
   readonly auth = inject(AuthService);
